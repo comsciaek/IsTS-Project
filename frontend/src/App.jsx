@@ -1,4 +1,9 @@
-import { Routes, Route } from "react-router";
+import {
+  
+  Routes,
+  Route,
+  useParams,
+} from "react-router"; // Correct import
 import Login from "./pages/Login";
 import RootLayout from "./layout/RootLayout";
 import Register from "./pages/Register";
@@ -10,16 +15,25 @@ import Messages from "./pages/Messages";
 import Reports from "./pages/Reports";
 import ForgotPassword from "./pages/ForgotPassword";
 import Overview from "./pages/Overview";
-import ManageRoles from "./pages/ManageRoles"; // Import UserRoles
+import ManageRoles from "./pages/ManageRoles";
+import ResetPasswordForm from "./pages/ResetPasswordForm";
+
+const ResetSetup = () => {
+  const { "*": token } = useParams();
+
+  return <ForgotPassword token={token} />;
+};
 
 const App = () => {
   return (
     <Routes>
       <Route path="/" element={<RootLayout />}>
-        {/* Public Routes */}
+        {/* /* Public Routes */}
         <Route path="login" element={<Login />} />
         <Route path="register" element={<Register />} />
         <Route path="forgot-password" element={<ForgotPassword />} />
+        <Route path="reset-password" element={<ResetPasswordForm />} />
+        <Route path="/reset/*" element={<ResetSetup />} />
         {/* Protected Routes */}
         <Route element={<DashboardLayout />}>
           <Route index element={<Overview />} />
@@ -28,7 +42,6 @@ const App = () => {
           <Route path="reports" element={<Reports />} />
           <Route path="settings" element={<Settings />} />
           <Route path="manage-roles" element={<ManageRoles />} />
-          {/* Add UserRoles route */}
         </Route>
         {/* Catch-all Route */}
         <Route path="*" element={<NotFound />} />

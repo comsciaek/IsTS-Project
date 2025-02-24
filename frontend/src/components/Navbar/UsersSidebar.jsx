@@ -24,7 +24,7 @@ const menuItems = [
   {
     key: "2",
     icon: <MessageOutlined />,
-    label: <NavLink to="/user/chat">Messages</NavLink>,
+    label: <NavLink to="/user/message">Messages</NavLink>,
   },
 ];
 

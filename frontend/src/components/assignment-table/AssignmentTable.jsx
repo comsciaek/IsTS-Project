@@ -45,7 +45,7 @@ const AssignmentTable = () => {
           id: `101 ${i}`,
           issue: `Issue ${timeRange} ${i}`,
           date: "2025-02-05",
-          employee: "John Doe",
+          name: "John Doe",
           status: "เสร็จสิ้น", // Resolved in Thai
           assignees: [
             {
@@ -125,11 +125,11 @@ const AssignmentTable = () => {
       ...SearchColumn("date", true),
     },
     {
-      title: "Employee",
-      dataIndex: "employee",
-      key: "employee",
+      title: "Emlpoyees",
+      dataIndex: "name",
+      key: "name",
       width: "10%",
-      ...SearchColumn("employee"),
+      ...SearchColumn("name"),
       render: (text) => (
         <Space>
           <Avatar

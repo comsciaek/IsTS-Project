@@ -1,6 +1,7 @@
 import { Button, Form, Input, Select, message } from "antd";
 import { useNavigate } from "react-router";
 import { useState } from "react";
+import axios from "axios";
 
 const formItemLayout = {
   labelCol: {
@@ -33,7 +34,7 @@ const RegisterForm = () => {
     email: "",
     password: "",
     confirmPassword: "",
-    phonenumber: "",
+    phoneNumber: "",
   });
 
   const handleChange = (e) => {
@@ -76,6 +77,24 @@ const RegisterForm = () => {
     { label: "101", value: "101" },
     { label: "102", value: "102" },
     { label: "103", value: "103" },
+    { label: "104", value: "104" },
+    { label: "105", value: "105" },
+    { label: "106", value: "106" },
+    { label: "107", value: "107" },
+    { label: "108", value: "108" },
+    { label: "109", value: "109" },
+    { label: "110", value: "110" },
+    { label: "111", value: "111" },
+    { label: "112", value: "112" },
+    { label: "113", value: "113" },
+    { label: "114", value: "114" },
+    { label: "115", value: "115" },
+    { label: "116", value: "116" },
+    { label: "117", value: "117" },
+    { label: "118", value: "118" },
+    { label: "119", value: "119" },
+    { label: "120", value: "120" },
+
     // Add more employee IDs as needed
   ];
 
@@ -89,7 +108,7 @@ const RegisterForm = () => {
       email,
       password,
       confirmPassword,
-      phonenumber,
+      phoneNumber,
     } = formData;
     if (
       !firstName ||
@@ -100,7 +119,7 @@ const RegisterForm = () => {
       !email ||
       !password ||
       !confirmPassword ||
-      !phonenumber
+      !phoneNumber
     ) {
       message.error("กรุณากรอกข้อมูลให้ครบทุกช่อง");
       return false;
@@ -109,28 +128,40 @@ const RegisterForm = () => {
   };
 
   const handleSubmit = async () => {
-    if (checkRequiredFields()) {
-      try {
-        const response = await fetch("http://172.18.43.39:5000/register", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
-          body: JSON.stringify(formData),
-        });
-        console.log("response", response);
-        if (response.ok) {
-          const data = await response.json();
-          message.success("Form submitted successfully:", data);
-          navigate("/login");
-        } else {
-          console.error("Form submission failed:", response.statusText);
-          message.error("การส่งแบบฟอร์มล้มเหลว กรุณาลองใหม่อีกครั้ง");
-        }
-      } catch (error) {
-        console.error("Error submitting form:", error);
-        message.error("เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง");
+    if (!checkRequiredFields()) return;
+
+    try {
+      const dataToSubmit = { ...formData };
+
+      console.log(" Sending data:", dataToSubmit);
+
+      const response = await axios.post(
+        "http://172.18.43.39:5000/api/auth/register",
+        dataToSubmit,
+        { headers: { "Content-Type": "application/json" } }
+      );
+
+      console.log(" Response received:", response);
+
+      if (response.status === 201) {
+        message.success("ลงทะเบียนสำเร็จ! กำลังนำทางไปยังหน้าล็อกอิน...");
+        navigate("/login");
+      } else {
+        message.error("เกิดข้อผิดพลาดขณะส่งแบบฟอร์ม กรุณาลองใหม่อีกครั้ง");
+      }
+    } catch (error) {
+      console.error(" Error submitting form:", error);
+
+      if (error.response) {
+        console.error(" Server Response:", error.response.data);
+
+        const errorMessage =
+          error.response.data.message || "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง";
+        message.error(errorMessage);
+      } else {
+        message.error(
+          "ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ กรุณาตรวจสอบการเชื่อมต่อ"
+        );
       }
     }
   };
@@ -239,14 +270,14 @@ const RegisterForm = () => {
           </Form.Item>
           <p>เบอร์โทรศัพท์</p>
           <Form.Item
-            name="phonenumber"
+            name="phoneNumber"
             rules={[{ required: true, message: "กรุณากรอกเบอร์โทรศัพท์!" }]}>
             <Input
-              type="phonenumber"
+              type="phoneNumber"
               placeholder="กรอกเบอร์โทรศัพท์"
               size="large"
-              name="phonenumber"
-              value={formData.phonenumber}
+              name="phoneNumber"
+              value={formData.phoneNumber}
               onChange={handleChange}
             />
           </Form.Item>

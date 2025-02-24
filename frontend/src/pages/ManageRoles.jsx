@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Layout,
   Table,
@@ -8,117 +8,39 @@ import {
   Button,
   Modal,
   Input,
+  Space,
 } from "antd";
 import { DeleteOutlined } from "@ant-design/icons";
+import axios from "axios";
 
 const { Content } = Layout;
 const { Option } = Select;
 const { Search } = Input;
 
 const ManageRoles = () => {
-  const [users, setUsers] = useState([
-    {
-      id: 1,
-      name: "John Doe",
-      email: "john@example.com",
-      role: "user",
-      avatar: "https://i.pravatar.cc/150?img=1",
-      joinedAt: "2023-01-01",
-    },
-    {
-      id: 2,
-      name: "Jane Smith",
-      email: "jane@example.com",
-      role: "admin",
-      avatar: "https://i.pravatar.cc/150?img=2",
-      joinedAt: "2023-02-01",
-    },
-    {
-      id: 3,
-      name: "Bob Johnson",
-      email: "bob@example.com",
-      role: "super-admin",
-      avatar: "https://i.pravatar.cc/150?img=3",
-      joinedAt: "2023-03-01",
-    },
-    // Add more users as needed for testing scrolling
-    {
-      id: 4,
-      name: "Alice Brown",
-      email: "alice@example.com",
-      role: "user",
-      avatar: "https://i.pravatar.cc/150?img=4",
-      joinedAt: "2023-04-01",
-    },
-    {
-      id: 5,
-      name: "Charlie Davis",
-      email: "charlie@example.com",
-      role: "admin",
-      avatar: "https://i.pravatar.cc/150?img=5",
-      joinedAt: "2023-05-01",
-    },
-    {
-      id: 6,
-      name: "Eve Foster",
-      email: "eve@example.com",
-      role: "super-admin",
-      avatar: "https://i.pravatar.cc/150?img=6",
-      joinedAt: "2023-06-01",
-    },
-    {
-      id: 7,
-      name: "Frank Green",
-      email: "frank@example.com",
-      role: "user",
-      avatar: "https://i.pravatar.cc/150?img=7",
-      joinedAt: "2023-07-01",
-    },
-    {
-      id: 8,
-      name: "Grace Hill",
-      email: "grace@example.com",
-      role: "admin",
-      avatar: "https://i.pravatar.cc/150?img=8",
-      joinedAt: "2023-08-01",
-    },
-    {
-      id: 9,
-      name: "Hank Ives",
-      email: "hank@example.com",
-      role: "super-admin",
-      avatar: "https://i.pravatar.cc/150?img=9",
-      joinedAt: "2023-09-01",
-    },
-    {
-      id: 10,
-      name: "Ivy Johnson",
-      email: "ivy@example.com",
-      role: "user",
-      avatar: "https://i.pravatar.cc/150?img=10",
-      joinedAt: "2023-10-01",
-    },
-  ]);
-
+  const [users, setUsers] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [filter, setFilter] = useState("all");
 
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const response = await axios.get("http://172.18.43.39:5000/users");
+        setUsers(response.data);
+      } catch (error) {
+        console.error("Failed to fetch users:", error);
+        message.error("Failed to fetch users");
+      }
+    };
+
+    fetchUsers();
+  }, []);
+
   const handleRoleChange = async (userId, newRole) => {
     try {
-      const response = await fetch(
-        `http://172.18.43.39:5000/api/manage-roles/${userId}/role`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ role: newRole }),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to update role");
-      }
+      await axios.put(`http://172.18.43.39:5000/manage-roles/${userId}/role`, {
+        role: newRole,
+      });
 
       setUsers((prevUsers) =>
         prevUsers.map((user) =>
@@ -135,9 +57,18 @@ const ManageRoles = () => {
   const handleDeleteUser = (userId) => {
     Modal.confirm({
       title: "Are you sure you want to delete this user?",
-      onOk: () => {
-        setUsers((prevUsers) => prevUsers.filter((user) => user.id !== userId));
-        message.success("User deleted successfully");
+      onOk: async () => {
+        try {
+          await axios.delete(`http://172.18.43.39:5000/users/${userId}`);
+
+          setUsers((prevUsers) =>
+            prevUsers.filter((user) => user.id !== userId)
+          );
+          message.success("User deleted successfully");
+        } catch (error) {
+          console.error("Error:", error);
+          message.error("Failed to delete user");
+        }
       },
     });
   };
@@ -157,16 +88,16 @@ const ManageRoles = () => {
 
   const columns = [
     {
-      title: "Avatar",
-      dataIndex: "avatar",
-      key: "avatar",
-      render: (text) => <Avatar src={text} />,
-    },
-    {
       title: "Name",
       dataIndex: "name",
       key: "name",
       sorter: (a, b) => a.name.localeCompare(b.name),
+      render: (text, record) => (
+        <Space>
+          <Avatar src={record.avatar} />
+          {text}
+        </Space>
+      ),
     },
     {
       title: "Email",

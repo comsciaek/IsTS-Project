@@ -2,6 +2,8 @@ import { Button, Checkbox, Input, Form, message } from "antd";
 import { Link, useNavigate } from "react-router";
 import { useState } from "react";
 
+import axios from "axios";
+
 const onChange = (e) => {
   console.log(`checked = ${e.target.checked}`);
 };
@@ -38,15 +40,10 @@ const LoginForm = () => {
         console.log("Success:", values);
         setError("");
         // Call the API to login
-        fetch("http://172.18.43.39:5000/login", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(values),
-        })
-          .then((response) => response.json())
-          .then((data) => {
+        axios
+          .post("http://172.18.43.39:5000/api/auth/login", values)
+          .then((response) => {
+            const data = response.data;
             console.log("Data:", data);
             if (data.success) {
               console.log("Login successful:", data);

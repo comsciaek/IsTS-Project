@@ -47,7 +47,7 @@ const ContentTable = () => {
           id: `101 ${i}`,
           issue: "Login failure",
           date: "2025-02-05",
-          employee: "John Doe",
+          name: "John Doe",
           profilePic: `https://i.pravatar.cc/150?img=${i}`, // Add profile picture URL
           status: "เสร็จสิ้น", // Resolved in Thai
         }))
@@ -149,11 +149,11 @@ const ContentTable = () => {
       ...SearchColumn("date", true),
     },
     {
-      title: "Employee",
-      dataIndex: "employee",
-      key: "employee",
+      title: "Emlpoyees",
+      dataIndex: "name",
+      key: "name",
       width: "10%",
-      ...SearchColumn("employee"),
+      ...SearchColumn("name"),
       render: (text, record) => (
         <Space>
           <Avatar src={record.profilePic} />
