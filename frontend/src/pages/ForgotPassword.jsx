@@ -1,106 +1,161 @@
 import { useState } from "react";
-import { Card, Form, Input, Button, Steps, Alert, message } from "antd";
-import {
-  MailOutlined,
-  KeyOutlined,
-  CheckCircleOutlined,
-} from "@ant-design/icons";
+import { Form, Input, Button, Layout, Alert, Result } from "antd";
+import { Link } from "react-router";
 import axios from "axios";
-import ResetPasswordForm from "./ResetPasswordForm";
-import { useSearchParams, useNavigate } from "react-router";
+
+const { Content } = Layout;
 
 const ForgotPassword = () => {
-  const [step, setStep] = useState(0);
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [email, setEmail] = useState(""); // Correct useState
-  const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
-  const token = searchParams.get("token");
+  const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState("");
 
-  const requestPasswordReset = async (values) => {
+  const handleSubmit = async (values) => {
     try {
       setLoading(true);
-      setError(null);
-      await axios.post("http://172.18.43.39:5000/api/auth/forgot-password", {
-        email: values.email,
-      });
-      message.success("ลิงก์รีเซ็ตรหัสผ่านถูกส่งไปยังอีเมลของคุณ");
-      setEmail(values.email);
-      setStep(1);
-    } catch (err) {
-      setError(err.response?.data?.message || "เกิดข้อผิดพลาด กรุณาลองใหม่");
-      console.log("Error:", err);
-    } finally {
+      setError("");
+
+      const response = await axios.post(
+        "http://172.18.43.39:5000/api/auth/forgot-password",
+        {
+          email: values.email,
+        }
+      );
+
+      if (response.data.success) {
+        setSubmitted(true);
+      } else {
+        setError(
+          response.data.message ||
+            "ไม่สามารถส่งลิงก์รีเซ็ตรหัสผ่านได้ โปรดลองอีกครั้งในภายหลัง"
+        );
+      }
+
+      setLoading(false);
+    } catch (error) {
+      console.error("Error requesting password reset:", error);
+      setError(
+        error.response?.data?.message ||
+          "ไม่สามารถส่งลิงก์รีเซ็ตรหัสผ่านได้ โปรดลองอีกครั้งในภายหลัง"
+      );
       setLoading(false);
     }
   };
 
+  if (submitted) {
+    return (
+      <Layout style={{ height: "100vh" }}>
+        <Content
+          style={{
+            margin: "0 auto",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            flexDirection: "column",
+            padding: "30px",
+            background: "#fff",
+            borderRadius: "8px",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+            maxWidth: "90%",
+            width: "100%",
+          }}>
+          <Result
+            status="success"
+            title="ส่งลิงก์รีเซ็ตรหัสผ่านเรียบร้อยแล้ว"
+            subTitle={`กรุณาตรวจสอบอีเมลของคุณสำหรับลิงก์เพื่อรีเซ็ตรหัสผ่าน ลิงก์จะหมดอายุใน 30 นาที`}
+            extra={[
+              <Button
+                type="primary"
+                key="login"
+                onClick={() => (window.location.href = "/login")}
+                style={{
+                  backgroundColor: "#262362",
+                  transition: "background-color 0.3s",
+                  border: "none",
+                }}>
+                กลับไปยังหน้าเข้าสู่ระบบ
+              </Button>,
+            ]}
+          />
+        </Content>
+      </Layout>
+    );
+  }
+
   return (
-    <div
+    <Content
       style={{
+        height: "100vh",
+        width: "100vw",
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
-        height: "100vh",
-        width: "100vw",
         background: "#f0f2f5",
       }}>
-      <Card title="ตั้งรหัสผ่านใหม่" style={{ width: 400 }}>
-        <Steps current={step} style={{ marginBottom: 20 }}>
-          <Steps.Step title="อีเมล" icon={<MailOutlined />} />
-          <Steps.Step title="รหัสผ่านใหม่" icon={<KeyOutlined />} />
-        </Steps>
+      <div
+        style={{
+          width: "100%",
+          maxWidth: "400px",
+          padding: "30px",
+          background: "#fff",
+          borderRadius: "8px",
+          boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+        }}>
+        <h2 style={{ marginBottom: "24px", textAlign: "center" }}>
+          ลืมรหัสผ่าน
+        </h2>
+
+        <p style={{ marginBottom: "24px" }}>
+          กรุณากรอกอีเมลที่คุณใช้ลงทะเบียน
+          เราจะส่งลิงก์สำหรับรีเซ็ตรหัสผ่านให้คุณ
+        </p>
 
         {error && (
           <Alert
-            message={error}
+            message="เกิดข้อผิดพลาด"
+            description={error}
             type="error"
             showIcon
-            style={{ marginBottom: 10 }}
+            style={{ marginBottom: "24px" }}
           />
         )}
 
-        {token ? (
-          <ResetPasswordForm token={token} setStep={setStep} />
-        ) : (
-          step === 0 && (
-            <Form form={form} onFinish={requestPasswordReset} layout="vertical">
-              <Form.Item
-                name="email"
-                label="อีเมล"
-                rules={[
-                  {
-                    required: true,
-                    type: "email",
-                    message: "กรุณากรอกอีเมลที่ถูกต้อง",
-                  },
-                ]}>
-                <Input
-                  prefix={<MailOutlined />}
-                  placeholder="กรอกอีเมลของคุณ"
-                />
-              </Form.Item>
-              <Button type="primary" htmlType="submit" loading={loading} block>
-                ขอรีเซ็ตรหัสผ่าน
-              </Button>
-            </Form>
-          )
-        )}
-
-        {step === 2 && (
-          <div style={{ textAlign: "center" }}>
-            <CheckCircleOutlined style={{ fontSize: 48, color: "green" }} />
-            <h3>เปลี่ยนรหัสผ่านสำเร็จ</h3>
-            <p>คุณสามารถใช้รหัสผ่านใหม่ในการเข้าสู่ระบบได้</p>
-            <Button type="primary" block onClick={() => navigate("/login")}>
-              ไปยังหน้าเข้าสู่ระบบ
+        <Form form={form} layout="vertical" onFinish={handleSubmit}>
+          <p className="mb-3">อีเมล</p>
+          <Form.Item
+            name="email"
+            rules={[
+              { required: true, message: "กรุณาใส่อีเมลของคุณ" },
+              { type: "email", message: "รูปแบบอีเมลไม่ถูกต้อง" },
+            ]}>
+            <Input size="large" placeholder="name@example.com" />
+          </Form.Item>
+          <Form.Item>
+            <Button
+              type="primary"
+              htmlType="submit"
+              loading={loading}
+              block
+              style={{
+                backgroundColor: "#262362",
+                transition: "background-color 0.3s",
+                border: "none",
+              }}
+              onMouseEnter={(e) => (e.target.style.backgroundColor = "#193CB8")}
+              onMouseLeave={(e) =>
+                (e.target.style.backgroundColor = "#262362")
+              }>
+              ส่งลิงก์รีเซ็ตรหัสผ่าน
             </Button>
-          </div>
-        )}
-      </Card>
-    </div>
+          </Form.Item>
+        </Form>
+
+        <div style={{ textAlign: "center", marginTop: "16px" }}>
+          <Link to="/login">กลับไปยังหน้าเข้าสู่ระบบ</Link>
+        </div>
+      </div>
+    </Content>
   );
 };
 

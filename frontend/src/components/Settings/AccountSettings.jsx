@@ -78,13 +78,13 @@ const AccountSettings = () => {
         </Col>
       </Row>
       <Form.Item name="employeeId" label="รหัสพนักงาน">
-        <Input size={"large"} disabled />
+        <Input size={"large"} readOnly />
       </Form.Item>
       <Form.Item name="department" label="แผนก">
-        <Input size={"large"} options={departmentOptions} disabled />
+        <Input size={"large"} options={departmentOptions} readOnly />
       </Form.Item>
       <Form.Item name="position" label="ตำแหน่ง">
-        <Input size={"large"} options={positionOptions} disabled />
+        <Input size={"large"} options={positionOptions} readOnly />
       </Form.Item>
       <Form.Item name="email" label="อีเมล">
         <Input size={"large"} readOnly />

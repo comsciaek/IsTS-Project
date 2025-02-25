@@ -1,11 +1,42 @@
 import { Form, Input, Button, message } from "antd";
+import axios from "axios"; // Import Axios
 
 const ChangePassword = () => {
   const [form] = Form.useForm();
 
-  const handleFinish = (values) => {
-    console.log("Form values: ", values);
-    message.success("เปลี่ยนรหัสผ่านสำเร็จ!");
+  const handleFinish = async (values) => {
+    try {
+      // Call the API to change the password
+      const response = await axios.post(
+        "http://172.18.43.39:5000/api/auth/change-password",
+        {
+          currentPassword: values.currentPassword,
+          newPassword: values.newPassword,
+          confirmNewPassword: values.confirmNewPassword,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`, // Add token to headers
+          },
+        }
+      );
+
+      if (response.data.message === "Password changed successfully") {
+        message.success("เปลี่ยนรหัสผ่านสำเร็จ!");
+        form.resetFields();
+      } else {
+        message.error(response.data.message || "ไม่สามารถเปลี่ยนรหัสผ่านได้");
+      }
+    } catch (error) {
+      console.error("Error changing password:", error);
+      if (error.response?.status === 401) {
+        message.error("Unauthorized: Please log in again.");
+      } else {
+        message.error(
+          error.response?.data?.message || "ไม่สามารถเปลี่ยนรหัสผ่านได้"
+        );
+      }
+    }
   };
 
   return (
@@ -23,7 +54,7 @@ const ChangePassword = () => {
         <Input.Password size={"large"} />
       </Form.Item>
       <Form.Item
-        name="confirmPassword"
+        name="confirmNewPassword"
         label="ยืนยันรหัสผ่าน"
         dependencies={["newPassword"]}
         rules={[
