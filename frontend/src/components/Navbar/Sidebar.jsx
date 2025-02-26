@@ -33,37 +33,37 @@ const Sidebar = () => {
         key: "1",
         icon: <LayoutOutlined />,
         label: <NavLink to="/">Overview</NavLink>,
-        allowedRoles: ["Admin", "SuperAdmin"],
+        allowedroles: ["Admin", "SuperAdmin"],
       },
       {
         key: "2",
         icon: <TableOutlined />,
         label: <NavLink to="/table">Issues Table</NavLink>,
-        allowedRoles: ["Admin", "SuperAdmin"],
+        allowedroles: ["Admin", "SuperAdmin"],
       },
       {
         key: "3",
         icon: <MessageOutlined />,
         label: <NavLink to="/messages">Messages</NavLink>,
-        allowedRoles: ["Admin", "SuperAdmin"],
+        allowedroles: ["Admin", "SuperAdmin"],
       },
       {
         key: "4",
         icon: <PieChartOutlined />,
         label: <NavLink to="/reports">Reports</NavLink>,
-        allowedRoles: ["SuperAdmin"],
+        allowedroles: ["SuperAdmin"],
       },
       {
         key: "5",
         icon: <ShieldCheck size={16} strokeWidth={1.25} absoluteStrokeWidth />,
         label: <NavLink to="/manage-roles">Manage Roles</NavLink>,
-        allowedRoles: ["SuperAdmin"],
+        allowedroles: ["SuperAdmin"],
       },
       {
         key: "6",
         icon: <SettingOutlined />,
         label: <NavLink to="/settings">Settings</NavLink>,
-        allowedRoles: ["Admin", "SuperAdmin", "User"],
+        allowedroles: ["Admin", "SuperAdmin", "User"],
       },
     ],
     []
@@ -72,9 +72,29 @@ const Sidebar = () => {
   // Filter menu items based on user role - MOVED UP before it's used in useEffect
   const filteredMenuItems = useMemo(() => {
     if (!user) return [];
-    return allMenuItems.filter((item) => item.allowedRoles.includes(user.role));
+    return allMenuItems.filter((item) => item.allowedroles.includes(user.role));
   }, [allMenuItems, user]);
 
+  /**
+   * เชื่อมต่อ API: ดึงข้อมูลผู้ใช้จาก localStorage
+   *
+   * อธิบาย: ไม่ได้เชื่อมต่อ API โดยตรง แต่ดึงข้อมูลที่บันทึกไว้ใน localStorage
+   * ซึ่งได้จากการ login ก่อนหน้านี้ โดยมีโครงสร้างข้อมูลดังนี้:
+   *
+   * Expected user structure:
+   * {
+   *   id: string,
+   *   name: string,
+   *   employeeId: string,
+   *   email: string,
+   *   role: "User" | "Admin" | "SuperAdmin",
+   *   profilePicture?: string (optional),
+   *   ...other properties
+   * }
+   *
+   * ถ้าไม่พบข้อมูลผู้ใช้ จะ redirect ไปยังหน้า login
+   * ไม่มีการตรวจสอบ role เพราะมีการกรองเมนูตาม role แทน
+   */
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
@@ -104,6 +124,16 @@ const Sidebar = () => {
     }
   }, [location.pathname, user, filteredMenuItems]);
 
+  /**
+   * Logout function
+   *
+   * อธิบาย: ไม่ได้เชื่อมต่อ API logout โดยตรง แต่ลบข้อมูล token และ user
+   * ออกจาก localStorage ซึ่งในระบบที่สมบูรณ์ควรมีการเรียก API Logout ด้วย
+   *
+   * สำหรับระบบที่มีความปลอดภัยสูง ควรทำการเพิ่ม:
+   * 1. การเรียก API ไปยัง endpoint เช่น /api/auth/logout เพื่อยกเลิก token ฝั่งเซิร์ฟเวอร์
+   * 2. ล้าง cookies ที่เกี่ยวข้อง (ถ้ามี)
+   */
   const handleLogout = () => {
     localStorage.removeItem("user");
     localStorage.removeItem("token");

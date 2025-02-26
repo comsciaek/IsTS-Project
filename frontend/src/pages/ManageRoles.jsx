@@ -27,7 +27,6 @@ import { mockUserAPI } from "../utils/mockData";
 
 const { Content } = Layout;
 const { Option } = Select;
-const { Search } = Input;
 const { confirm } = Modal;
 
 const ManageRoles = () => {
@@ -198,7 +197,7 @@ const ManageRoles = () => {
   // กำหนดคอลัมน์สำหรับตาราง
   const columns = [
     {
-      title: "พนักงาน",
+      title: "Employees",
       dataIndex: "name",
       key: "name",
       sorter: (a, b) => a.name.localeCompare(b.name),
@@ -221,19 +220,19 @@ const ManageRoles = () => {
       ),
     },
     {
-      title: "อีเมล",
+      title: "Email",
       dataIndex: "email",
       key: "email",
       responsive: ["md"],
     },
     {
-      title: "แผนก",
+      title: "Department",
       dataIndex: "department",
       key: "department",
       responsive: ["lg"],
     },
     {
-      title: "บทบาท",
+      title: "Role",
       dataIndex: "role",
       key: "role",
       render: (text, record) => {
@@ -242,14 +241,19 @@ const ManageRoles = () => {
             value={text}
             onChange={(value) => handleRoleChange(record.id, value)}
             style={{ width: 130 }}
-            dropdownMatchSelectWidth={false}>
-            <Option value="User">
+            variant={false}
+            popupMatchSelectWidth={false}
+            className="role-select"
+            optionLabelProp="label">
+            <Option value="User" label={<Tag color="blue">User</Tag>}>
               <Tag color="blue">User</Tag>
             </Option>
-            <Option value="Admin">
+            <Option value="Admin" label={<Tag color="green">Admin</Tag>}>
               <Tag color="green">Admin</Tag>
             </Option>
-            <Option value="SuperAdmin">
+            <Option
+              value="SuperAdmin"
+              label={<Tag color="red">Super Admin</Tag>}>
               <Tag color="red">Super Admin</Tag>
             </Option>
           </Select>
@@ -257,7 +261,7 @@ const ManageRoles = () => {
       },
     },
     {
-      title: "การจัดการ",
+      title: "Action",
       key: "action",
       render: (_, record) => (
         <Tooltip title="ลบ">
@@ -308,7 +312,7 @@ const ManageRoles = () => {
         <div
           className="flex justify-between items-center mb-4 flex-wrap"
           style={{ gap: 8 }}>
-          <Search
+          <Input
             placeholder="ค้นหาด้วยชื่อ, อีเมล, รหัสพนักงาน"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}

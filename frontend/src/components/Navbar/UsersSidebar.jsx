@@ -45,6 +45,25 @@ const UsersSidebar = () => {
     []
   );
 
+  /**
+   * เชื่อมต่อ API: ดึงข้อมูลผู้ใช้จาก localStorage
+   *
+   * อธิบาย: ไม่ได้เชื่อมต่อ API โดยตรง แต่ดึงข้อมูลที่บันทึกไว้ใน localStorage
+   * ซึ่งได้จากการ login ก่อนหน้านี้ โดยมีโครงสร้างข้อมูลดังนี้:
+   *
+   * Expected user structure:
+   * {
+   *   id: string,
+   *   name: string,
+   *   employeeId: string,
+   *   email: string,
+   *   role: "User" | "Admin" | "SuperAdmin",
+   *   profilePicture?: string (optional),
+   *   ...other properties
+   * }
+   *
+   * ถ้าไม่พบข้อมูลผู้ใช้ หรือไม่ใช่ role "User" จะ redirect ไปยังหน้า unauthorized หรือ login
+   */
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
@@ -75,6 +94,12 @@ const UsersSidebar = () => {
     else setSelectedKey("");
   }, [location]);
 
+  /**
+   * Logout function
+   *
+   * อธิบาย: ไม่ได้เชื่อมต่อ API logout โดยตรง แต่ลบข้อมูล token และ user
+   * ออกจาก localStorage ซึ่งในระบบที่สมบูรณ์ควรมีการเรียก API Logout ด้วย
+   */
   const handleLogout = () => {
     localStorage.removeItem("user");
     localStorage.removeItem("token");

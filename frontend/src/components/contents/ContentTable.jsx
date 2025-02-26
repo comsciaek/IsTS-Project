@@ -159,7 +159,10 @@ const ContentTable = () => {
           <Avatar src={record.profilePic} />
           {text}
           <Link to={"/messages"}>
-            <Button icon={<MessageOutlined />} />
+            <Button
+              style={{ borderRadius: "50%", height: "30px", width: "30px" }}
+              icon={<MessageOutlined />}
+            />
           </Link>
         </Space>
       ),
@@ -183,8 +186,16 @@ const ContentTable = () => {
       width: "10%",
       render: (_, record) => (
         <Space>
-          <Button onClick={() => showModal(record)} icon={<EditOutlined />} />
-          <Button onClick={() => handleDelete(record.key)} danger>
+          <Button
+            style={{ borderRadius: "50%", height: "30px", width: "30px" }}
+            onClick={() => showModal(record)}
+            icon={<EditOutlined />}
+          />
+          <Button
+            style={{ borderRadius: "50%", height: "30px" }}
+            size="small"
+            onClick={() => handleDelete(record.key)}
+            danger>
             <DeleteOutlined />
           </Button>
           <Dropdown
@@ -198,7 +209,10 @@ const ContentTable = () => {
                 },
               ],
             }}>
-            <Button icon={<EllipsisOutlined />} />
+            <Button
+              style={{ borderRadius: "50%", height: "30px", width: "30px" }}
+              icon={<EllipsisOutlined />}
+            />
           </Dropdown>
         </Space>
       ),

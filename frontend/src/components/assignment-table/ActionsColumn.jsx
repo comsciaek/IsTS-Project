@@ -78,7 +78,7 @@ const ActionsColumn = ({
     trigger={["hover"]}
     open={dropdownVisible === record.key}
     onOpenChange={(open) => setDropdownVisible(open ? record.key : null)}>
-    <Button>
+    <Button style={{ borderRadius: "50%", height: "32px", width: "30px" }}>
       <UsergroupAddOutlined />
     </Button>
   </Dropdown>

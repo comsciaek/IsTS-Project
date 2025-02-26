@@ -1,15 +1,15 @@
 /**
  * Check if the user has the required role
  * @param {string} userRole - The current user's role
- * @param {string[]} allowedRoles - Array of roles that are allowed
+ * @param {string[]} allowedroles - Array of roles that are allowed
  * @returns {boolean} - True if user has permission, false otherwise
  */
-export const hasRequiredRole = (userRole, allowedRoles) => {
-  if (!userRole || !allowedRoles || allowedRoles.length === 0) {
+export const hasRequiredRole = (userRole, allowedroles) => {
+  if (!userRole || !allowedroles || allowedroles.length === 0) {
     return false;
   }
 
-  return allowedRoles.includes(userRole);
+  return allowedroles.includes(userRole);
 };
 
 /**
