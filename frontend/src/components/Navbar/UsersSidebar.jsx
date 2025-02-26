@@ -12,6 +12,7 @@ import logo from "../../assets/jib-logo-2.png";
 import { Content } from "antd/es/layout/layout";
 import { Outlet } from "react-router";
 import NotiFications from "../NotiFications";
+import { getUserDisplayName, getUserInitial } from "../../utils/userUtils";
 
 const { Header, Sider } = Layout;
 
@@ -150,15 +151,19 @@ const UsersSidebar = () => {
                 onClick={(e) => e.preventDefault()}
                 style={{ marginLeft: "16px" }}>
                 <Space className="text-white">
-                  <Avatar />
+                  {user?.profilePicture ? (
+                    <Avatar src={user.profilePicture} />
+                  ) : (
+                    <Avatar>{getUserInitial(user)}</Avatar>
+                  )}
                   <div
                     style={{
                       display: "flex",
                       flexDirection: "column",
                       alignItems: "flex-start",
                     }}>
-                    <div style={{ lineHeight: "1.2" }}>
-                      {user?.name || "User"}
+                    <div style={{ lineHeight: "1.2", fontWeight: "500" }}>
+                      {getUserDisplayName(user)}
                     </div>
                     <div
                       style={{
