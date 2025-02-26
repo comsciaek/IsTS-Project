@@ -47,13 +47,13 @@ const userSchema = new mongoose.Schema({
   },
   confirmPassword: {
     type: String,
-    required: [true, 'Please confirm your password'],
     validate: {
       validator: function (el) {
         return el === this.password;
       },
       message: 'Passwords do not match',
     },
+    // ไม่กำหนด required: true เพื่อให้ไม่บังคับใช้ในทุกกรณี
   },
   phoneNumber: {
     type: String,
@@ -64,6 +64,10 @@ const userSchema = new mongoose.Schema({
     type: String,
     enum: ['SuperAdmin', 'Admin', 'User'], // เปลี่ยน HeadAdmin เป็น SuperAdmin
     default: 'User', // ผู้ใช้ใหม่จะเป็น User โดยอัตโนมัติ
+  },
+  profileImage: {
+    type: String, // เก็บ URL ของรูปภาพ (เช่น "https://example.com/image.jpg")
+    default: '', // ค่าเริ่มต้นเป็นสตริงว่างถ้าไม่มีรูปภาพ
   },
   createdAt: {
     type: Date,

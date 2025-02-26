@@ -239,6 +239,7 @@ router.post('/reset-password', async (req, res) => {
   }
 });
 
+// Route สำหรับเปลี่ยนรหัสผ่าน (ต้องล็อกอินก่อน)
 router.post('/change-password', protect, async (req, res) => {
   try {
     console.log(req.body)
