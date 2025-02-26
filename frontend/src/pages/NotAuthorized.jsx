@@ -1,31 +1,59 @@
-import { Button, Result } from "antd";
+import { Result, Button } from "antd";
 import { useNavigate } from "react-router";
+import { useEffect, useState } from "react";
 
 const NotAuthorized = () => {
   const navigate = useNavigate();
+  const [userRole, setUserRole] = useState(null);
 
-  const handleBackToHome = () => {
-    navigate("/login");
+  useEffect(() => {
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      try {
+        const user = JSON.parse(storedUser);
+        setUserRole(user.role);
+      } catch (error) {
+        console.error("Failed to parse user data:", error);
+      }
+    }
+  }, []);
+
+  const handleRedirect = () => {
+    // Redirect based on user role
+    if (userRole === "User") {
+      navigate("/user/home");
+    } else if (userRole === "Admin" || userRole === "SuperAdmin") {
+      navigate("/");
+    } else {
+      // If role is unknown or not logged in, go to login
+      navigate("/login");
+    }
   };
 
   return (
-    <div className="flex flex-col items-center justify-center h-screen w-screen bg-gray-100">
+    <div
+      style={{
+        height: "100vh",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+      }}>
       <Result
         status="403"
-        title="403"
-        subTitle="Sorry, you are not authorized to access this page."
+        title="ไม่มีสิทธิ์เข้าถึง"
+        subTitle="ขออภัย คุณไม่มีสิทธิ์เข้าถึงหน้านี้"
         extra={
           <Button
+            type="primary"
+            onClick={handleRedirect}
             style={{
               backgroundColor: "#262362",
               transition: "background-color 0.3s",
               border: "none",
             }}
             onMouseEnter={(e) => (e.target.style.backgroundColor = "#193CB8")}
-            onMouseLeave={(e) => (e.target.style.backgroundColor = "#262362")}
-            type="primary"
-            onClick={handleBackToHome}>
-            Back Home
+            onMouseLeave={(e) => (e.target.style.backgroundColor = "#262362")}>
+            กลับไปยังหน้าหลัก
           </Button>
         }
       />

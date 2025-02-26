@@ -1,4 +1,5 @@
-import { Routes, Route } from "react-router";
+import { Routes, Route, Navigate, useLocation } from "react-router"; // Change from "react-router" to "react-router-dom"
+import { useEffect, useState } from "react";
 import Login from "./pages/Login";
 import RootLayout from "./layout/RootLayout";
 import Register from "./pages/Register";
@@ -11,10 +12,64 @@ import Reports from "./pages/Reports";
 import ForgotPassword from "./pages/ForgotPassword";
 import Overview from "./pages/Overview";
 import ManageRoles from "./pages/ManageRoles";
-
 import ResetSetup from "./pages/ResetSetup";
 import UserHome from "./pages/UserHome";
 import UserDashboardLayout from "./layout/UserDashboardLayout";
+import NotAuthorized from "./pages/NotAuthorized";
+import { hasRequiredRole } from "./utils/authUtils";
+
+import PropTypes from "prop-types";
+
+// Protected Route Component
+const ProtectedRoute = ({ children, allowedRoles }) => {
+  const [loading, setLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [userRole, setUserRole] = useState(null);
+  const location = useLocation();
+
+  useEffect(() => {
+    const checkAuth = () => {
+      const token = localStorage.getItem("token");
+      const userStr = localStorage.getItem("user");
+
+      if (token && userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          setUserRole(user.role);
+          setIsAuthenticated(true);
+        } catch (error) {
+          console.error("Failed to parse user data:", error);
+          setIsAuthenticated(false);
+        }
+      } else {
+        setIsAuthenticated(false);
+      }
+
+      setLoading(false);
+    };
+
+    checkAuth();
+  }, [location.pathname]);
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  if (allowedRoles && !hasRequiredRole(userRole, allowedRoles)) {
+    return <Navigate to="/unauthorized" replace />;
+  }
+
+  return children;
+};
+
+ProtectedRoute.propTypes = {
+  children: PropTypes.node.isRequired,
+  allowedRoles: PropTypes.arrayOf(PropTypes.string),
+};
 
 const App = () => {
   return (
@@ -25,17 +80,47 @@ const App = () => {
         <Route path="register" element={<Register />} />
         <Route path="forgot-password" element={<ForgotPassword />} />
         <Route path="reset-password/*" element={<ResetSetup />} />
-        {/* Protected Routes */}
-        <Route element={<DashboardLayout />}>
+        <Route path="unauthorized" element={<NotAuthorized />} />
+
+        {/* Admin & Super Admin Routes */}
+        <Route
+          element={
+            <ProtectedRoute allowedRoles={["Admin", "SuperAdmin"]}>
+              <DashboardLayout />
+            </ProtectedRoute>
+          }>
           <Route index element={<Overview />} />
           <Route path="table" element={<Issuestable />} />
           <Route path="messages" element={<Messages />} />
-          <Route path="reports" element={<Reports />} />
           <Route path="settings" element={<Settings />} />
-          <Route path="manage-roles" element={<ManageRoles />} />
+
+          {/* Super Admin Only Routes */}
+          <Route
+            path="reports"
+            element={
+              <ProtectedRoute allowedRoles={["SuperAdmin"]}>
+                <Reports />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="manage-roles"
+            element={
+              <ProtectedRoute allowedRoles={["SuperAdmin"]}>
+                <ManageRoles />
+              </ProtectedRoute>
+            }
+          />
         </Route>
 
-        <Route path="user" element={<UserDashboardLayout />}>
+        {/* User Routes */}
+        <Route
+          path="user"
+          element={
+            <ProtectedRoute allowedRoles={["User"]}>
+              <UserDashboardLayout />
+            </ProtectedRoute>
+          }>
           <Route path="home" element={<UserHome />} />
           <Route path="message" element={<Messages />} />
           <Route path="settings" element={<Settings />} />

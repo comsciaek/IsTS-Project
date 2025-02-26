@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { Layout, Menu, Dropdown, Space, Avatar } from "antd";
+import { useState, useEffect, useMemo } from "react";
+import { Layout, Menu, Dropdown, Space, Avatar, message } from "antd";
 import {
   SettingOutlined,
   LogoutOutlined,
@@ -7,7 +7,7 @@ import {
   MessageOutlined,
   LayoutOutlined,
 } from "@ant-design/icons";
-import { Link, NavLink, useLocation } from "react-router";
+import { Link, NavLink, useLocation, useNavigate } from "react-router"; // Change to react-router-dom
 import logo from "../../assets/jib-logo-2.png";
 import { Content } from "antd/es/layout/layout";
 import { Outlet } from "react-router";
@@ -15,41 +15,78 @@ import NotiFications from "../NotiFications";
 
 const { Header, Sider } = Layout;
 
-const menuItems = [
-  {
-    key: "1",
-    icon: <LayoutOutlined />,
-    label: <NavLink to="/user/home">Home</NavLink>,
-  },
-  {
-    key: "2",
-    icon: <MessageOutlined />,
-    label: <NavLink to="/user/message">Messages</NavLink>,
-  },
-];
-
-const Sidebar = () => {
+const UsersSidebar = () => {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
   const [selectedKey, setSelectedKey] = useState("");
+  const [user, setUser] = useState(null);
+
+  // Define menu items with role-based access
+  const menuItems = useMemo(
+    () => [
+      {
+        key: "1",
+        icon: <LayoutOutlined />,
+        label: <NavLink to="/user/home">Home</NavLink>,
+      },
+      {
+        key: "2",
+        icon: <MessageOutlined />,
+        label: <NavLink to="/user/message">Messages</NavLink>,
+      },
+      {
+        key: "3",
+        icon: <SettingOutlined />,
+        label: <NavLink to="/user/settings">Settings</NavLink>,
+      },
+    ],
+    []
+  );
 
   useEffect(() => {
-    if (location.pathname === "/settings") {
-      setSelectedKey("");
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      try {
+        const parsedUser = JSON.parse(storedUser);
+        setUser(parsedUser);
+
+        // Check if user has User role
+        if (parsedUser.role !== "User") {
+          navigate("/unauthorized");
+        }
+      } catch (error) {
+        console.error("Failed to parse user data:", error);
+        localStorage.removeItem("user");
+        navigate("/login");
+      }
     } else {
-      const menuItem = menuItems.find(
-        (item) => item.label.props.to === location.pathname
-      );
-      setSelectedKey(menuItem ? menuItem.key : "1");
+      navigate("/login");
     }
+  }, [navigate]);
+
+  useEffect(() => {
+    // Find selected key based on current path
+    const path = location.pathname;
+    if (path === "/user/home") setSelectedKey("1");
+    else if (path === "/user/message") setSelectedKey("2");
+    else if (path === "/user/settings") setSelectedKey("3");
+    else setSelectedKey("");
   }, [location]);
+
+  const handleLogout = () => {
+    localStorage.removeItem("user");
+    localStorage.removeItem("token");
+    message.success("Logged out successfully");
+    navigate("/login");
+  };
 
   const accountdropdown = [
     {
       key: "1",
       label: (
         <NavLink
-          to="/settings"
+          to="/user/settings"
           style={{ display: "flex", alignItems: "center" }}>
           <SettingOutlined />
           <span style={{ marginLeft: "8px" }}>Settings</span>
@@ -62,17 +99,15 @@ const Sidebar = () => {
     {
       key: "2",
       label: (
-        <NavLink to="/login" style={{ display: "flex", alignItems: "center" }}>
+        <div
+          onClick={handleLogout}
+          style={{ display: "flex", alignItems: "center" }}>
           <LogoutOutlined />
           <span style={{ marginLeft: "8px" }}>Logout</span>
-        </NavLink>
+        </div>
       ),
     },
   ];
-
-  // const getCurrentYear = () => {
-  //   return new Date().getFullYear();
-  // };
 
   return (
     <Layout style={{ height: "100vh", width: "100vw" }}>
@@ -116,7 +151,12 @@ const Sidebar = () => {
                 style={{ marginLeft: "16px" }}>
                 <Space className="text-white">
                   <Avatar />
-                  name
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                    <div style={{ lineHeight: '1.2' }}>{user?.name || "User"}</div>
+                    <div style={{ fontSize: '12px', opacity: 0.8, lineHeight: '1.2' }}>
+                      {user?.role}
+                    </div>
+                  </div>
                   <DownOutlined />
                 </Space>
               </a>
@@ -126,12 +166,9 @@ const Sidebar = () => {
         <Content style={{ padding: "16px", overflow: "auto" }}>
           <Outlet />
         </Content>
-        {/* <Footer style={{ textAlign: "center" }}>
-          JIB ©{getCurrentYear()} Created by JIB
-        </Footer> */}
       </Layout>
     </Layout>
   );
 };
 
-export default Sidebar;
+export default UsersSidebar;

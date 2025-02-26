@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { Layout, Menu, Dropdown, Space, Avatar } from "antd";
+import { useState, useEffect, useMemo } from "react";
+import { Layout, Menu, Dropdown, Space, Avatar, message } from "antd";
 import {
   TableOutlined,
   SettingOutlined,
@@ -9,7 +9,7 @@ import {
   PieChartOutlined,
   LayoutOutlined,
 } from "@ant-design/icons";
-import { Link, NavLink, useLocation } from "react-router";
+import { Link, NavLink, useLocation, useNavigate } from "react-router";
 import logo from "../../assets/jib-logo-2.png";
 import { Content } from "antd/es/layout/layout";
 import { Outlet } from "react-router";
@@ -18,49 +18,97 @@ import { ShieldCheck } from "lucide-react";
 
 const { Header, Sider } = Layout;
 
-const menuItems = [
-  {
-    key: "1",
-    icon: <LayoutOutlined />,
-    label: <NavLink to="/">Overview</NavLink>,
-  },
-  {
-    key: "2",
-    icon: <TableOutlined />,
-    label: <NavLink to="/table">Issues Table</NavLink>,
-  },
-  {
-    key: "3",
-    icon: <MessageOutlined />,
-    label: <NavLink to="/messages">Messages</NavLink>,
-  },
-  {
-    key: "4",
-    icon: <PieChartOutlined />,
-    label: <NavLink to="/reports">Reports</NavLink>,
-  },
-  {
-    key: "5",
-    icon: <ShieldCheck size={16} strokeWidth={1.25} absoluteStrokeWidth />,
-    label: <NavLink to="/manage-roles">Manage Roles</NavLink>,
-  },
-];
-
 const Sidebar = () => {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
   const [selectedKey, setSelectedKey] = useState("");
+  const [user, setUser] = useState(null);
+
+  // Define all menu items with role permissions
+  const allMenuItems = useMemo(
+    () => [
+      {
+        key: "1",
+        icon: <LayoutOutlined />,
+        label: <NavLink to="/">Overview</NavLink>,
+        allowedRoles: ["Admin", "SuperAdmin"],
+      },
+      {
+        key: "2",
+        icon: <TableOutlined />,
+        label: <NavLink to="/table">Issues Table</NavLink>,
+        allowedRoles: ["Admin", "SuperAdmin"],
+      },
+      {
+        key: "3",
+        icon: <MessageOutlined />,
+        label: <NavLink to="/messages">Messages</NavLink>,
+        allowedRoles: ["Admin", "SuperAdmin"],
+      },
+      {
+        key: "4",
+        icon: <PieChartOutlined />,
+        label: <NavLink to="/reports">Reports</NavLink>,
+        allowedRoles: ["SuperAdmin"],
+      },
+      {
+        key: "5",
+        icon: <ShieldCheck size={16} strokeWidth={1.25} absoluteStrokeWidth />,
+        label: <NavLink to="/manage-roles">Manage Roles</NavLink>,
+        allowedRoles: ["SuperAdmin"],
+      },
+      {
+        key: "6",
+        icon: <SettingOutlined />,
+        label: <NavLink to="/settings">Settings</NavLink>,
+        allowedRoles: ["Admin", "SuperAdmin", "User"],
+      },
+    ],
+    []
+  );
+
+  // Filter menu items based on user role - MOVED UP before it's used in useEffect
+  const filteredMenuItems = useMemo(() => {
+    if (!user) return [];
+    return allMenuItems.filter((item) => item.allowedRoles.includes(user.role));
+  }, [allMenuItems, user]);
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      try {
+        setUser(JSON.parse(storedUser));
+      } catch (error) {
+        console.error("Failed to parse user data:", error);
+        localStorage.removeItem("user");
+        navigate("/login");
+      }
+    } else {
+      navigate("/login");
+    }
+  }, [navigate]);
 
   useEffect(() => {
     if (location.pathname === "/settings") {
-      setSelectedKey("");
+      setSelectedKey("6");
     } else {
-      const menuItem = menuItems.find(
-        (item) => item.label.props.to === location.pathname
-      );
-      setSelectedKey(menuItem ? menuItem.key : "1");
+      // Make sure we handle the case when filteredMenuItems might be empty
+      if (filteredMenuItems.length > 0) {
+        const menuItem = filteredMenuItems.find(
+          (item) => item.label.props.to === location.pathname
+        );
+        setSelectedKey(menuItem ? menuItem.key : "1");
+      }
     }
-  }, [location]);
+  }, [location.pathname, user, filteredMenuItems]);
+
+  const handleLogout = () => {
+    localStorage.removeItem("user");
+    localStorage.removeItem("token");
+    message.success("Logged out successfully");
+    navigate("/login");
+  };
 
   const accountdropdown = [
     {
@@ -80,17 +128,15 @@ const Sidebar = () => {
     {
       key: "2",
       label: (
-        <NavLink to="/login" style={{ display: "flex", alignItems: "center" }}>
+        <div
+          onClick={handleLogout}
+          style={{ display: "flex", alignItems: "center" }}>
           <LogoutOutlined />
           <span style={{ marginLeft: "8px" }}>Logout</span>
-        </NavLink>
+        </div>
       ),
     },
   ];
-
-  // const getCurrentYear = () => {
-  //   return new Date().getFullYear();
-  // };
 
   return (
     <Layout style={{ height: "100vh", width: "100vw" }}>
@@ -112,7 +158,7 @@ const Sidebar = () => {
           theme="light"
           mode="inline"
           selectedKeys={[selectedKey]}
-          items={menuItems}
+          items={filteredMenuItems}
         />
       </Sider>
       <Layout>
@@ -134,7 +180,24 @@ const Sidebar = () => {
                 style={{ marginLeft: "16px" }}>
                 <Space className="text-white">
                   <Avatar />
-                  name
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "flex-start",
+                    }}>
+                    <div style={{ lineHeight: "1.2" }}>
+                      {user?.name || "User"}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: "12px",
+                        opacity: 0.8,
+                        lineHeight: "1.2",
+                      }}>
+                      {user?.role}
+                    </div>
+                  </div>
                   <DownOutlined />
                 </Space>
               </a>
@@ -144,9 +207,6 @@ const Sidebar = () => {
         <Content style={{ padding: "16px", overflow: "auto" }}>
           <Outlet />
         </Content>
-        {/* <Footer style={{ textAlign: "center" }}>
-          JIB ©{getCurrentYear()} Created by JIB
-        </Footer> */}
       </Layout>
     </Layout>
   );
