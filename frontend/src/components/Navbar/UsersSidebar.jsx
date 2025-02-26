@@ -151,9 +151,21 @@ const UsersSidebar = () => {
                 style={{ marginLeft: "16px" }}>
                 <Space className="text-white">
                   <Avatar />
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                    <div style={{ lineHeight: '1.2' }}>{user?.name || "User"}</div>
-                    <div style={{ fontSize: '12px', opacity: 0.8, lineHeight: '1.2' }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "flex-start",
+                    }}>
+                    <div style={{ lineHeight: "1.2" }}>
+                      {user?.name || "User"}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: "12px",
+                        opacity: 0.8,
+                        lineHeight: "1.2",
+                      }}>
                       {user?.role}
                     </div>
                   </div>
