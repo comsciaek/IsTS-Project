@@ -9,12 +9,12 @@ import axios from "axios";
 export const uploadProfilePicture = async (file, userId) => {
   try {
     const formData = new FormData();
-    formData.append("profilePicture", file);
+    formData.append("profileImage", file);
 
     const token = localStorage.getItem("token");
 
     const response = await axios.post(
-      `http://172.18.43.39:5000/api/users/${userId}/upload-profile-picture`,
+      `http://172.18.43.39:5000/api/users/profile/${userId}`,
       formData,
       {
         headers: {
@@ -64,7 +64,7 @@ export const fetchUserProfile = async (userId) => {
     const token = localStorage.getItem("token");
 
     const response = await axios.get(
-      `http://172.18.43.39:5000/api/users/profile/${userId}`,
+      `http://172.18.43.39:5000/api/uploads/${userId}`,
       {
         headers: {
           Authorization: `Bearer ${token}`,

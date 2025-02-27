@@ -17,6 +17,7 @@ import {
 } from "@ant-design/icons";
 import axios from "axios";
 import { useUser } from "../../context/UserContext";
+import { data } from "react-router";
 
 const AccountSettings = () => {
   const [form] = Form.useForm();
@@ -57,8 +58,8 @@ const AccountSettings = () => {
           }
 
           // ตั้งค่ารูปโปรไฟล์
-          if (user.profilePicture) {
-            setProfilePic(user.profilePicture);
+          if (user.profileImage) {
+            setProfilePic(user.profileImage);
           }
 
           // ตั้งค่าข้อมูลเริ่มต้นในฟอร์มจากข้อมูลที่มีอยู่ใน context
@@ -114,8 +115,8 @@ const AccountSettings = () => {
                 });
 
                 // ตั้งค่ารูปโปรไฟล์จาก API
-                if (apiUser.profilePicture) {
-                  setProfilePic(apiUser.profilePicture);
+                if (apiUser.profileImage) {
+                  setProfilePic(apiUser.profileImage);
                 }
 
                 // เราใช้ useRef แทนที่จะอัพเดต context ในที่นี้
@@ -160,7 +161,7 @@ const AccountSettings = () => {
       try {
         // สร้าง FormData สำหรับอัพโหลดไฟล์
         const formData = new FormData();
-        formData.append("profilePicture", info.file.originFileObj);
+        formData.append("profileImage", info.file.originFileObj);
 
         // ดึง token และ user ID
         const token = localStorage.getItem("token");
@@ -169,7 +170,7 @@ const AccountSettings = () => {
         // ส่งไฟล์ไปยัง endpoint สำหรับอัพโหลดรูปโปรไฟล์
         try {
           const response = await axios.post(
-            `http://172.18.43.39:5000/api/users/${userId}/upload-profile-picture`,
+            `http://172.18.43.39:5000/api/users/profile/${userId}`,
             formData,
             {
               headers: {
@@ -187,12 +188,12 @@ const AccountSettings = () => {
             message.success(`${info.file.name} อัปโหลดสำเร็จ`);
 
             // อัพเดตข้อมูล user ใน context ด้วย URL รูปใหม่
-            updateUser({ profilePicture: profilePictureUrl });
+            updateUser({ profileImage: profilePictureUrl });
 
             // อัพเดต state
             setUserData((prevData) => ({
               ...prevData,
-              profilePicture: profilePictureUrl,
+              profileImage: profilePictureUrl,
             }));
           } else {
             message.error(`${info.file.name} อัปโหลดไม่สำเร็จ`);
@@ -208,7 +209,7 @@ const AccountSettings = () => {
           setProfilePic(localUrl);
 
           // บันทึกและอัพเดต context ด้วย URL ภาพชั่วคราว
-          updateUser({ profilePicture: localUrl });
+          updateUser({ profileImage: localUrl });
         }
       } catch (error) {
         console.error("Error uploading profile picture:", error);
@@ -238,7 +239,7 @@ const AccountSettings = () => {
       const token = localStorage.getItem("token");
       const updatedData = {
         ...values,
-        profilePicture: profilePic,
+        profileImage: profilePic,
       };
 
       // อัพเดตข้อมูลผู้ใช้ผ่าน API
@@ -273,7 +274,7 @@ const AccountSettings = () => {
         lastName: values.lastName,
         name: fullName,
         phoneNumber: values.phoneNumber,
-        profilePicture: profilePic,
+        profileImage: profilePic,
       });
 
       // อัพเดต state
@@ -283,7 +284,7 @@ const AccountSettings = () => {
         lastName: values.lastName,
         name: fullName,
         phoneNumber: values.phoneNumber,
-        profilePicture: profilePic,
+        profileImage: profilePic,
       }));
 
       message.success("บันทึกข้อมูลเรียบร้อย!");
@@ -321,7 +322,7 @@ const AccountSettings = () => {
               style={{ marginBottom: "16px" }}
             />
             <Upload
-              name="profilePic"
+              name="profileImage"
               showUploadList={false}
               customRequest={({ onSuccess }) => {
                 setTimeout(() => {
