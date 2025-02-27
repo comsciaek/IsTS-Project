@@ -53,7 +53,7 @@ const NotAuthorized = () => {
             }}
             onMouseEnter={(e) => (e.target.style.backgroundColor = "#193CB8")}
             onMouseLeave={(e) => (e.target.style.backgroundColor = "#262362")}>
-            กลับไปยังหน้าหลัก
+            Go Back
           </Button>
         }
       />

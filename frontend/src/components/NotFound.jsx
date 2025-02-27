@@ -20,7 +20,7 @@ const NotFound = () => {
             onMouseLeave={(e) => (e.target.style.backgroundColor = "#262362")}
             type="primary"
             onClick={() => navigate("/")}>
-            Back to Overview Page
+            Go Back
           </Button>
         }
       />
