@@ -69,6 +69,10 @@ const userSchema = new mongoose.Schema({
     type: String, // เก็บ URL ของรูปภาพ (เช่น "https://example.com/image.jpg")
     default: '', // ค่าเริ่มต้นเป็นสตริงว่างถ้าไม่มีรูปภาพ
   },
+  profileImage: {
+    type: String,
+    default: '',
+  },
   createdAt: {
     type: Date,
     default: Date.now,

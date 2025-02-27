@@ -108,11 +108,12 @@ router.post('/register', async (req, res) => {
   }
 });
 
-// Route สำหรับการล็อกอิน (Login)
+// Route สำหรับการล็อกอิน (Login) และดึงข้อมูลผู้ใช้
 router.post('/login', async (req, res) => {
   try {
+    
     const { employeeId, password } = req.body;
-
+    // console.log(employeeId)
     if (!employeeId || !password) {
       return res.status(400).json({
         message: 'Employee ID and password are required',
@@ -120,7 +121,6 @@ router.post('/login', async (req, res) => {
     }
 
     const user = await User.findOne({ employeeId }).select('+password');
-
     if (!user) {
       return res.status(401).json({
         message: 'Invalid employeeId or password',
@@ -128,7 +128,6 @@ router.post('/login', async (req, res) => {
     }
 
     const isMatch = await user.matchPassword(password);
-
     if (!isMatch) {
       return res.status(401).json({
         message: 'Invalid employeeId or password',
@@ -137,6 +136,7 @@ router.post('/login', async (req, res) => {
 
     const token = generateToken(user._id, user.role); // รวม role ใน token
 
+    // ดึงข้อมูลผู้ใช้จาก MongoDB และส่งกลับ
     const userResponse = {
       id: user._id,
       firstName: user.firstName,
@@ -147,13 +147,14 @@ router.post('/login', async (req, res) => {
       email: user.email,
       phoneNumber: user.phoneNumber,
       role: user.role,
+      profileImage: user.profileImage,
       createdAt: user.createdAt,
     };
 
     return res.status(200).json({
       message: 'Login Success',
       success: true,
-      data: userResponse,
+      data: userResponse, // ส่งข้อมูลผู้ใช้กลับไป
       token: token,
     });
   } catch (error) {
@@ -225,6 +226,7 @@ router.post('/reset-password', async (req, res) => {
 
     user.password = password;
     user.confirmPassword = confirmPassword;
+    console.log(user.password) // ไว้ดูรหัสตอนไอนายเปลี่ยน
     await user.save();
 
     return res.status(200).json({ message: 'Password reset successfully' });

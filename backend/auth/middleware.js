@@ -28,15 +28,15 @@ const protect = (req, res, next) => {
   }
 };
 
-// Middleware สำหรับตรวจสอบว่าผู้ใช้เป็น SuperAdmin เท่านั้น
-const authorizeSuperAdmin = (req, res, next) => {
-  // ดึงข้อมูลผู้ใช้จาก token (จาก middleware protect)
-  if (req.user.role !== 'SuperAdmin') {
+// Middleware สำหรับตรวจสอบว่าผู้ใช้เป็น SuperAdmin หรือ Admin
+const authorizeAdminOrSuperAdmin = (req, res, next) => {
+  const { role } = req.user;
+  if (role !== 'SuperAdmin' && role !== 'Admin') {
     return res.status(403).json({
-      message: 'Only SuperAdmin is authorized to perform this action',
+      message: 'Only SuperAdmin or Admin is authorized to perform this action',
     });
   }
   next();
 };
 
-export { protect, authorizeSuperAdmin }; // เปลี่ยนชื่อ authorizeHeadAdmin เป็น authorizeSuperAdmin
+export { protect, authorizeAdminOrSuperAdmin };
