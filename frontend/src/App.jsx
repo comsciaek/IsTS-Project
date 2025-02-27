@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate, useLocation } from "react-router"; // Change from "react-router" to "react-router-dom"
-import { useEffect, useState } from "react";
+import { useEffect, useState } from "react"; // ลบ useMemo ที่ไม่ได้ใช้
 import Login from "./pages/Login";
 import RootLayout from "./layout/RootLayout";
 import Register from "./pages/Register";
@@ -17,6 +17,8 @@ import UserHome from "./pages/UserHome";
 import UserDashboardLayout from "./layout/UserDashboardLayout";
 import NotAuthorized from "./pages/NotAuthorized";
 import { hasRequiredRole } from "./utils/authUtils";
+// ตั้งค่าการนำเข้า useUser เพื่อใช้ใน AuthContext ถ้าต้องการ
+// แต่เนื่องจากไม่ได้ใช้งานในไฟล์นี้จึงลบออกไป
 
 import PropTypes from "prop-types";
 
@@ -72,6 +74,9 @@ ProtectedRoute.propTypes = {
 };
 
 const App = () => {
+  // เนื่องจากไม่ได้ใช้ useUser และ user ภายในคอมโพเนนต์นี้
+  // จึงนำออกไปเพื่อแก้ issue no-unused-vars
+
   return (
     <Routes>
       <Route path="/" element={<RootLayout />}>

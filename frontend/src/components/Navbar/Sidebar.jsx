@@ -16,6 +16,7 @@ import { Outlet } from "react-router";
 import NotiFications from "../NotiFications";
 import { ShieldCheck } from "lucide-react";
 import { getUserDisplayName, getUserInitial } from "../../utils/userUtils";
+import { useUser } from "../../context/UserContext";
 
 const { Header, Sider } = Layout;
 
@@ -24,7 +25,9 @@ const Sidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [selectedKey, setSelectedKey] = useState("");
-  const [user, setUser] = useState(null);
+
+  // ใช้ context แทนการเก็บ state แยก
+  const { user, clearUser } = useUser();
 
   // Define all menu items with role permissions
   const allMenuItems = useMemo(
@@ -69,46 +72,22 @@ const Sidebar = () => {
     []
   );
 
-  // Filter menu items based on user role - MOVED UP before it's used in useEffect
+  // Filter menu items based on user role
   const filteredMenuItems = useMemo(() => {
     if (!user) return [];
     return allMenuItems.filter((item) => item.allowedroles.includes(user.role));
   }, [allMenuItems, user]);
 
   /**
-   * เชื่อมต่อ API: ดึงข้อมูลผู้ใช้จาก localStorage
-   *
-   * อธิบาย: ไม่ได้เชื่อมต่อ API โดยตรง แต่ดึงข้อมูลที่บันทึกไว้ใน localStorage
-   * ซึ่งได้จากการ login ก่อนหน้านี้ โดยมีโครงสร้างข้อมูลดังนี้:
-   *
-   * Expected user structure:
-   * {
-   *   id: string,
-   *   name: string,
-   *   employeeId: string,
-   *   email: string,
-   *   role: "User" | "Admin" | "SuperAdmin",
-   *   profilePicture?: string (optional),
-   *   ...other properties
-   * }
-   *
-   * ถ้าไม่พบข้อมูลผู้ใช้ จะ redirect ไปยังหน้า login
-   * ไม่มีการตรวจสอบ role เพราะมีการกรองเมนูตาม role แทน
+   * ตรวจสอบ authentication
    */
   useEffect(() => {
-    const storedUser = localStorage.getItem("user");
-    if (storedUser) {
-      try {
-        setUser(JSON.parse(storedUser));
-      } catch (error) {
-        console.error("Failed to parse user data:", error);
-        localStorage.removeItem("user");
-        navigate("/login");
-      }
-    } else {
+    // ย้ายการตรวจสอบมาที่ App หรือ ProtectedRoute
+    // เนื่องจาก UserContext จะจัดการข้อมูลให้แล้ว
+    if (!user) {
       navigate("/login");
     }
-  }, [navigate]);
+  }, [navigate, user]);
 
   useEffect(() => {
     if (location.pathname === "/settings") {
@@ -122,21 +101,13 @@ const Sidebar = () => {
         setSelectedKey(menuItem ? menuItem.key : "1");
       }
     }
-  }, [location.pathname, user, filteredMenuItems]);
+  }, [location.pathname, filteredMenuItems]);
 
   /**
-   * Logout function
-   *
-   * อธิบาย: ไม่ได้เชื่อมต่อ API logout โดยตรง แต่ลบข้อมูล token และ user
-   * ออกจาก localStorage ซึ่งในระบบที่สมบูรณ์ควรมีการเรียก API Logout ด้วย
-   *
-   * สำหรับระบบที่มีความปลอดภัยสูง ควรทำการเพิ่ม:
-   * 1. การเรียก API ไปยัง endpoint เช่น /api/auth/logout เพื่อยกเลิก token ฝั่งเซิร์ฟเวอร์
-   * 2. ล้าง cookies ที่เกี่ยวข้อง (ถ้ามี)
+   * Logout function - เรียกใช้ clearUser จาก context
    */
   const handleLogout = () => {
-    localStorage.removeItem("user");
-    localStorage.removeItem("token");
+    clearUser(); // ใช้ฟังก์ชันจาก context แทน
     message.success("Logged out successfully");
     navigate("/login");
   };

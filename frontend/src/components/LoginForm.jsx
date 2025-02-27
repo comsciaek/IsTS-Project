@@ -6,6 +6,7 @@ import {
   logNavigationAttempt,
   diagnoseNavigationIssues,
 } from "../utils/debugUtils";
+import { useUser } from "../context/UserContext";
 
 const onChange = (e) => {
   console.log(`checked = ${e.target.checked}`);
@@ -35,6 +36,9 @@ const LoginForm = () => {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const variant = Form.useWatch("variant", form);
+
+  // ใช้ context เพื่ออัพเดตข้อมูลผู้ใช้
+  const { updateUser } = useUser();
 
   const handleLogin = () => {
     // Check for common navigation issues before attempting login
@@ -81,7 +85,8 @@ const LoginForm = () => {
 
                 // Store what we have
                 localStorage.setItem("token", data.token || "");
-                localStorage.setItem("user", JSON.stringify(fallbackUserData));
+                // อัพเดตข้อมูลผู้ใช้ใน context
+                updateUser(fallbackUserData);
 
                 message.success("Login successful!");
 
@@ -96,7 +101,8 @@ const LoginForm = () => {
 
               // If we got here, we have user data - store it
               localStorage.setItem("token", data.token || "");
-              localStorage.setItem("user", JSON.stringify(userData));
+              // อัพเดตข้อมูลผู้ใช้ใน context
+              updateUser(userData);
 
               message.success(
                 "Welcome to the Issue Support and Tracking System!"
@@ -108,7 +114,8 @@ const LoginForm = () => {
               if (!role) {
                 console.warn("User role is undefined, defaulting to User role");
                 userData.role = "User"; // Set default role
-                localStorage.setItem("user", JSON.stringify(userData)); // Update stored user data
+                // อัพเดตข้อมูลผู้ใช้ใน context อีกครั้ง
+                updateUser(userData);
               }
 
               // Log navigation attempt for debugging

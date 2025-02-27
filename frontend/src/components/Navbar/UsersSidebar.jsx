@@ -13,6 +13,7 @@ import { Content } from "antd/es/layout/layout";
 import { Outlet } from "react-router";
 import NotiFications from "../NotiFications";
 import { getUserDisplayName, getUserInitial } from "../../utils/userUtils";
+import { useUser } from "../../context/UserContext";
 
 const { Header, Sider } = Layout;
 
@@ -21,7 +22,9 @@ const UsersSidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [selectedKey, setSelectedKey] = useState("");
-  const [user, setUser] = useState(null);
+
+  // ใช้ context แทนการเก็บ state แยก
+  const { user, clearUser } = useUser();
 
   // Define menu items with role-based access
   const menuItems = useMemo(
@@ -46,44 +49,19 @@ const UsersSidebar = () => {
   );
 
   /**
-   * เชื่อมต่อ API: ดึงข้อมูลผู้ใช้จาก localStorage
-   *
-   * อธิบาย: ไม่ได้เชื่อมต่อ API โดยตรง แต่ดึงข้อมูลที่บันทึกไว้ใน localStorage
-   * ซึ่งได้จากการ login ก่อนหน้านี้ โดยมีโครงสร้างข้อมูลดังนี้:
-   *
-   * Expected user structure:
-   * {
-   *   id: string,
-   *   name: string,
-   *   employeeId: string,
-   *   email: string,
-   *   role: "User" | "Admin" | "SuperAdmin",
-   *   profilePicture?: string (optional),
-   *   ...other properties
-   * }
-   *
-   * ถ้าไม่พบข้อมูลผู้ใช้ หรือไม่ใช่ role "User" จะ redirect ไปยังหน้า unauthorized หรือ login
+   * ตรวจสอบ authentication และ role
    */
   useEffect(() => {
-    const storedUser = localStorage.getItem("user");
-    if (storedUser) {
-      try {
-        const parsedUser = JSON.parse(storedUser);
-        setUser(parsedUser);
-
-        // Check if user has User role
-        if (parsedUser.role !== "User") {
-          navigate("/unauthorized");
-        }
-      } catch (error) {
-        console.error("Failed to parse user data:", error);
-        localStorage.removeItem("user");
-        navigate("/login");
-      }
-    } else {
+    if (!user) {
       navigate("/login");
+      return;
     }
-  }, [navigate]);
+
+    // Check if user has User role
+    if (user.role !== "User") {
+      navigate("/unauthorized");
+    }
+  }, [navigate, user]);
 
   useEffect(() => {
     // Find selected key based on current path
@@ -95,14 +73,10 @@ const UsersSidebar = () => {
   }, [location]);
 
   /**
-   * Logout function
-   *
-   * อธิบาย: ไม่ได้เชื่อมต่อ API logout โดยตรง แต่ลบข้อมูล token และ user
-   * ออกจาก localStorage ซึ่งในระบบที่สมบูรณ์ควรมีการเรียก API Logout ด้วย
+   * Logout function - เรียกใช้ clearUser จาก context
    */
   const handleLogout = () => {
-    localStorage.removeItem("user");
-    localStorage.removeItem("token");
+    clearUser(); // ใช้ฟังก์ชันจาก context แทน
     message.success("Logged out successfully");
     navigate("/login");
   };
