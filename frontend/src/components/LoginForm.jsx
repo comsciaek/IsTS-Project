@@ -182,9 +182,7 @@ const LoginForm = () => {
       variant={variant || "filled"}
       initialValues={{
         variant: "filled",
-      }}
-      onFinish={handleLogin} // เพิ่ม onFinish prop เพื่อให้ทำงานเมื่อกด Enter
-    >
+      }}>
       <div className="text-2xl font-semibold mb-6 ">
         <span className="text-[#757575] text-sm font-normal">
           ยินดีต้อนรับ Issue Support and Tracking System!
@@ -225,24 +223,21 @@ const LoginForm = () => {
 
       {/* ปุ่ม Login */}
       <div className="mb-4">
-        <Form.Item>
-          <Button
-            type="primary"
-            htmlType="submit" // เพิ่ม htmlType="submit" เพื่อระบุว่านี่เป็นปุ่ม submit ของแบบฟอร์ม
-            style={{
-              backgroundColor: "#262362",
-              transition: "background-color 0.3s",
-              border: "none",
-            }}
-            onMouseEnter={(e) => (e.target.style.backgroundColor = "#193CB8")}
-            onMouseLeave={(e) => (e.target.style.backgroundColor = "#262362")}
-            size={"large"}
-            block
-            loading={loading}
-            onClick={handleLogin}>
-            Login
-          </Button>
-        </Form.Item>
+        <Button
+          type="primary"
+          style={{
+            backgroundColor: "#262362",
+            transition: "background-color 0.3s",
+            border: "none",
+          }}
+          onMouseEnter={(e) => (e.target.style.backgroundColor = "#193CB8")}
+          onMouseLeave={(e) => (e.target.style.backgroundColor = "#262362")}
+          size={"large"}
+          block
+          loading={loading}
+          onClick={handleLogin}>
+          Login
+        </Button>
       </div>
 
       {/* ลิงก์ Create Account และ Forgot Password */}

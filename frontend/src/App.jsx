@@ -21,7 +21,7 @@ import { hasRequiredRole } from "./utils/authUtils";
 import PropTypes from "prop-types";
 
 // Protected Route Component
-const ProtectedRoute = ({ children, allowedroles }) => {
+const ProtectedRoute = ({ children, allowedRoles }) => {
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userRole, setUserRole] = useState(null);
@@ -59,7 +59,7 @@ const ProtectedRoute = ({ children, allowedroles }) => {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  if (allowedroles && !hasRequiredRole(userRole, allowedroles)) {
+  if (allowedRoles && !hasRequiredRole(userRole, allowedRoles)) {
     return <Navigate to="/unauthorized" replace />;
   }
 
@@ -68,7 +68,7 @@ const ProtectedRoute = ({ children, allowedroles }) => {
 
 ProtectedRoute.propTypes = {
   children: PropTypes.node.isRequired,
-  allowedroles: PropTypes.arrayOf(PropTypes.string),
+  allowedRoles: PropTypes.arrayOf(PropTypes.string),
 };
 
 const App = () => {
@@ -85,7 +85,7 @@ const App = () => {
         {/* Admin & Super Admin Routes */}
         <Route
           element={
-            <ProtectedRoute allowedroles={["Admin", "SuperAdmin"]}>
+            <ProtectedRoute allowedRoles={["Admin", "SuperAdmin"]}>
               <DashboardLayout />
             </ProtectedRoute>
           }>
@@ -98,7 +98,7 @@ const App = () => {
           <Route
             path="reports"
             element={
-              <ProtectedRoute allowedroles={["SuperAdmin"]}>
+              <ProtectedRoute allowedRoles={["SuperAdmin"]}>
                 <Reports />
               </ProtectedRoute>
             }
@@ -106,7 +106,7 @@ const App = () => {
           <Route
             path="manage-roles"
             element={
-              <ProtectedRoute allowedroles={["SuperAdmin"]}>
+              <ProtectedRoute allowedRoles={["SuperAdmin"]}>
                 <ManageRoles />
               </ProtectedRoute>
             }
@@ -117,7 +117,7 @@ const App = () => {
         <Route
           path="user"
           element={
-            <ProtectedRoute allowedroles={["User"]}>
+            <ProtectedRoute allowedRoles={["User"]}>
               <UserDashboardLayout />
             </ProtectedRoute>
           }>
