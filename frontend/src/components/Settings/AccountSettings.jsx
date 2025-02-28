@@ -56,8 +56,6 @@ const AccountSettings = () => {
           },
         });
 
-        console.log("User profile data:", response);
-
         // รองรับทั้งกรณี response.data.user และ response.data
         const profileData = response.data.user || response.data.data;
 
@@ -138,7 +136,6 @@ const AccountSettings = () => {
       );
 
       const newres = response.data;
-      console.log("Upload response:", response.data);
 
       // ตรวจสอบการตอบกลับ
       if (

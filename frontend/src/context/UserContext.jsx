@@ -82,7 +82,7 @@ export const UserProvider = ({ children }) => {
           // บันทึกเวลาล่าสุดที่อัพเดต
           setLastUpdateTime(now);
 
-          console.log("User data updated:", mergedData);
+          
           return mergedData;
         });
 
