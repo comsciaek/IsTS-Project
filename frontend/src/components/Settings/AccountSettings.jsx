@@ -282,20 +282,19 @@ const AccountSettings = () => {
             />
           </div>
 
-          {/* วิธีที่ 1: ใช้ input file ธรรมดากับปุ่มอัพโหลด */}
-          {/* <div className="flex flex-col items-center space-y-2">
-            <input
-              type="file"
-              id="profile-upload"
-              onChange={handleFileChange}
-              accept="image/*"
-              style={{ display: "none" }}
-            />
-            <label htmlFor="profile-upload">
+          {/* วิธีที่ 2: ยังคงใช้ Upload component ของ antd */}
+          <div className="flex flex-col items-center space-y-4">
+            <Upload
+              name="profileImage"
+              showUploadList={false}
+              beforeUpload={(file) => {
+                setImage(file);
+                return false; // ป้องกันการอัพโหลดอัตโนมัติ
+              }}>
               <Button icon={<UploadOutlined />} style={{ marginTop: 8 }}>
                 เลือกรูปภาพ
               </Button>
-            </label>
+            </Upload>
 
             {image && (
               <Button
@@ -305,39 +304,12 @@ const AccountSettings = () => {
                 style={{
                   backgroundColor: "#262362",
                   borderColor: "#262362",
+                  marginTop: 16, // เพิ่มระยะห่างด้านบนเป็น 16px
                 }}>
                 อัพโหลดรูปภาพ
               </Button>
             )}
-          </div> */}
-
-          {/* วิธีที่ 2: ยังคงใช้ Upload component ของ antd (ใช้อันใดอันหนึ่ง) */}
-
-          <Upload
-            name="profileImage"
-            showUploadList={false}
-            beforeUpload={(file) => {
-              setImage(file);
-              return false; // ป้องกันการอัพโหลดอัตโนมัติ
-            }}>
-            <Button icon={<UploadOutlined />} style={{ marginTop: 8 }}>
-              เลือกรูปภาพ
-            </Button>
-          </Upload>
-
-          {image && (
-            <Button
-              type="primary"
-              onClick={handleUpload}
-              loading={uploadLoading}
-              style={{
-                backgroundColor: "#262362",
-                borderColor: "#262362",
-                marginTop: 8,
-              }}>
-              อัพโหลดรูปภาพ
-            </Button>
-          )}
+          </div>
         </div>
 
         <Divider />

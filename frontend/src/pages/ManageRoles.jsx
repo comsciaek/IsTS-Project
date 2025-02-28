@@ -205,7 +205,7 @@ const ManageRoles = () => {
   // กำหนดคอลัมน์สำหรับตาราง
   const columns = [
     {
-      title: "ผู้ใช้งาน",
+      title: "Employee",
       dataIndex: "name",
       key: "name",
       render: (_, record) => (
@@ -224,19 +224,19 @@ const ManageRoles = () => {
       ),
     },
     {
-      title: "อีเมล",
+      title: "Email",
       dataIndex: "email",
       key: "email",
       responsive: ["md"],
     },
     {
-      title: "แผนก",
+      title: "Department",
       dataIndex: "department",
       key: "department",
       responsive: ["lg"],
     },
     {
-      title: "บทบาท",
+      title: "Roles",
       dataIndex: "role",
       key: "role",
       render: (text, record) => (
@@ -259,7 +259,7 @@ const ManageRoles = () => {
       ),
     },
     {
-      title: "จัดการ",
+      title: "Action",
       key: "action",
       render: (_, record) => (
         <Button
