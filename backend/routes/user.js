@@ -129,6 +129,15 @@ router.put('/profile/:id', protect, (req, res, next) => {
         return res.status(400).json({ message: 'Only image files are allowed' });
       }
 
+      // ลบไฟล์เก่าจากโฟลเดอร์ ./uploads ถ้ามี
+      if (user.profileImage) {
+        const oldFileName = user.profileImage.split('/').pop(); // ดึงชื่อไฟล์เก่าจาก URL
+        const oldFilePath = path.join(uploadDir, oldFileName);
+        if (fs.existsSync(oldFilePath)) {
+          fs.unlinkSync(oldFilePath); // ลบไฟล์เก่า
+        }
+      }
+
       imageUrl = `http://172.18.43.39:5000/uploads/${req.file.filename}`;
       updatedData.profileImage = imageUrl;
     }
