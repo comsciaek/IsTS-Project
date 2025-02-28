@@ -70,10 +70,6 @@ const ManageRoles = () => {
         userData = []; // ใช้อาร์เรย์ว่าง
       }
 
-      // กำหนดรูปภาพเริ่มต้น
-      const defaultImage =
-        "https://t3.ftcdn.net/jpg/02/43/12/34/360_F_243123463_zTooub557xEWABDLk0jJklDyLSGl2jrr.jpg";
-
       // แปลงข้อมูล
       const formattedUsers = userData.map((user) => ({
         key: user.id || user._id,
@@ -84,7 +80,7 @@ const ManageRoles = () => {
           `${user.firstName || ""} ${user.lastName || ""}`.trim() ||
           "ไม่ระบุชื่อ",
         email: user.email || "ไม่มีอีเมล",
-        image: user.profileImage || user.profilePicture || defaultImage,
+        image: user.profileImage || user.profilePicture,
         role: user.role || "User",
         department: user.department || "ไม่ระบุแผนก",
       }));
