@@ -150,8 +150,8 @@ const UsersSidebar = () => {
                 onClick={(e) => e.preventDefault()}
                 style={{ marginLeft: "16px" }}>
                 <Space className="text-white">
-                  {user?.profilePicture ? (
-                    <Avatar src={user.profilePicture} />
+                  {user?.profileImage || user?.profilePicture ? (
+                    <Avatar src={user.profileImage || user.profilePicture} />
                   ) : (
                     <Avatar>{getUserInitial(user)}</Avatar>
                   )}

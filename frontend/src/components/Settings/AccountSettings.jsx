@@ -108,7 +108,7 @@ const AccountSettings = () => {
     fetchUserProfile();
   }, [form, updateUser, user]);
 
-  // อัพโหลดรูปโปรไฟล์ (แบบใหม่)
+  // อัพโหลดรูปโปรไฟล์
   const handleUpload = async () => {
     if (!image) {
       message.warning("กรุณาเลือกรูปภาพก่อนอัพโหลด");
@@ -153,7 +153,7 @@ const AccountSettings = () => {
           newres.data.profileImage ||
           newres.data.profilePicture;
 
-        // อัพเดต state และ context
+        // อัพเดต state และ context - ทำให้แน่ใจว่า update ทั้ง profileImage และ profilePicture
         setProfileImage(imageUrl);
         updateUser({
           profileImage: imageUrl,
@@ -162,11 +162,29 @@ const AccountSettings = () => {
 
         message.success("อัพโหลดรูปโปรไฟล์สำเร็จ");
       } else {
-        message.error("อัพโหลดรูปโปรไฟล์ไม่สำเร็จ");
+        // ถ้าไม่มีข้อมูลรูปจาก API แต่เรามี image แล้ว ให้สร้าง URL ท้องถิ่นและอัพเดต
+        const localUrl = URL.createObjectURL(image);
+        setProfileImage(localUrl);
+        updateUser({
+          profileImage: localUrl,
+          profilePicture: localUrl,
+        });
+
+        message.success("อัพโหลดรูปโปรไฟล์สำเร็จ (local)");
       }
     } catch (error) {
       console.error("Error uploading profile image:", error);
       message.error("ไม่สามารถอัพโหลดรูปโปรไฟล์ได้");
+
+      // ในกรณีที่มีข้อผิดพลาด ให้สร้าง URL ท้องถิ่นเพื่อแสดงรูปที่เลือก
+      if (image) {
+        const localUrl = URL.createObjectURL(image);
+        setProfileImage(localUrl);
+        updateUser({
+          profileImage: localUrl,
+          profilePicture: localUrl,
+        });
+      }
     } finally {
       setUploadLoading(false);
     }

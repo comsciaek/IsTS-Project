@@ -66,16 +66,24 @@ export const UserProvider = ({ children }) => {
             return prevUser;
           }
 
-          // สร้างข้อมูลที่อัพเดตแล้ว
-          const updatedUser = { ...prevUser, ...newUserData };
+          // รวมข้อมูลรูปโปรไฟล์ให้ตรงกัน ไม่ว่าจะเรียกว่า profileImage หรือ profilePicture
+          const mergedData = { ...prevUser, ...newUserData };
+
+          // ทำให้ชื่อฟิลด์ profileImage และ profilePicture มีค่าเดียวกันเสมอ
+          if (newUserData.profileImage) {
+            mergedData.profilePicture = newUserData.profileImage;
+          } else if (newUserData.profilePicture) {
+            mergedData.profileImage = newUserData.profilePicture;
+          }
 
           // บันทึกลง localStorage
-          localStorage.setItem("user", JSON.stringify(updatedUser));
+          localStorage.setItem("user", JSON.stringify(mergedData));
 
           // บันทึกเวลาล่าสุดที่อัพเดต
           setLastUpdateTime(now);
 
-          return updatedUser;
+          console.log("User data updated:", mergedData);
+          return mergedData;
         });
 
         return true;
