@@ -1,296 +1,234 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import {
   Form,
   Input,
   Button,
-  Upload,
   Avatar,
   message,
   Row,
   Col,
   Spin,
+  Card,
+  Divider,
+  Upload,
 } from "antd";
 import {
   UploadOutlined,
   UserOutlined,
   LoadingOutlined,
+  SaveOutlined,
 } from "@ant-design/icons";
 import axios from "axios";
 import { useUser } from "../../context/UserContext";
-import { data } from "react-router";
+
+// API Base URL
+const API_BASE_URL = "http://172.18.43.39:5000/api";
 
 const AccountSettings = () => {
   const [form] = Form.useForm();
-  const [profilePic, setProfilePic] = useState(null);
+  const [profileImage, setProfileImage] = useState(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [userData, setUserData] = useState(null);
+  const [uploadLoading, setUploadLoading] = useState(false);
+  const [image, setImage] = useState(null);
 
   // เรียกใช้ context สำหรับข้อมูลผู้ใช้
   const { user, updateUser } = useUser();
 
-  // เพิ่ม ref เพื่อติดตามสถานะการดึงข้อมูลจาก API
-  const apiCallMadeRef = useRef(false);
-  const initialRenderRef = useRef(true);
-
-  // ดึงข้อมูลผู้ใช้จาก localStorage และ API
+  // ดึงข้อมูลผู้ใช้จากเซิร์ฟเวอร์
   useEffect(() => {
-    // ถ้าเป็นการเรนเดอร์ครั้งแรก หรือยังไม่เคยเรียก API ให้ดำเนินการ
-    if (initialRenderRef.current || !apiCallMadeRef.current) {
-      const fetchUserProfile = async () => {
+    const fetchUserProfile = async () => {
+      try {
         setLoading(true);
-        try {
-          // ใช้ข้อมูลจาก context แทนการดึงจาก localStorage โดยตรง
-          if (!user) {
-            message.error("ไม่พบข้อมูลผู้ใช้");
-            setLoading(false);
-            return;
-          }
 
-          setUserData(user); // เก็บข้อมูลเบื้องต้นจาก context ก่อน
+        if (!user || !user.id) {
+          message.error("ไม่พบข้อมูลผู้ใช้");
+          setLoading(false);
+          return;
+        }
 
-          const userId = user.id || user._id;
+        const token = localStorage.getItem("token");
 
-          if (!userId) {
-            message.error("ไม่พบ ID ของผู้ใช้");
-            setLoading(false);
-            return;
-          }
+        // เรียก API เพื่อดึงข้อมูลโปรไฟล์
+        const response = await axios.get(`${API_BASE_URL}/users/me`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
 
-          // ตั้งค่ารูปโปรไฟล์
-          if (user.profileImage) {
-            setProfilePic(user.profileImage);
-          }
+        console.log("User profile data:", response);
 
-          // ตั้งค่าข้อมูลเริ่มต้นในฟอร์มจากข้อมูลที่มีอยู่ใน context
+        // รองรับทั้งกรณี response.data.user และ response.data
+        const profileData = response.data.user || response.data.data;
+
+        // อัพเดตข้อมูลผู้ใช้ใน context
+        updateUser(profileData);
+
+        // กำหนดค่าเริ่มต้นให้แบบฟอร์ม
+        form.setFieldsValue({
+          firstName: profileData.firstName || user.firstName || "",
+          lastName: profileData.lastName || user.lastName || "",
+          employeeId: profileData.employeeId || user.employeeId || "",
+          department: profileData.department || user.department || "",
+          position: profileData.position || user.position || "",
+          phoneNumber: profileData.phoneNumber || user.phoneNumber || "",
+          email: profileData.email || user.email || "",
+        });
+
+        // ตั้งค่ารูปโปรไฟล์
+        setProfileImage(
+          profileData.profileImage ||
+            profileData.profilePicture ||
+            user.profileImage ||
+            user.profilePicture
+        );
+      } catch (error) {
+        console.error("Error fetching user profile:", error);
+        message.error("ไม่สามารถดึงข้อมูลโปรไฟล์ได้");
+
+        // ถ้าไม่สามารถเรียก API ได้ ใช้ข้อมูลจาก context แทน
+        if (user) {
           form.setFieldsValue({
-            firstName: user.firstName || user.name?.split(" ")[0] || "",
-            lastName: user.lastName || user.name?.split(" ")[1] || "",
+            firstName: user.firstName || "",
+            lastName: user.lastName || "",
             employeeId: user.employeeId || "",
             department: user.department || "",
             position: user.position || "",
-            email: user.email || "",
             phoneNumber: user.phoneNumber || "",
+            email: user.email || "",
           });
 
-          // ดึงข้อมูลจาก API เฉพาะเมื่อยังไม่เคยทำการ API call
-          if (!apiCallMadeRef.current) {
-            try {
-              const token = localStorage.getItem("token");
-              const response = await axios.get(
-                `http://172.18.43.39:5000/api/users/profile/${userId}`,
-                {
-                  headers: {
-                    Authorization: `Bearer ${token}`,
-                  },
-                }
-              );
-
-              console.log("API response:", response.data);
-
-              if (response.data) {
-                // รองรับทั้งกรณี { user: {...} } และ { ... }
-                const apiUser = response.data.user || response.data;
-
-                // อัพเดทข้อมูลผู้ใช้ด้วยข้อมูลล่าสุดจาก API
-                setUserData((prev) => ({ ...prev, ...apiUser }));
-
-                // ตั้งค่าข้อมูลเริ่มต้นในฟอร์มจากข้อมูล API
-                form.setFieldsValue({
-                  firstName:
-                    apiUser.firstName ||
-                    apiUser.name?.split(" ")[0] ||
-                    user.firstName ||
-                    "",
-                  lastName:
-                    apiUser.lastName ||
-                    apiUser.name?.split(" ")[1] ||
-                    user.lastName ||
-                    "",
-                  employeeId: apiUser.employeeId || user.employeeId || "",
-                  department: apiUser.department || user.department || "",
-                  position: apiUser.position || user.position || "",
-                  email: apiUser.email || user.email || "",
-                  phoneNumber: apiUser.phoneNumber || user.phoneNumber || "",
-                });
-
-                // ตั้งค่ารูปโปรไฟล์จาก API
-                if (apiUser.profileImage) {
-                  setProfilePic(apiUser.profileImage);
-                }
-
-                // เราใช้ useRef แทนที่จะอัพเดต context ในที่นี้
-                // นี่เป็นสาเหตุของการ loop
-                // updateUser(apiUser); <- สาเหตุของการ loop
-              }
-
-              // ทำเครื่องหมายว่าได้เรียก API แล้ว
-              apiCallMadeRef.current = true;
-            } catch (apiError) {
-              console.error("API Error:", apiError);
-              message.warning(
-                "ไม่สามารถดึงข้อมูลเพิ่มเติมจาก API ได้ จะใช้ข้อมูลเดิมที่มีอยู่"
-              );
-
-              // ถึงแม้จะเกิด error ก็ถือว่าได้พยายามเรียก API แล้ว
-              apiCallMadeRef.current = true;
-            }
-          }
-        } catch (error) {
-          console.error("Error fetching user profile:", error);
-          message.error("ไม่สามารถดึงข้อมูลโปรไฟล์ได้");
-        } finally {
-          setLoading(false);
-          initialRenderRef.current = false;
+          setProfileImage(user.profileImage || user.profilePicture);
         }
-      };
-
-      fetchUserProfile();
-    }
-
-    // ไม่ต้องมี return สำหรับ cleanup function เนื่องจากเราใช้ ref
-    // ถ้ามีการ cleanup อาจทำให้ ref reset และเกิด loop ใหม่
-  }, [form, user]); // ลบ updateUser ออกจาก dependencies
-
-  const handleUpload = async (info) => {
-    if (info.file.status !== "uploading") {
-      console.log(info.file, info.fileList);
-    }
-
-    if (info.file.status === "done") {
-      try {
-        // สร้าง FormData สำหรับอัพโหลดไฟล์
-        const formData = new FormData();
-        formData.append("profileImage", info.file.originFileObj);
-
-        // ดึง token และ user ID
-        const token = localStorage.getItem("token");
-        const userId = userData.id || userData._id;
-
-        // ส่งไฟล์ไปยัง endpoint สำหรับอัพโหลดรูปโปรไฟล์
-        try {
-          const response = await axios.post(
-            `http://172.18.43.39:5000/api/users/profile/${userId}`,
-            formData,
-            {
-              headers: {
-                "Content-Type": "multipart/form-data",
-                Authorization: `Bearer ${token}`,
-              },
-            }
-          );
-
-          if (response.data && response.data.success) {
-            // อัพเดต URL รูปโปรไฟล์จาก response
-            const profilePictureUrl =
-              response.data.profilePictureUrl || response.data.url;
-            setProfilePic(profilePictureUrl);
-            message.success(`${info.file.name} อัปโหลดสำเร็จ`);
-
-            // อัพเดตข้อมูล user ใน context ด้วย URL รูปใหม่
-            updateUser({ profileImage: profilePictureUrl });
-
-            // อัพเดต state
-            setUserData((prevData) => ({
-              ...prevData,
-              profileImage: profilePictureUrl,
-            }));
-          } else {
-            message.error(`${info.file.name} อัปโหลดไม่สำเร็จ`);
-          }
-        } catch (apiError) {
-          console.error("API Error during upload:", apiError);
-          message.warning(
-            "ไม่สามารถอัพโหลดไปยังเซิร์ฟเวอร์ได้ แสดงภาพชั่วคราว"
-          );
-
-          // ใช้ URL ชั่วคราว
-          const localUrl = URL.createObjectURL(info.file.originFileObj);
-          setProfilePic(localUrl);
-
-          // บันทึกและอัพเดต context ด้วย URL ภาพชั่วคราว
-          updateUser({ profileImage: localUrl });
-        }
-      } catch (error) {
-        console.error("Error uploading profile picture:", error);
-        message.error(`${info.file.name} อัปโหลดไม่สำเร็จ: ${error.message}`);
-
-        // ถ้าอัพโหลดไม่สำเร็จ เราจะใช้ URL ชั่วคราวเพื่อแสดงผลในหน้าเว็บ
-        const localUrl = URL.createObjectURL(info.file.originFileObj);
-        setProfilePic(localUrl);
+      } finally {
+        setLoading(false);
       }
-    } else if (info.file.status === "error") {
-      message.error(
-        `${info.file.name} อัปโหลดล้มเหลว: ${info.file.error.message}`
+    };
+
+    fetchUserProfile();
+  }, [form, updateUser, user]);
+
+  // อัพโหลดรูปโปรไฟล์ (แบบใหม่)
+  const handleUpload = async () => {
+    if (!image) {
+      message.warning("กรุณาเลือกรูปภาพก่อนอัพโหลด");
+      return;
+    }
+
+    try {
+      setUploadLoading(true);
+
+      const userId = user.id || user._id;
+      const token = localStorage.getItem("token");
+
+      // สร้าง FormData สำหรับส่งไฟล์
+      const formData = new FormData();
+      formData.append("image", image);
+
+      // ส่งไฟล์ไปยังเซิร์ฟเวอร์
+      const response = await axios.put(
+        `${API_BASE_URL}/users/profile/${userId}`,
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+            Authorization: `Bearer ${token}`,
+          },
+        }
       );
+
+      const newres = response.data;
+      console.log("Upload response:", response.data);
+
+      // ตรวจสอบการตอบกลับ
+      if (
+        newres.data &&
+        (newres.data.url ||
+          newres.data.profileImage ||
+          newres.data.profilePicture)
+      ) {
+        // ดึง URL รูปภาพจาก newres
+        const imageUrl =
+          newres.data.url ||
+          newres.data.profileImage ||
+          newres.data.profilePicture;
+
+        // อัพเดต state และ context
+        setProfileImage(imageUrl);
+        updateUser({
+          profileImage: imageUrl,
+          profilePicture: imageUrl,
+        });
+
+        message.success("อัพโหลดรูปโปรไฟล์สำเร็จ");
+      } else {
+        message.error("อัพโหลดรูปโปรไฟล์ไม่สำเร็จ");
+      }
+    } catch (error) {
+      console.error("Error uploading profile image:", error);
+      message.error("ไม่สามารถอัพโหลดรูปโปรไฟล์ได้");
+    } finally {
+      setUploadLoading(false);
     }
   };
 
+  // ฟังก์ชันใหม่สำหรับจัดการการเลือกไฟล์
+  // const handleFileChange = (e) => {
+  //   const file = e.target.files[0];
+  //   if (file) {
+  //     setImage(file);
+  //     // สร้าง URL ชั่วคราวสำหรับแสดงตัวอย่าง
+  //     const previewURL = URL.createObjectURL(file);
+  //     setProfileImage(previewURL);
+  //   }
+  // };
+
+  // อัพเดตข้อมูลผู้ใช้
   const handleFinish = async (values) => {
     try {
       setSubmitting(true);
 
-      if (!userData || !(userData.id || userData._id)) {
-        message.error("ไม่พบข้อมูลผู้ใช้สำหรับอัปเดต");
+      if (!user || !user.id) {
+        message.error("ไม่พบข้อมูลผู้ใช้");
         return;
       }
 
-      const userId = userData.id || userData._id;
+      const userId = user.id || user._id;
       const token = localStorage.getItem("token");
-      const updatedData = {
-        ...values,
-        profileImage: profilePic,
-      };
 
-      // อัพเดตข้อมูลผู้ใช้ผ่าน API
-      try {
-        const response = await axios.put(
-          `http://172.18.43.39:5000/api/users/profile/${userId}`,
-          updatedData,
-          {
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
-
-        if (response.data && response.data.success) {
-          message.success("อัปเดตโปรไฟล์สำเร็จ!");
+      // ส่งข้อมูลไปอัพเดตที่เซิร์ฟเวอร์
+      const response = await axios.put(
+        `${API_BASE_URL}/users/profile/${userId}`,
+        {
+          ...values,
+          profileImage: profileImage,
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
         }
-      } catch (apiError) {
-        console.error("API Error during profile update:", apiError);
-        message.warning(
-          "ไม่สามารถอัพเดตโปรไฟล์ไปยังเซิร์ฟเวอร์ได้ บันทึกเฉพาะในเบราว์เซอร์"
-        );
+      );
+      const newres = response.data;
+
+      if (newres.data) {
+        message.success("อัพเดตข้อมูลโปรไฟล์สำเร็จ");
+
+        // อัพเดตข้อมูลใหม่ใน context
+        const fullName = `${values.firstName} ${values.lastName}`.trim();
+        updateUser({
+          ...values,
+          name: fullName,
+          profileImage: profileImage,
+          profilePicture: profileImage,
+        });
+      } else {
+        message.warning("ไม่สามารถอัพเดตข้อมูลบนเซิร์ฟเวอร์ได้");
       }
-
-      // อัพเดตชื่อเต็ม
-      const fullName = `${values.firstName} ${values.lastName}`.trim();
-
-      // อัพเดตข้อมูลใน context
-      updateUser({
-        firstName: values.firstName,
-        lastName: values.lastName,
-        name: fullName,
-        phoneNumber: values.phoneNumber,
-        profileImage: profilePic,
-      });
-
-      // อัพเดต state
-      setUserData((prevData) => ({
-        ...prevData,
-        firstName: values.firstName,
-        lastName: values.lastName,
-        name: fullName,
-        phoneNumber: values.phoneNumber,
-        profileImage: profilePic,
-      }));
-
-      message.success("บันทึกข้อมูลเรียบร้อย!");
     } catch (error) {
-      console.error("Error updating user profile:", error);
-      message.error(`ไม่สามารถอัปเดตโปรไฟล์ได้: ${error.message}`);
+      console.error("Error updating profile:", error);
+      message.error("ไม่สามารถอัพเดตข้อมูลโปรไฟล์ได้");
     } finally {
       setSubmitting(false);
     }
@@ -298,126 +236,170 @@ const AccountSettings = () => {
 
   if (loading) {
     return (
-      <div style={{ textAlign: "center", padding: "50px 0" }}>
+      <div style={{ textAlign: "center", padding: "100px 0" }}>
         <Spin indicator={<LoadingOutlined style={{ fontSize: 24 }} spin />} />
-        <p style={{ marginTop: 16 }}>กำลังโหลดข้อมูลโปรไฟล์...</p>
+        <div style={{ marginTop: 16 }}>กำลังโหลดข้อมูลโปรไฟล์...</div>
       </div>
     );
   }
 
   return (
-    <>
-      <Form form={form} layout="vertical" onFinish={handleFinish}>
-        <Form.Item label="รูปโปรไฟล์" style={{ textAlign: "center" }}>
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-            }}>
+    <Card title="ข้อมูลส่วนตัว" className="shadow-md">
+      <Form
+        form={form}
+        layout="vertical"
+        onFinish={handleFinish}
+        initialValues={{
+          firstName: "",
+          lastName: "",
+          employeeId: "",
+          department: "",
+          position: "",
+          email: "",
+          phoneNumber: "",
+        }}>
+        <div className="mb-6 text-center">
+          <div style={{ marginBottom: "16px" }}>
             <Avatar
               size={100}
-              src={profilePic}
-              icon={<UserOutlined />}
-              style={{ marginBottom: "16px" }}
+              src={profileImage}
+              icon={!profileImage && <UserOutlined />}
             />
-            <Upload
-              name="profileImage"
-              showUploadList={false}
-              customRequest={({ onSuccess }) => {
-                setTimeout(() => {
-                  onSuccess("ok");
-                }, 0);
-              }}
-              onChange={handleUpload}>
-              <Button icon={<UploadOutlined />} style={{ marginTop: 8 }}>
-                เปลี่ยนรูปโปรไฟล์
-              </Button>
-            </Upload>
           </div>
-        </Form.Item>
+
+          {/* วิธีที่ 1: ใช้ input file ธรรมดากับปุ่มอัพโหลด */}
+          {/* <div className="flex flex-col items-center space-y-2">
+            <input
+              type="file"
+              id="profile-upload"
+              onChange={handleFileChange}
+              accept="image/*"
+              style={{ display: "none" }}
+            />
+            <label htmlFor="profile-upload">
+              <Button icon={<UploadOutlined />} style={{ marginTop: 8 }}>
+                เลือกรูปภาพ
+              </Button>
+            </label>
+
+            {image && (
+              <Button
+                type="primary"
+                onClick={handleUpload}
+                loading={uploadLoading}
+                style={{
+                  backgroundColor: "#262362",
+                  borderColor: "#262362",
+                }}>
+                อัพโหลดรูปภาพ
+              </Button>
+            )}
+          </div> */}
+
+          {/* วิธีที่ 2: ยังคงใช้ Upload component ของ antd (ใช้อันใดอันหนึ่ง) */}
+
+          <Upload
+            name="profileImage"
+            showUploadList={false}
+            beforeUpload={(file) => {
+              setImage(file);
+              return false; // ป้องกันการอัพโหลดอัตโนมัติ
+            }}>
+            <Button icon={<UploadOutlined />} style={{ marginTop: 8 }}>
+              เลือกรูปภาพ
+            </Button>
+          </Upload>
+
+          {image && (
+            <Button
+              type="primary"
+              onClick={handleUpload}
+              loading={uploadLoading}
+              style={{
+                backgroundColor: "#262362",
+                borderColor: "#262362",
+                marginTop: 8,
+              }}>
+              อัพโหลดรูปภาพ
+            </Button>
+          )}
+        </div>
+
+        <Divider />
 
         <Row gutter={16}>
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Form.Item
               name="firstName"
               label="ชื่อจริง"
-              rules={[{ required: true, message: "กรุณาใส่ชื่อจริง!" }]}>
-              <Input size={"large"} />
+              rules={[{ required: true, message: "กรุณากรอกชื่อจริง" }]}>
+              <Input placeholder="กรอกชื่อจริง" />
             </Form.Item>
           </Col>
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Form.Item
               name="lastName"
               label="นามสกุล"
-              rules={[{ required: true, message: "กรุณาใส่นามสกุล!" }]}>
-              <Input size={"large"} />
+              rules={[{ required: true, message: "กรุณากรอกนามสกุล" }]}>
+              <Input placeholder="กรอกนามสกุล" />
             </Form.Item>
           </Col>
         </Row>
 
-        <Form.Item name="employeeId" label="รหัสพนักงาน">
-          <Input
-            size={"large"}
-            disabled
-            placeholder="รหัสพนักงานจะไม่สามารถเปลี่ยนแปลงได้"
-          />
-        </Form.Item>
+        <Row gutter={16}>
+          <Col xs={24} md={12}>
+            <Form.Item name="employeeId" label="รหัสพนักงาน">
+              <Input disabled placeholder="รหัสพนักงาน" />
+            </Form.Item>
+          </Col>
+          <Col xs={24} md={12}>
+            <Form.Item name="email" label="อีเมล">
+              <Input disabled placeholder="อีเมล" />
+            </Form.Item>
+          </Col>
+        </Row>
 
-        <Form.Item name="department" label="แผนก">
-          <Input
-            size={"large"}
-            disabled
-            placeholder="แผนกจะไม่สามารถเปลี่ยนแปลงได้"
-          />
-        </Form.Item>
-
-        <Form.Item name="position" label="ตำแหน่ง">
-          <Input
-            size={"large"}
-            disabled
-            placeholder="ตำแหน่งจะไม่สามารถเปลี่ยนแปลงได้"
-          />
-        </Form.Item>
-
-        <Form.Item name="email" label="อีเมล">
-          <Input
-            size={"large"}
-            disabled
-            placeholder="อีเมลจะไม่สามารถเปลี่ยนแปลงได้"
-          />
-        </Form.Item>
+        <Row gutter={16}>
+          <Col xs={24} md={12}>
+            <Form.Item name="department" label="แผนก">
+              <Input disabled placeholder="แผนก" />
+            </Form.Item>
+          </Col>
+          <Col xs={24} md={12}>
+            <Form.Item name="position" label="ตำแหน่ง">
+              <Input disabled placeholder="ตำแหน่ง" />
+            </Form.Item>
+          </Col>
+        </Row>
 
         <Form.Item
           name="phoneNumber"
           label="เบอร์โทรศัพท์"
           rules={[
-            { required: true, message: "กรุณาใส่เบอร์โทรศัพท์!" },
+            { required: true, message: "กรุณากรอกเบอร์โทรศัพท์" },
             {
               pattern: /^[0-9]{9,10}$/,
               message: "เบอร์โทรศัพท์ต้องเป็นตัวเลข 9-10 หลัก",
             },
           ]}>
-          <Input size={"large"} placeholder="กรอกเบอร์โทรศัพท์" />
+          <Input placeholder="กรอกเบอร์โทรศัพท์" />
         </Form.Item>
 
         <Form.Item>
           <Button
             type="primary"
             htmlType="submit"
+            icon={<SaveOutlined />}
             loading={submitting}
             style={{
               backgroundColor: "#262362",
-              transition: "background-color 0.3s",
-              border: "none",
-            }}
-            onMouseEnter={(e) => (e.target.style.backgroundColor = "#193CB8")}
-            onMouseLeave={(e) => (e.target.style.backgroundColor = "#262362")}>
+              borderColor: "#262362",
+            }}>
             บันทึกการเปลี่ยนแปลง
           </Button>
         </Form.Item>
       </Form>
-    </>
+    </Card>
   );
 };
 
