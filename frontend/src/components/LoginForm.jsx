@@ -1,6 +1,6 @@
 import { Button, Checkbox, Input, Form, message } from "antd";
 import { Link } from "react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import axios from "axios";
 import {
   logNavigationAttempt,
@@ -8,26 +8,14 @@ import {
 } from "../utils/debugUtils";
 import { useUser } from "../context/UserContext";
 
-const onChange = (e) => {
-  console.log(`checked = ${e.target.checked}`);
-};
-
 const formItemLayout = {
   labelCol: {
-    xs: {
-      span: 24,
-    },
-    sm: {
-      span: 6,
-    },
+    xs: { span: 24 },
+    sm: { span: 6 },
   },
   wrapperCol: {
-    xs: {
-      span: 24,
-    },
-    sm: {
-      span: 24,
-    },
+    xs: { span: 24 },
+    sm: { span: 24 },
   },
 };
 
@@ -35,150 +23,171 @@ const LoginForm = () => {
   const [form] = Form.useForm();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const variant = Form.useWatch("variant", form);
 
   // ใช้ context เพื่ออัพเดตข้อมูลผู้ใช้
   const { updateUser } = useUser();
 
-  const handleLogin = () => {
-    // Check for common navigation issues before attempting login
-    diagnoseNavigationIssues();
+  // โหลดข้อมูลที่จัดเก็บไว้เมื่อเริ่มต้นคอมโพเนนต์
+  useEffect(() => {
+    // ตรวจสอบว่ามีข้อมูล remember me หรือไม่
+    const savedEmployeeId = localStorage.getItem("rememberedEmployeeId");
+    const rememberedMe = localStorage.getItem("rememberMe") === "true";
 
-    form
-      .validateFields()
-      .then((values) => {
-        setLoading(true);
-        setError("");
+    if (savedEmployeeId && rememberedMe) {
+      form.setFieldsValue({ employeeId: savedEmployeeId });
+      setRememberMe(true);
+    }
+  }, [form]);
 
-        // Call the API to login
-        axios
-          .post("http://172.18.43.39:5000/api/auth/login", values)
-          .then((response) => {
-            const data = response.data;
-            console.log("Raw login response:", data); // Log the exact response structure
+  // จัดการ checkbox remember me
+  const handleRememberMeChange = (e) => {
+    setRememberMe(e.target.checked);
+  };
 
-            if (data && data.success) {
-              // Look for user data in different possible locations
-              const userData = data.user || data.userData || data.data || {};
+  const handleLogin = async (values) => {
+    try {
+      // ถ้าไม่มี values ที่ถูกส่งเข้ามา (กรณีเรียกฟังก์ชันจากปุ่ม) ให้ใช้ form.validateFields()
+      if (!values) {
+        values = await form.validateFields();
+      }
 
-              console.log("User data extracted:", userData);
+      // จัดการ Remember Me
+      if (rememberMe) {
+        localStorage.setItem("rememberedEmployeeId", values.employeeId);
+        localStorage.setItem("rememberMe", "true");
+      } else {
+        // ถ้าไม่ได้เลือก remember me ให้ลบข้อมูลออก
+        localStorage.removeItem("rememberedEmployeeId");
+        localStorage.removeItem("rememberMe");
+      }
 
-              // Check if we have enough user information to proceed
-              if (
-                !userData ||
-                (typeof userData === "object" &&
-                  Object.keys(userData).length === 0)
-              ) {
-                console.warn(
-                  "Login successful but user data is missing or empty"
-                );
+      // ตรวจสอบปัญหาการนำทางก่อนพยายามเข้าสู่ระบบ
+      diagnoseNavigationIssues();
 
-                // Create minimal user data if needed
-                const fallbackUserData = {
-                  // Try to extract from other parts of the response or use defaults
-                  employeeId: values.employeeId,
-                  name: data.name || values.employeeId || "User",
-                  role: data.role || "User", // Default to User role if missing
-                };
+      setLoading(true);
+      setError("");
 
-                console.log("Using fallback user data:", fallbackUserData);
+      // เรียก API เพื่อเข้าสู่ระบบ
+      const response = await axios.post(
+        "http://172.18.43.39:5000/api/auth/login",
+        values
+      );
+      const data = response.data;
+      console.log("Raw login response:", data);
 
-                // Store what we have
-                localStorage.setItem("token", data.token || "");
-                // อัพเดตข้อมูลผู้ใช้ใน context
-                updateUser(fallbackUserData);
+      if (data && data.success) {
+        // ค้นหาข้อมูลผู้ใช้ในตำแหน่งที่เป็นไปได้
+        const userData = data.user || data.userData || data.data || {};
 
-                message.success("Login successful!");
+        console.log("User data extracted:", userData);
 
-                // Log navigation attempt for debugging
-                logNavigationAttempt("/user/home", fallbackUserData);
+        // ตรวจสอบว่าเรามีข้อมูลผู้ใช้เพียงพอที่จะดำเนินการหรือไม่
+        if (
+          !userData ||
+          (typeof userData === "object" && Object.keys(userData).length === 0)
+        ) {
+          console.warn("Login successful but user data is missing or empty");
 
-                // Redirect to user home as fallback
-                console.log("Redirecting to user home (fallback)");
-                window.location.href = "/user/home";
-                return;
-              }
+          // สร้างข้อมูลผู้ใช้ขั้นต่ำหากจำเป็น
+          const fallbackUserData = {
+            employeeId: values.employeeId,
+            name: data.name || values.employeeId || "User",
+            role: data.role || "User",
+          };
 
-              // If we got here, we have user data - store it
-              localStorage.setItem("token", data.token || "");
-              // อัพเดตข้อมูลผู้ใช้ใน context
-              updateUser(userData);
+          console.log("Using fallback user data:", fallbackUserData);
 
-              message.success(
-                "Welcome to the Issue Support and Tracking System!"
-              );
+          // จัดเก็บข้อมูลที่มี
+          localStorage.setItem("token", data.token || "");
+          updateUser(fallbackUserData);
 
-              // Determine where to redirect based on user role
-              const role = userData.role;
+          message.success("Login successful!");
 
-              if (!role) {
-                console.warn("User role is undefined, defaulting to User role");
-                userData.role = "User"; // Set default role
-                // อัพเดตข้อมูลผู้ใช้ใน context อีกครั้ง
-                updateUser(userData);
-              }
+          // บันทึกการพยายามนำทางเพื่อการดีบัก
+          logNavigationAttempt("/user/home", fallbackUserData);
 
-              // Log navigation attempt for debugging
-              logNavigationAttempt(
-                userData.role === "User" ? "/user/home" : "/",
-                userData
-              );
+          // เปลี่ยนเส้นทางไปยังหน้าแรกของผู้ใช้เป็นทางออก
+          console.log("Redirecting to user home (fallback)");
+          window.location.href = "/user/home";
+          return;
+        }
 
-              console.log("User role:", userData.role);
+        // หากเรามาถึงที่นี่ แสดงว่าเรามีข้อมูลผู้ใช้ - จัดเก็บข้อมูล
+        localStorage.setItem("token", data.token || "");
+        updateUser(userData);
 
-              // Redirect based on role with safe checks
-              if (userData.role === "User") {
-                console.log("Redirecting to user home");
-                window.location.href = "/user/home";
-              } else if (
-                userData.role === "Admin" ||
-                userData.role === "SuperAdmin"
-              ) {
-                console.log("Redirecting to admin dashboard");
-                window.location.href = "/";
-              } else {
-                console.log(
-                  "Unknown role, redirecting to user home as fallback"
-                );
-                window.location.href = "/user/home";
-              }
-            } else {
-              setError(data?.message || "Login failed");
-            }
-          })
-          .catch((error) => {
-            console.error("Error during login:", error);
-            // Better error handling with more details
-            if (error.response) {
-              // The request was made and the server responded with a status code
-              // that falls out of the range of 2xx
-              console.error("Server error data:", error.response.data);
-              console.error("Server error status:", error.response.status);
-              setError(
-                `Server error: ${
-                  error.response.data?.message || error.response.status
-                }`
-              );
-            } else if (error.request) {
-              // The request was made but no response was received
-              console.error("No response received:", error.request);
-              setError(
-                "No response from server. Please check your connection."
-              );
-            } else {
-              // Something happened in setting up the request that triggered an Error
-              console.error("Error message:", error.message);
-              setError(`Error: ${error.message}`);
-            }
-          })
-          .finally(() => {
-            setLoading(false);
-          });
-      })
-      .catch((errorInfo) => {
-        console.log("Form validation failed:", errorInfo);
+        message.success("ยินดีต้อนรับสู่ระบบ Issue Support and Tracking!");
+
+        // กำหนดว่าจะเปลี่ยนเส้นทางไปที่ใดตามบทบาทผู้ใช้
+        const role = userData.role;
+
+        if (!role) {
+          console.warn(
+            "บทบาทผู้ใช้ไม่ได้กำหนด กำลังใช้บทบาท User เป็นค่าเริ่มต้น"
+          );
+          userData.role = "User"; // ตั้งค่าบทบาทเริ่มต้น
+          updateUser(userData);
+        }
+
+        // บันทึกการพยายามนำทางเพื่อการดีบัก
+        logNavigationAttempt(
+          userData.role === "User" ? "/user/home" : "/",
+          userData
+        );
+
+        console.log("User role:", userData.role);
+
+        // เปลี่ยนเส้นทางตามบทบาทพร้อมการตรวจสอบที่ปลอดภัย
+        if (userData.role === "User") {
+          console.log("Redirecting to user home");
+          window.location.href = "/user/home";
+        } else if (
+          userData.role === "Admin" ||
+          userData.role === "SuperAdmin"
+        ) {
+          console.log("Redirecting to admin dashboard");
+          window.location.href = "/";
+        } else {
+          console.log("Unknown role, redirecting to user home as fallback");
+          window.location.href = "/user/home";
+        }
+      } else {
+        setError(data?.message || "Login failed");
+      }
+    } catch (error) {
+      console.error("Error during login:", error);
+
+      if (error.name === "ValidationError") {
         setError("กรุณากรอกข้อมูลให้ครบถ้วน");
-      });
+      } else if (error.response) {
+        console.error("Server error data:", error.response.data);
+        console.error("Server error status:", error.response.status);
+        setError(
+          `Server error: ${
+            error.response.data?.message || error.response.status
+          }`
+        );
+      } else if (error.request) {
+        console.error("No response received:", error.request);
+        setError(
+          "ไม่ได้รับการตอบกลับจากเซิร์ฟเวอร์ กรุณาตรวจสอบการเชื่อมต่อของคุณ"
+        );
+      } else {
+        console.error("Error message:", error.message);
+        setError(`Error: ${error.message}`);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ฟังก์ชันสำหรับจัดการกด Enter บนฟอร์ม
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter") {
+      form.submit();
+    }
   };
 
   return (
@@ -189,7 +198,10 @@ const LoginForm = () => {
       variant={variant || "filled"}
       initialValues={{
         variant: "filled",
-      }}>
+        remember: rememberMe,
+      }}
+      onFinish={handleLogin}
+      onKeyDown={handleKeyDown}>
       <div className="text-2xl font-semibold mb-6 ">
         <span className="text-[#757575] text-sm font-normal">
           ยินดีต้อนรับ Issue Support and Tracking System!
@@ -206,7 +218,12 @@ const LoginForm = () => {
         <Form.Item
           name="employeeId"
           rules={[{ required: true, message: "กรุณากรอกรหัสพนักงาน" }]}>
-          <Input type="text" placeholder="กรอกรหัสพนักงาน" size={"large"} />
+          <Input
+            type="text"
+            placeholder="กรอกรหัสพนักงาน"
+            size="large"
+            autoComplete="username"
+          />
         </Form.Item>
       </div>
 
@@ -216,13 +233,22 @@ const LoginForm = () => {
         <Form.Item
           name="password"
           rules={[{ required: true, message: "กรุณากรอกรหัสผ่าน" }]}>
-          <Input type="password" placeholder="กรอกรหัสผ่าน" size={"large"} />
+          <Input
+            type="password"
+            placeholder="กรอกรหัสผ่าน"
+            size="large"
+            autoComplete="current-password"
+          />
         </Form.Item>
       </div>
 
       {/* Remember Me */}
       <div className="mb-4">
-        <Checkbox onChange={onChange}>Remember me</Checkbox>
+        <Form.Item name="remember" valuePropName="checked" noStyle>
+          <Checkbox checked={rememberMe} onChange={handleRememberMeChange}>
+            Remember Me
+          </Checkbox>
+        </Form.Item>
       </div>
 
       {/* Error Message */}
@@ -232,6 +258,7 @@ const LoginForm = () => {
       <div className="mb-4">
         <Button
           type="primary"
+          htmlType="submit"
           style={{
             backgroundColor: "#262362",
             transition: "background-color 0.3s",
@@ -239,11 +266,10 @@ const LoginForm = () => {
           }}
           onMouseEnter={(e) => (e.target.style.backgroundColor = "#193CB8")}
           onMouseLeave={(e) => (e.target.style.backgroundColor = "#262362")}
-          size={"large"}
+          size="large"
           block
-          loading={loading}
-          onClick={handleLogin}>
-          Login
+          loading={loading}>
+          เข้าสู่ระบบ
         </Button>
       </div>
 
