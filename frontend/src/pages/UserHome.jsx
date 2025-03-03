@@ -4,17 +4,12 @@ import IssuesReport from "../users-components/IssuesReport";
 
 const UserHome = () => {
   return (
-    <Layout>
-      <div className="pl-8 pt-5 pb-2">
-        <h1 className="uppercase font-semibold tracking-[4px] text-2xl">
-          คำร้องของฉัน
-        </h1>
-      </div>
+    <Layout className=" pt-5 pb-2">
       <Content
         style={{
           padding: 24,
         }}>
-        <IssuesReport  />
+        <IssuesReport />
       </Content>
     </Layout>
   );

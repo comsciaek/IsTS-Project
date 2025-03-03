@@ -71,12 +71,6 @@ const ContentReports = () => {
 
   const columns = [
     {
-      title: "Issue ID",
-      dataIndex: "id",
-      key: "id",
-      width: "10%",
-    },
-    {
       title: "Issue",
       dataIndex: "issue",
       key: "issue",

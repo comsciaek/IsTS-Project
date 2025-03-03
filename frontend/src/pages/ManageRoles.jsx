@@ -511,11 +511,14 @@ const ManageRoles = () => {
             onClick={fetchUsers}
             style={{
               backgroundColor: "#262362",
-              borderColor: "#262362",
+              transition: "background-color 0.3s",
+              border: "none",
               borderRadius: "50%",
               height: "32px",
               width: "32px",
-            }}>
+            }}
+            onMouseEnter={(e) => (e.target.style.backgroundColor = "#193CB8")}
+            onMouseLeave={(e) => (e.target.style.backgroundColor = "#262362")}>
             <ReloadOutlined />
           </Button>
         </Space>

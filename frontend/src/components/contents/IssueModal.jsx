@@ -47,9 +47,6 @@ const IssueModal = ({ visible, onOk, onCancel, editingRecord }) => {
       onOk={handleOk}
       onCancel={onCancel}>
       <Form form={form} layout="vertical">
-        <Form.Item name="id" label="Issue ID">
-          <Input disabled />
-        </Form.Item>
         <Form.Item
           name="issue"
           label="Issue"

@@ -128,13 +128,6 @@ const ContentTable = () => {
 
   const columns = [
     {
-      title: "Issue ID",
-      dataIndex: "id",
-      key: "id",
-      width: "10%",
-      ...SearchColumn("id"),
-    },
-    {
       title: "Issue",
       dataIndex: "issue",
       key: "issue",
@@ -252,6 +245,9 @@ const ContentTable = () => {
               backgroundColor: "#262362",
               transition: "background-color 0.3s",
               border: "none",
+              borderRadius: "50%",
+              height: "32px",
+              width: "32px",
             }}>
             <ReloadOutlined />
           </Button>

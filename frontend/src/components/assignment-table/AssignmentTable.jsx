@@ -1,20 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import {
-  Layout,
-  Table,
-  Button,
-  Space,
-  Dropdown,
-  message,
-  theme,
-  Avatar,
-} from "antd";
-import { ReloadOutlined, DownOutlined, UserOutlined } from "@ant-design/icons";
+import { Layout, Table, Button, Space, message, theme, Avatar } from "antd";
+import { ReloadOutlined, UserOutlined } from "@ant-design/icons";
 import SearchColumn from "../contents/SearchColumn";
 import StatusColumn from "../contents/StatusColumn";
 import AssigneesColumn from "./AssigneesColumn";
 import ActionsColumn from "./ActionsColumn";
-import TableSkeleton from "../skeletons/TableSkeleton"; // Import TableSkeleton
+import TableSkeleton from "../skeletons/TableSkeleton";
 
 const { Content } = Layout;
 
@@ -25,27 +16,22 @@ const AssignmentTable = () => {
   const [dataSource, setDataSource] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dropdownVisible, setDropdownVisible] = useState(null);
-  const [timeRange, setTimeRange] = useState("daily");
   const tableRef = useRef(null);
 
-  const menuItems = [
-    { key: "daily", label: "Daily" },
-    { key: "weekly", label: "Weekly" },
-    { key: "monthly", label: "Monthly" },
-  ];
+  // ลบ state timeRange และ menuItems ออกแล้ว
 
   const fetchData = useCallback(() => {
     setLoading(true);
-    // Simulate data fetching based on timeRange
+    // ปรับปรุงการดึงข้อมูลไม่ให้มีการอ้างอิงถึง timeRange
     setTimeout(() => {
       setDataSource(
         Array.from({ length: 46 }).map((_, i) => ({
           key: i,
           id: `101 ${i}`,
-          issue: `Issue ${timeRange} ${i}`,
+          issue: `Issue ${i}`, // ลบ timeRange ออก
           date: "2025-02-05",
           name: "John Doe",
-          status: "เสร็จสิ้น", // Resolved in Thai
+          status: "เสร็จสิ้น",
           assignees: [
             {
               name: "John Doe",
@@ -55,8 +41,8 @@ const AssignmentTable = () => {
         }))
       );
       setLoading(false);
-    }, 1000); // Simulate a 1-second loading time
-  }, [timeRange]);
+    }, 1000);
+  }, []); // ลบ timeRange ออกจาก dependencies
 
   useEffect(() => {
     fetchData();
@@ -102,13 +88,6 @@ const AssignmentTable = () => {
   };
 
   const columns = [
-    {
-      title: "Issue ID",
-      dataIndex: "id",
-      key: "id",
-      width: "10%",
-      ...SearchColumn("id"),
-    },
     {
       title: "Issue",
       dataIndex: "issue",
@@ -182,19 +161,9 @@ const AssignmentTable = () => {
           borderRadius: borderRadiusLG,
           background: colorBgContainer,
         }}>
-        <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <Dropdown
-            menu={{
-              items: menuItems,
-              onClick: (e) => setTimeRange(e.key),
-            }}>
-            <Button style={{ marginBottom: 16 }}>
-              <Space>
-                {timeRange.charAt(0).toUpperCase() + timeRange.slice(1)}
-                <DownOutlined />
-              </Space>
-            </Button>
-          </Dropdown>
+        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          {" "}
+          {/* ปรับ layout เนื่องจากลบปุ่มซ้ายออก */}
           <Button
             type="primary"
             onClick={fetchData}
@@ -203,6 +172,9 @@ const AssignmentTable = () => {
               backgroundColor: "#262362",
               transition: "background-color 0.3s",
               border: "none",
+              borderRadius: "50%",
+              height: "32px",
+              width: "32px",
             }}
             onMouseEnter={(e) => (e.target.style.backgroundColor = "#193CB8")}
             onMouseLeave={(e) => (e.target.style.backgroundColor = "#262362")}>
@@ -216,7 +188,7 @@ const AssignmentTable = () => {
             dataSource={dataSource}
             columns={columns}
             pagination={{ pageSize: 10 }}
-            scroll={{ x: "max-content", y: 300 }} // Add horizontal and vertical scroll
+            scroll={{ x: "max-content", y: 300 }}
           />
         )}
       </Content>
