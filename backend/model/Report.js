@@ -3,19 +3,33 @@ import mongoose from 'mongoose';
 const reportSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User', // เชื่อมโยงกับ User model
-    required: [true, 'User ID is required'],
+    ref: 'User',
+    required: true,
+  },
+  topic: {
+    type: String,
+    required: [true, 'Topic is required'],
+    trim: true,
+    maxlength: [100, 'Topic cannot be more than 100 characters'],
   },
   description: {
     type: String,
     required: [true, 'Description is required'],
     trim: true,
-    maxlength: [500, 'Description cannot be more than 500 characters'],
+  },
+  date: {
+    type: Date,
+    required: [true, 'Date is required'],
+    default: Date.now,
+  },
+  file: {
+    type: String, // เก็บ URL หรือพาธของไฟล์
+    default: '',
   },
   status: {
     type: String,
-    enum: ['Pending', 'In Progress', 'Resolved'], // สถานะของรายงาน
-    default: 'Pending',
+    enum: ['pending', 'approved', 'rejected','inprogress'],
+    default: 'pending',
   },
   createdAt: {
     type: Date,
