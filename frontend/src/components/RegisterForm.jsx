@@ -1,6 +1,7 @@
 import { Button, Form, Input, Select, message } from "antd";
 import { useNavigate } from "react-router";
 import { useState } from "react";
+import { EyeOutlined, EyeInvisibleOutlined } from "@ant-design/icons"; // เพิ่มการ import ไอคอน
 import axios from "axios";
 
 const formItemLayout = {
@@ -36,6 +37,10 @@ const RegisterForm = () => {
     confirmPassword: "",
     phoneNumber: "",
   });
+
+  // เพิ่ม state สำหรับการแสดง/ซ่อนรหัสผ่าน
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const [confirmPasswordVisible, setConfirmPasswordVisible] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -299,12 +304,19 @@ const RegisterForm = () => {
             name="password"
             rules={[{ required: true, message: "กรุณากรอกรหัสผ่าน!" }]}>
             <Input
-              type="password"
+              type={passwordVisible ? "text" : "password"}
               placeholder="กรอกรหัสผ่าน"
               size="large"
               name="password"
               value={formData.password}
               onChange={handleChange}
+              suffix={
+                <span
+                  onClick={() => setPasswordVisible(!passwordVisible)}
+                  style={{ cursor: "pointer" }}>
+                  {passwordVisible ? <EyeInvisibleOutlined /> : <EyeOutlined />}
+                </span>
+              }
             />
           </Form.Item>
           <p>ยืนยันรหัสผ่าน</p>
@@ -323,12 +335,25 @@ const RegisterForm = () => {
               }),
             ]}>
             <Input
-              type="password"
+              type={confirmPasswordVisible ? "text" : "password"}
               placeholder="ยืนยันรหัสผ่าน"
               size="large"
               name="confirmPassword"
               value={formData.confirmPassword}
               onChange={handleChange}
+              suffix={
+                <span
+                  onClick={() =>
+                    setConfirmPasswordVisible(!confirmPasswordVisible)
+                  }
+                  style={{ cursor: "pointer" }}>
+                  {confirmPasswordVisible ? (
+                    <EyeInvisibleOutlined />
+                  ) : (
+                    <EyeOutlined />
+                  )}
+                </span>
+              }
             />
           </Form.Item>
         </div>

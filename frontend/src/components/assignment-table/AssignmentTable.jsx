@@ -1,120 +1,437 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Layout, Table, Button, Space, message, theme, Avatar } from "antd";
-import { ReloadOutlined, UserOutlined } from "@ant-design/icons";
-import SearchColumn from "../contents/SearchColumn";
-import StatusColumn from "../contents/StatusColumn";
-import AssigneesColumn from "./AssigneesColumn";
-import ActionsColumn from "./ActionsColumn";
+import {
+  Layout,
+  Table,
+  Button,
+  message,
+  theme,
+  Avatar,
+  Space,
+  Tooltip,
+  Tag,
+  Input,
+  Badge,
+  Menu,
+  Dropdown,
+} from "antd";
+import {
+  ReloadOutlined,
+  UserOutlined,
+  FileTextOutlined,
+  MoreOutlined,
+  EditOutlined,
+  CheckCircleOutlined,
+  CloseCircleOutlined,
+} from "@ant-design/icons";
+import axios from "axios";
+import dayjs from "dayjs";
+import PropTypes from "prop-types"; // เพิ่มการนำเข้า PropTypes
+
+import AssignAdminModal from "./AssignAdminModal";
+import ReportDetailModal from "./ReportDetailModal";
 import TableSkeleton from "../skeletons/TableSkeleton";
 
 const { Content } = Layout;
+const { Search } = Input;
+
+// API Base URL
+const API_BASE_URL = "http://172.18.43.39:5000/api";
 
 const AssignmentTable = () => {
   const {
     token: { colorBgContainer, borderRadiusLG },
   } = theme.useToken();
+
+  // State variables
   const [dataSource, setDataSource] = useState([]);
+  const [filteredData, setFilteredData] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [dropdownVisible, setDropdownVisible] = useState(null);
+  const [admins, setAdmins] = useState([]);
+  // ลบตัวแปร searchText ที่ไม่ได้ใช้งาน
+
+  // Modal states
+  const [assignModalVisible, setAssignModalVisible] = useState(false);
+  const [detailModalVisible, setDetailModalVisible] = useState(false);
+  const [currentRecord, setCurrentRecord] = useState(null);
+  const [loadingAdmins, setLoadingAdmins] = useState(false);
+
   const tableRef = useRef(null);
 
-  // ลบ state timeRange และ menuItems ออกแล้ว
+  // ฟังก์ชันแปลงข้อมูลจาก API ไปเป็นรูปแบบที่เหมาะสมสำหรับตาราง
+  const transformReportData = (report, index) => {
+    return {
+      key: report.issueId || report._id || index,
+      issueId: report.issueId || report._id,
+      topic: report.topic || report.title || report.issue || `Issue ${index}`,
+      description: report.description || "",
+      date: report.date || report.createdAt,
+      status: report.status || "pending",
+      file: report.file || "",
 
-  const fetchData = useCallback(() => {
-    setLoading(true);
-    // ปรับปรุงการดึงข้อมูลไม่ให้มีการอ้างอิงถึง timeRange
-    setTimeout(() => {
-      setDataSource(
-        Array.from({ length: 46 }).map((_, i) => ({
-          key: i,
-          id: `101 ${i}`,
-          issue: `Issue ${i}`, // ลบ timeRange ออก
-          date: "2025-02-05",
-          name: "John Doe",
-          status: "เสร็จสิ้น",
-          assignees: [
-            {
-              name: "John Doe",
-              avatar: "https://dummyimage.com/40x40/000/fff",
-            },
-          ],
-        }))
-      );
-      setLoading(false);
-    }, 1000);
-  }, []); // ลบ timeRange ออกจาก dependencies
+      // ข้อมูลผู้แจ้งปัญหา
+      userId: report.userId || "",
+      employeeId: report.employeeId || "",
+      employeeName:
+        report.employeeName ||
+        (report.firstName && report.lastName
+          ? `${report.firstName} ${report.lastName}`
+          : report.firstName || report.lastName || "ไม่ระบุชื่อ"),
+      department: report.department || "ไม่ระบุแผนก",
+      position: report.position || "",
+      email: report.email || "",
+      phoneNumber: report.phoneNumber || "",
+      profileImage: report.profileImage || report.profilePicture || null,
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+      // ผู้รับผิดชอบ
+      assignedAdmin: report.assignedAdmin || null,
 
-  useEffect(() => {
-    const handleScroll = () => {
-      setDropdownVisible(null);
+      // ข้อมูลเพิ่มเติม
+      response: report.response || "",
+      updatedAt: report.updatedAt || "",
     };
+  };
 
-    const tableElement = tableRef.current;
-    if (tableElement) {
-      tableElement.addEventListener("scroll", handleScroll);
-    }
+  // ดึงข้อมูลคำร้องทั้งหมดจาก API สำหรับ admin
+  const fetchReports = useCallback(async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem("token");
 
-    return () => {
-      if (tableElement) {
-        tableElement.removeEventListener("scroll", handleScroll);
+      const response = await axios.get(`${API_BASE_URL}/reports/admin/all`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      console.log("Fetched all reports:", response.data);
+
+      // ตรวจสอบรูปแบบการตอบกลับ
+      let reportsData = [];
+      if (response.data && Array.isArray(response.data.data)) {
+        reportsData = response.data.data;
+      } else if (response.data && Array.isArray(response.data)) {
+        reportsData = response.data;
+      } else {
+        console.warn("Unexpected API response format:", response.data);
+        reportsData = [];
       }
-    };
+
+      // แปลงข้อมูลจาก API ให้อยู่ในรูปแบบที่ Table ต้องการ
+      const formattedData = reportsData.map((report, index) =>
+        transformReportData(report, index)
+      );
+
+      setDataSource(formattedData);
+      setFilteredData(formattedData);
+    } catch (error) {
+      console.error("Error fetching reports:", error);
+      if (error.response?.status === 403) {
+        message.error("คุณไม่มีสิทธิ์เข้าถึงข้อมูลนี้");
+      } else {
+        message.error("ไม่สามารถโหลดข้อมูลคำร้องได้");
+      }
+      setDataSource([]);
+      setFilteredData([]);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const handleStatusChange = (key, newStatus) => {
-    const newData = dataSource.map((item) => {
-      if (item.key === key) {
-        return { ...item, status: newStatus };
+  // ดึงข้อมูลแอดมินทั้งหมดสำหรับใช้ในการมอบหมายงาน
+  const fetchAdmins = useCallback(async () => {
+    try {
+      setLoadingAdmins(true);
+      const token = localStorage.getItem("token");
+
+      // เรียก API เพื่อดึงรายชื่อผู้ใช้ทั้งหมด
+      const response = await axios.get(`${API_BASE_URL}/users/all`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (
+        response.data &&
+        (Array.isArray(response.data.data) || Array.isArray(response.data))
+      ) {
+        // ดึงข้อมูลผู้ใช้ทั้งหมด
+        const allUsers = Array.isArray(response.data.data)
+          ? response.data.data
+          : response.data;
+
+        // กรองเฉพาะผู้ใช้ที่มี role เป็น Admin หรือ SuperAdmin
+        const filteredAdmins = allUsers.filter(
+          (user) => user.role === "Admin" || user.role === "SuperAdmin"
+        );
+
+        setAdmins(filteredAdmins);
+        console.log("Filtered admins:", filteredAdmins);
+      } else {
+        console.warn(
+          "Unexpected API response format for admins:",
+          response.data
+        );
       }
-      return item;
-    });
-    setDataSource(newData);
-    message.success(`Status changed to ${newStatus}`);
+    } catch (error) {
+      console.error("Error fetching admins:", error);
+      message.error("ไม่สามารถดึงข้อมูลผู้ดูแลระบบได้");
+    } finally {
+      setLoadingAdmins(false);
+    }
+  }, []);
+
+  // โหลดข้อมูลเมื่อคอมโพเนนต์ mount
+  useEffect(() => {
+    fetchReports();
+    fetchAdmins();
+  }, [fetchReports, fetchAdmins]);
+
+  // แสดง Modal มอบหมายงาน
+  const showAssignModal = (record) => {
+    setCurrentRecord(record);
+    setAssignModalVisible(true);
   };
 
-  const handleAssign = (key, assignee) => {
-    const newData = dataSource.map((item) => {
-      if (item.key === key) {
-        return { ...item, assignees: [...item.assignees, assignee] };
-      }
-      return item;
-    });
-    setDataSource(newData);
-    message.success(`Assigned to ${assignee.name}`);
+  // แสดง Modal รายละเอียด
+  const showDetailModal = (record) => {
+    setCurrentRecord(record);
+    setDetailModalVisible(true);
   };
 
+  // อัพเดตสถานะคำร้อง
+  const handleStatusChange = async (record, newStatus) => {
+    try {
+      const token = localStorage.getItem("token");
+      const issueId = record.issueId || record._id;
+
+      // ส่งคำขอ API เพื่ออัพเดตสถานะ
+      await axios.put(
+        `${API_BASE_URL}/reports/edit/${issueId}`,
+        { status: newStatus },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      // อัพเดตข้อมูลในตาราง
+      const newData = dataSource.map((item) => {
+        if (item.key === record.key) {
+          return { ...item, status: newStatus };
+        }
+        return item;
+      });
+
+      setDataSource(newData);
+      setFilteredData(
+        filteredData.map((item) => {
+          if (item.key === record.key) {
+            return { ...item, status: newStatus };
+          }
+          return item;
+        })
+      );
+
+      message.success(`อัพเดตสถานะเป็น ${newStatus} สำเร็จ`);
+    } catch (error) {
+      console.error("Error updating status:", error);
+      message.error("ไม่สามารถอัพเดตสถานะได้");
+    }
+  };
+
+  // ฟังก์ชันสำหรับค้นหา - ปรับปรุงให้ไม่ต้องใช้ตัวแปร searchText
+  const handleSearch = (value) => {
+    if (!value) {
+      setFilteredData(dataSource);
+      return;
+    }
+
+    const lowercasedValue = value.toLowerCase();
+    const filtered = dataSource.filter(
+      (item) =>
+        (item.topic && item.topic.toLowerCase().includes(lowercasedValue)) ||
+        (item.description &&
+          item.description.toLowerCase().includes(lowercasedValue)) ||
+        (item.employeeName &&
+          item.employeeName.toLowerCase().includes(lowercasedValue)) ||
+        (item.department &&
+          item.department.toLowerCase().includes(lowercasedValue))
+    );
+
+    setFilteredData(filtered);
+  };
+
+  // แปลงสถานะเป็นภาษาไทย
+  const getStatusText = (status) => {
+    const statusMapping = {
+      pending: "รอดำเนินการ",
+      approved: "อนุมัติแล้ว", // แก้ไขจาก completed เป็น approved
+      rejected: "ถูกปฏิเสธ",
+    };
+    return statusMapping[status] || status;
+  };
+
+  // กำหนดสีของสถานะ
+  const getStatusColor = (status) => {
+    const statusColors = {
+      pending: "orange",
+      approved: "green", // แก้ไขจาก completed เป็น approved
+      rejected: "red",
+      รอดำเนินการ: "orange",
+      อนุมัติแล้ว: "green", // แก้ไขจาก เสร็จสิ้น เป็น อนุมัติแล้ว
+      ถูกปฏิเสธ: "red",
+    };
+    return statusColors[status] || "default";
+  };
+
+  // ทำหน้าที่แทน ActionsColumn: รวมเข้ากับโค้ดโดยตรงเพื่อไม่ต้องสร้างไฟล์แยก
+  const ActionsColumn = ({
+    record,
+    onAssign,
+    onViewDetail,
+    onStatusChange,
+  }) => {
+    const [dropdownVisible, setDropdownVisible] = useState(false);
+
+    const menu = (
+      <Menu>
+        <Menu.Item key="view" onClick={() => onViewDetail(record)}>
+          <FileTextOutlined /> ดูรายละเอียด
+        </Menu.Item>
+        <Menu.Item key="assign" onClick={() => onAssign(record)}>
+          <UserOutlined /> มอบหมายงาน
+        </Menu.Item>
+        <Menu.Divider />
+        {record.status !== "approved" && ( // แก้ไขจาก completed เป็น approved
+          <Menu.Item
+            key="complete"
+            onClick={() => onStatusChange(record, "approved")}>
+            {" "}
+            {/* แก้ไขจาก completed เป็น approved */}
+            <CheckCircleOutlined /> อนุมัติ
+          </Menu.Item>
+        )}
+        {record.status !== "pending" && (
+          <Menu.Item
+            key="inProgress"
+            onClick={() => onStatusChange(record, "pending")}>
+            {" "}
+            {/* แก้ไขจาก in-progress เป็น pending */}
+            <EditOutlined /> รอดำเนินการ
+          </Menu.Item>
+        )}
+        {record.status !== "rejected" && (
+          <Menu.Item
+            key="reject"
+            onClick={() => onStatusChange(record, "rejected")}>
+            <CloseCircleOutlined /> ปฏิเสธคำร้อง
+          </Menu.Item>
+        )}
+      </Menu>
+    );
+
+    return (
+      <Dropdown
+        overlay={menu}
+        trigger={["click"]}
+        open={dropdownVisible}
+        onOpenChange={setDropdownVisible}>
+        <Button
+          type="text"
+          icon={<MoreOutlined />}
+          style={{ borderRadius: "50%" }}
+        />
+      </Dropdown>
+    );
+  };
+
+  // เพิ่ม prop types validation สำหรับ ActionsColumn
+  ActionsColumn.propTypes = {
+    record: PropTypes.shape({
+      key: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+      status: PropTypes.string.isRequired, // เพิ่มการตรวจสอบ record.status
+      // เพิ่ม props อื่นๆ ของ record ที่จำเป็นตามต้องการ
+    }).isRequired,
+    onAssign: PropTypes.func.isRequired,
+    onViewDetail: PropTypes.func.isRequired,
+    onStatusChange: PropTypes.func.isRequired,
+  };
+
+  // คอลัมน์ของตาราง
   const columns = [
     {
-      title: "Issue",
-      dataIndex: "issue",
-      key: "issue",
-      width: "20%",
-      ...SearchColumn("issue"),
+      title: "Issues",
+      dataIndex: "topic",
+      key: "topic",
+      width: "25%",
+      render: (text, record) => (
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="font-semibold">{text}</span>
+            {record.file && (
+              <Tooltip title="มีไฟล์แนบ">
+                <Badge status="processing" color="blue" />
+              </Tooltip>
+            )}
+          </div>
+          <div style={{ fontSize: "12px", color: "#666", marginTop: "4px" }}>
+            {record.description && record.description.length > 60
+              ? `${record.description.substring(0, 60)}...`
+              : record.description}
+          </div>
+          <Button
+            type="link"
+            size="small"
+            onClick={() => showDetailModal(record)}
+            style={{ padding: "0", height: "auto", marginTop: "4px" }}>
+            <span className="text-blue-500 text-xs flex items-center">
+              <FileTextOutlined style={{ marginRight: "4px" }} />
+              ดูรายละเอียดเพิ่มเติม
+            </span>
+          </Button>
+        </div>
+      ),
     },
     {
       title: "Date",
       dataIndex: "date",
       key: "date",
       width: "10%",
-      ...SearchColumn("date", true),
+      render: (date) => dayjs(date).format("DD/MM/YYYY"),
     },
     {
-      title: "Emlpoyees",
-      dataIndex: "name",
-      key: "name",
-      width: "10%",
-      ...SearchColumn("name"),
-      render: (text) => (
+      title: "Employees",
+      dataIndex: "employeeName",
+      key: "employeeName",
+      width: "20%",
+      render: (_, record) => (
         <Space>
           <Avatar
-            src="https://dummyimage.com/40x40/000/fff"
-            icon={<UserOutlined />}
-          />
-          {text}
+            src={record.profileImage} 
+            icon={!record.profileImage && <UserOutlined />}
+            style={{
+              backgroundColor: !record.profileImage ? "#87d068" : undefined,
+            }}>
+            {!record.profileImage && record.employeeName
+              ? record.employeeName[0].toUpperCase()
+              : null}
+          </Avatar>
+
+          <div>
+            <Tooltip
+              title={`${
+                record.employeeId ? `รหัส: ${record.employeeId}` : ""
+              } ${record.email ? `อีเมล: ${record.email}` : ""} ${
+                record.phoneNumber ? `โทร: ${record.phoneNumber}` : ""
+              }`}>
+              <div style={{ fontWeight: "500" }}>{record.employeeName}</div>
+              <div style={{ fontSize: "12px", color: "#666" }}>
+                <div>{record.department || "ไม่ระบุแผนก"}</div>
+                {record.position && <div>{record.position}</div>}
+              </div>
+            </Tooltip>
+          </div>
         </Space>
       ),
     },
@@ -122,32 +439,61 @@ const AssignmentTable = () => {
       title: "Status",
       dataIndex: "status",
       key: "status",
-      width: "11%",
-      render: (text, record) => (
-        <StatusColumn
-          text={text}
-          record={record}
-          handleStatusChange={handleStatusChange}
-        />
+      width: "12%",
+      filters: [
+        { text: "รอดำเนินการ", value: "pending" },
+        { text: "อนุมัติแล้ว", value: "approved" }, // แก้ไขจาก in-progress/เสร็จสิ้น เป็น approved/อนุมัติแล้ว
+        { text: "ถูกปฏิเสธ", value: "rejected" },
+      ],
+      onFilter: (value, record) => record.status === value,
+      render: (status) => (
+        <Tag color={getStatusColor(status)}>{getStatusText(status)}</Tag>
       ),
     },
     {
-      title: "Assignees",
-      dataIndex: "assignees",
-      key: "assignees",
-      width: "20%",
-      render: (assignees) => <AssigneesColumn assignees={assignees} />,
+      title: "Assigned Admin",
+      dataIndex: "assignedAdmin",
+      key: "assignedAdmin",
+      width: "15%",
+      render: (assignedAdmin, record) => (
+        <div>
+          {assignedAdmin ? (
+            <Space>
+              <Avatar
+                src={assignedAdmin.profileImage } // แก้ไขใช้ null แทนค่าว่าง
+                style={{ backgroundColor: "#1890ff" }}
+                icon={!assignedAdmin.profileImage && <UserOutlined />}
+              />
+              <div>
+                <div style={{ fontWeight: "500" }}>
+                  {assignedAdmin.firstName} {assignedAdmin.lastName}
+                </div>
+                <div style={{ fontSize: "12px", color: "#666" }}>
+                  {assignedAdmin.role}
+                </div>
+              </div>
+            </Space>
+          ) : (
+            <Button
+              type="dashed"
+              size="small"
+              onClick={() => showAssignModal(record)}>
+              มอบหมายงาน
+            </Button>
+          )}
+        </div>
+      ),
     },
     {
       title: "Actions",
-      key: "6",
-      width: "5%",
+      key: "action",
+      width: "10%",
       render: (_, record) => (
         <ActionsColumn
           record={record}
-          handleAssign={handleAssign}
-          dropdownVisible={dropdownVisible}
-          setDropdownVisible={setDropdownVisible}
+          onAssign={() => showAssignModal(record)}
+          onViewDetail={() => showDetailModal(record)}
+          onStatusChange={handleStatusChange}
         />
       ),
     },
@@ -156,41 +502,75 @@ const AssignmentTable = () => {
   return (
     <Layout>
       <Content
-        ref={tableRef}
         style={{
           borderRadius: borderRadiusLG,
           background: colorBgContainer,
+          padding: 24,
         }}>
-        <div style={{ display: "flex", justifyContent: "flex-end" }}>
-          {" "}
-          {/* ปรับ layout เนื่องจากลบปุ่มซ้ายออก */}
-          <Button
-            type="primary"
-            onClick={fetchData}
-            style={{
-              marginBottom: 16,
-              backgroundColor: "#262362",
-              transition: "background-color 0.3s",
-              border: "none",
-              borderRadius: "50%",
-              height: "32px",
-              width: "32px",
-            }}
-            onMouseEnter={(e) => (e.target.style.backgroundColor = "#193CB8")}
-            onMouseLeave={(e) => (e.target.style.backgroundColor = "#262362")}>
-            <ReloadOutlined />
-          </Button>
+        <div className="flex justify-between items-center mb-4">
+          <div className="flex gap-4">
+            <Search
+              placeholder="ค้นหาคำร้อง..."
+              allowClear
+              onSearch={handleSearch}
+              onChange={(e) => handleSearch(e.target.value)}
+              style={{ width: 250 }}
+            />
+            <Button
+              type="primary"
+              onClick={fetchReports}
+              icon={<ReloadOutlined />}
+              style={{
+                backgroundColor: "#262362",
+                transition: "background-color 0.3s",
+              }}
+              onMouseEnter={(e) => (e.target.style.backgroundColor = "#193CB8")}
+              onMouseLeave={(e) =>
+                (e.target.style.backgroundColor = "#262362")
+              }>
+              รีเฟรช
+            </Button>
+          </div>
         </div>
+
         {loading ? (
           <TableSkeleton />
         ) : (
           <Table
-            dataSource={dataSource}
+            ref={tableRef}
+            dataSource={filteredData}
             columns={columns}
-            pagination={{ pageSize: 10 }}
-            scroll={{ x: "max-content", y: 300 }}
+            pagination={{
+              pageSize: 10,
+              showTotal: (total) => `ทั้งหมด ${total} รายการ`,
+            }}
+            scroll={{ x: "max-content", y: 600 }}
           />
         )}
+
+        {/* Modal สำหรับมอบหมายงาน */}
+        <AssignAdminModal
+          visible={assignModalVisible}
+          onCancel={() => setAssignModalVisible(false)}
+          record={currentRecord}
+          admins={admins}
+          loadingAdmins={loadingAdmins}
+          onRefresh={fetchReports}
+          API_BASE_URL={API_BASE_URL}
+        />
+
+        {/* Modal สำหรับแสดงรายละเอียด */}
+        <ReportDetailModal
+          visible={detailModalVisible}
+          onCancel={() => setDetailModalVisible(false)}
+          record={currentRecord}
+          onAssign={() => {
+            setDetailModalVisible(false);
+            if (currentRecord) showAssignModal(currentRecord);
+          }}
+          onRefresh={fetchReports}
+          API_BASE_URL={API_BASE_URL}
+        />
       </Content>
     </Layout>
   );

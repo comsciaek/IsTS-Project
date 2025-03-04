@@ -28,10 +28,12 @@ const statusColors = {
   กำลังดำเนินการ: "blue",
   เสร็จสิ้น: "green",
   ถูกปฏิเสธ: "red",
+  อนุมัติแล้ว: "green",
   pending: "orange",
   "in-progress": "blue",
   completed: "green",
   rejected: "red",
+  approved: "green",
 };
 
 const IssueCard = ({ issue, onEdit, onDelete }) => {
@@ -70,6 +72,7 @@ const IssueCard = ({ issue, onEdit, onDelete }) => {
     "in-progress": "กำลังดำเนินการ",
     completed: "เสร็จสิ้น",
     rejected: "ถูกปฏิเสธ",
+    approved: "อนุมัติแล้ว",
   };
 
   const displayStatus = statusMapping[status] || status;
@@ -164,7 +167,6 @@ const IssueCard = ({ issue, onEdit, onDelete }) => {
             )}
             {fileType === "other" && <FileOutlined />}
             <span className="ml-2 truncate max-w-[180px]">{fileName}</span>
-            
           </a>
         </div>
       )}

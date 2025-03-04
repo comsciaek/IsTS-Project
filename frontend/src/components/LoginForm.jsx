@@ -1,6 +1,7 @@
 import { Button, Checkbox, Input, Form, message } from "antd";
 import { Link } from "react-router";
 import { useState, useEffect } from "react";
+import { EyeOutlined, EyeInvisibleOutlined } from "@ant-design/icons"; // เพิ่มการ import ไอคอน
 import axios from "axios";
 import {
   logNavigationAttempt,
@@ -24,6 +25,7 @@ const LoginForm = () => {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [passwordVisible, setPasswordVisible] = useState(false); // State สำหรับการแสดงรหัสผ่าน
   const variant = Form.useWatch("variant", form);
 
   // ใช้ context เพื่ออัพเดตข้อมูลผู้ใช้
@@ -44,6 +46,11 @@ const LoginForm = () => {
   // จัดการ checkbox remember me
   const handleRememberMeChange = (e) => {
     setRememberMe(e.target.checked);
+  };
+
+  // สลับการแสดง/ซ่อนรหัสผ่าน
+  const togglePasswordVisibility = () => {
+    setPasswordVisible(!passwordVisible);
   };
 
   const handleLogin = async (values) => {
@@ -234,10 +241,17 @@ const LoginForm = () => {
           name="password"
           rules={[{ required: true, message: "กรุณากรอกรหัสผ่าน" }]}>
           <Input
-            type="password"
+            type={passwordVisible ? "text" : "password"}
             placeholder="กรอกรหัสผ่าน"
             size="large"
             autoComplete="current-password"
+            suffix={
+              <span
+                onClick={togglePasswordVisibility}
+                style={{ cursor: "pointer" }}>
+                {passwordVisible ? <EyeInvisibleOutlined /> : <EyeOutlined />}
+              </span>
+            }
           />
         </Form.Item>
       </div>

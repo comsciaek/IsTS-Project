@@ -74,8 +74,6 @@ ProtectedRoute.propTypes = {
 };
 
 const App = () => {
-  // เนื่องจากไม่ได้ใช้ useUser และ user ภายในคอมโพเนนต์นี้
-  // จึงนำออกไปเพื่อแก้ issue no-unused-vars
 
   return (
     <Routes>

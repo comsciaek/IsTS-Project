@@ -34,14 +34,15 @@ const NotAuthorized = () => {
     <div
       style={{
         height: "100vh",
+        width: "100vw",
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
       }}>
       <Result
         status="403"
-        title="ไม่มีสิทธิ์เข้าถึง"
-        subTitle="ขออภัย คุณไม่มีสิทธิ์เข้าถึงหน้านี้"
+        title="403"
+        subTitle="Sorry, you are not authorized to access this page."
         extra={
           <Button
             type="primary"
