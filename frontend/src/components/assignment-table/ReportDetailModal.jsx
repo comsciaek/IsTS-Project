@@ -129,9 +129,8 @@ const ReportDetailModal = ({ visible, onCancel, record, onAssign }) => {
             <Descriptions.Item label="ผู้รับผิดชอบ">
               <Space>
                 <Avatar
-                  src={record.profileImage} 
-                  icon={!record.profileImage && <UserOutlined />}
-                  style={{ backgroundColor: "#1890ff" }}
+                  src={record.assignedAdmin.profileImage}
+                  icon={!record.assignedAdmin.profileImage && <UserOutlined />}
                 />
                 {record.assignedAdmin.firstName} {record.assignedAdmin.lastName}
                 ({record.assignedAdmin.role})

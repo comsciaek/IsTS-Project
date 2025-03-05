@@ -65,22 +65,23 @@ const AssignmentTable = () => {
       topic: report.topic || report.title || report.issue || `Issue ${index}`,
       description: report.description || "",
       date: report.date || report.createdAt,
-      status: report.status || "pending",
+      status: report.status || "รอดำเนินการ",
       file: report.file || "",
 
       // ข้อมูลผู้แจ้งปัญหา
       userId: report.userId || "",
       employeeId: report.employeeId || "",
       employeeName:
-        report.employeeName ||
-        (report.firstName && report.lastName
-          ? `${report.firstName} ${report.lastName}`
-          : report.firstName || report.lastName || "ไม่ระบุชื่อ"),
-      department: report.department || "ไม่ระบุแผนก",
-      position: report.position || "",
-      email: report.email || "",
-      phoneNumber: report.phoneNumber || "",
-      profileImage: report.profileImage || report.profilePicture || null,
+        report.userId.employeeName ||
+        (report.userId.firstName && report.userId.lastName
+          ? `${report.userId.firstName} ${report.userId.lastName}`
+          : report.userId.firstName || report.userId.lastName || "ไม่ระบุชื่อ"),
+      department: report.userId.department || "ไม่ระบุแผนก",
+      position: report.userId.position || "",
+      email: report.userId.email || "",
+      phoneNumber: report.userId.phoneNumber || "",
+      profileImage:
+        report.userId.profileImage || report.userId.profilePicture || "",
 
       // ผู้รับผิดชอบ
       assignedAdmin: report.assignedAdmin || null,
@@ -121,8 +122,13 @@ const AssignmentTable = () => {
         transformReportData(report, index)
       );
 
-      setDataSource(formattedData);
-      setFilteredData(formattedData);
+      // กรองออกรายการที่ถูกปฏิเสธ (status: rejected)
+      const filteredData = formattedData.filter(
+        (item) => item.status !== "rejected"
+      );
+
+      setDataSource(filteredData);
+      setFilteredData(filteredData);
     } catch (error) {
       console.error("Error fetching reports:", error);
       if (error.response?.status === 403) {
@@ -215,25 +221,34 @@ const AssignmentTable = () => {
         }
       );
 
-      // อัพเดตข้อมูลในตาราง
-      const newData = dataSource.map((item) => {
-        if (item.key === record.key) {
-          return { ...item, status: newStatus };
-        }
-        return item;
-      });
+      if (newStatus === "rejected") {
+        // ถ้าสถานะใหม่เป็น "rejected" ให้ลบรายการนั้นออกจากตาราง
+        const newData = dataSource.filter((item) => item.key !== record.key);
+        setDataSource(newData);
+        setFilteredData(filteredData.filter((item) => item.key !== record.key));
 
-      setDataSource(newData);
-      setFilteredData(
-        filteredData.map((item) => {
+        message.success(`รายการถูกปฏิเสธ`);
+      } else {
+        // อัพเดตข้อมูลในตารางตามปกติ
+        const newData = dataSource.map((item) => {
           if (item.key === record.key) {
             return { ...item, status: newStatus };
           }
           return item;
-        })
-      );
+        });
 
-      message.success(`อัพเดตสถานะเป็น ${newStatus} สำเร็จ`);
+        setDataSource(newData);
+        setFilteredData(
+          filteredData.map((item) => {
+            if (item.key === record.key) {
+              return { ...item, status: newStatus };
+            }
+            return item;
+          })
+        );
+
+        message.success(`อัพเดตสถานะเป็น ${newStatus} สำเร็จ`);
+      }
     } catch (error) {
       console.error("Error updating status:", error);
       message.error("ไม่สามารถอัพเดตสถานะได้");
@@ -268,6 +283,7 @@ const AssignmentTable = () => {
       pending: "รอดำเนินการ",
       approved: "อนุมัติแล้ว", // แก้ไขจาก completed เป็น approved
       rejected: "ถูกปฏิเสธ",
+      completed: "เสร็จสิ้น",
     };
     return statusMapping[status] || status;
   };
@@ -278,9 +294,11 @@ const AssignmentTable = () => {
       pending: "orange",
       approved: "green", // แก้ไขจาก completed เป็น approved
       rejected: "red",
+      completed: "green",
       รอดำเนินการ: "orange",
       อนุมัติแล้ว: "green", // แก้ไขจาก เสร็จสิ้น เป็น อนุมัติแล้ว
       ถูกปฏิเสธ: "red",
+      เสร็จสิ้น: "green",
     };
     return statusColors[status] || "default";
   };
@@ -365,6 +383,7 @@ const AssignmentTable = () => {
       dataIndex: "topic",
       key: "topic",
       width: "25%",
+      ellipsis: false, // ตัดข้อความที่ยาวเกินไป
       render: (text, record) => (
         <div>
           <div className="flex items-center gap-2">
@@ -392,6 +411,7 @@ const AssignmentTable = () => {
           </Button>
         </div>
       ),
+      responsive: ["xs", "sm", "md", "lg", "xl"], // แสดงในทุกขนาดหน้าจอ
     },
     {
       title: "Date",
@@ -399,41 +419,36 @@ const AssignmentTable = () => {
       key: "date",
       width: "10%",
       render: (date) => dayjs(date).format("DD/MM/YYYY"),
+      responsive: ["sm", "md", "lg", "xl"], // ไม่แสดงในขนาด xs (มือถือ)
     },
     {
       title: "Employees",
       dataIndex: "employeeName",
       key: "employeeName",
       width: "20%",
+      ellipsis: true,
       render: (_, record) => (
         <Space>
           <Avatar
-            src={record.profileImage} 
-            icon={!record.profileImage && <UserOutlined />}
-            style={{
-              backgroundColor: !record.profileImage ? "#87d068" : undefined,
-            }}>
+            src={record.profileImage}
+            icon={!record.profileImage && <UserOutlined />}>
             {!record.profileImage && record.employeeName
               ? record.employeeName[0].toUpperCase()
               : null}
           </Avatar>
 
-          <div>
-            <Tooltip
-              title={`${
-                record.employeeId ? `รหัส: ${record.employeeId}` : ""
-              } ${record.email ? `อีเมล: ${record.email}` : ""} ${
-                record.phoneNumber ? `โทร: ${record.phoneNumber}` : ""
-              }`}>
-              <div style={{ fontWeight: "500" }}>{record.employeeName}</div>
-              <div style={{ fontSize: "12px", color: "#666" }}>
-                <div>{record.department || "ไม่ระบุแผนก"}</div>
-                {record.position && <div>{record.position}</div>}
-              </div>
-            </Tooltip>
+          <div className="hidden sm:block">
+            {" "}
+            {/* ซ่อนข้อมูลเพิ่มเติมในมุมมองมือถือ แต่แสดง Avatar */}
+            <div style={{ fontWeight: "500" }}>{record.employeeName}</div>
+            <div style={{ fontSize: "12px", color: "#666" }}>
+              <div>{record.department || "ไม่ระบุแผนก"}</div>
+              {record.position && <div>{record.position}</div>}
+            </div>
           </div>
         </Space>
       ),
+      responsive: ["xs", "sm", "md", "lg", "xl"],
     },
     {
       title: "Status",
@@ -442,13 +457,14 @@ const AssignmentTable = () => {
       width: "12%",
       filters: [
         { text: "รอดำเนินการ", value: "pending" },
-        { text: "อนุมัติแล้ว", value: "approved" }, // แก้ไขจาก in-progress/เสร็จสิ้น เป็น approved/อนุมัติแล้ว
+        { text: "อนุมัติแล้ว", value: "approved" },
         { text: "ถูกปฏิเสธ", value: "rejected" },
       ],
       onFilter: (value, record) => record.status === value,
       render: (status) => (
         <Tag color={getStatusColor(status)}>{getStatusText(status)}</Tag>
       ),
+      responsive: ["xs", "sm", "md", "lg", "xl"], // แสดงในทุกขนาดหน้าจอ
     },
     {
       title: "Assigned Admin",
@@ -460,11 +476,12 @@ const AssignmentTable = () => {
           {assignedAdmin ? (
             <Space>
               <Avatar
-                src={assignedAdmin.profileImage } // แก้ไขใช้ null แทนค่าว่าง
-                style={{ backgroundColor: "#1890ff" }}
+                src={assignedAdmin.profileImage}
                 icon={!assignedAdmin.profileImage && <UserOutlined />}
               />
-              <div>
+              <div className="hidden sm:block">
+                {" "}
+                {/* ซ่อนรายละเอียดในมุมมองมือถือ */}
                 <div style={{ fontWeight: "500" }}>
                   {assignedAdmin.firstName} {assignedAdmin.lastName}
                 </div>
@@ -478,11 +495,12 @@ const AssignmentTable = () => {
               type="dashed"
               size="small"
               onClick={() => showAssignModal(record)}>
-              มอบหมายงาน
+              มอบหมาย
             </Button>
           )}
         </div>
       ),
+      responsive: ["sm", "md", "lg", "xl"], // ไม่แสดงในขนาด xs (มือถือ)
     },
     {
       title: "Actions",
@@ -496,6 +514,7 @@ const AssignmentTable = () => {
           onStatusChange={handleStatusChange}
         />
       ),
+      responsive: ["xs", "sm", "md", "lg", "xl"], // แสดงในทุกขนาดหน้าจอ
     },
   ];
 
@@ -507,28 +526,36 @@ const AssignmentTable = () => {
           background: colorBgContainer,
           padding: 24,
         }}>
-        <div className="flex justify-between items-center mb-4">
-          <div className="flex gap-4">
+        <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-2">
+          {/* ช่องค้นหา - จะอยู่ด้านบนในมือถือ และด้านซ้ายในจอใหญ่ */}
+          <div className="w-full sm:w-auto">
             <Search
               placeholder="ค้นหาคำร้อง..."
               allowClear
               onSearch={handleSearch}
               onChange={(e) => handleSearch(e.target.value)}
-              style={{ width: 250 }}
+              style={{ width: "100%" }}
             />
+          </div>
+
+          {/* ปุ่มรีเฟรช - จะอยู่ด้านล่างในมือถือ และด้านขวาในจอใหญ่ */}
+          <div>
             <Button
               type="primary"
               onClick={fetchReports}
-              icon={<ReloadOutlined />}
               style={{
                 backgroundColor: "#262362",
                 transition: "background-color 0.3s",
+                border: "none",
+                borderRadius: "50%",
+                height: "32px",
+                width: "32px",
               }}
               onMouseEnter={(e) => (e.target.style.backgroundColor = "#193CB8")}
               onMouseLeave={(e) =>
                 (e.target.style.backgroundColor = "#262362")
               }>
-              รีเฟรช
+              <ReloadOutlined />
             </Button>
           </div>
         </div>
@@ -536,16 +563,22 @@ const AssignmentTable = () => {
         {loading ? (
           <TableSkeleton />
         ) : (
-          <Table
-            ref={tableRef}
-            dataSource={filteredData}
-            columns={columns}
-            pagination={{
-              pageSize: 10,
-              showTotal: (total) => `ทั้งหมด ${total} รายการ`,
-            }}
-            scroll={{ x: "max-content", y: 600 }}
-          />
+          <div className="overflow-x-auto">
+            <Table
+              ref={tableRef}
+              dataSource={filteredData}
+              columns={columns}
+              pagination={{
+                pageSize: 10,
+                showTotal: (total) => `ทั้งหมด ${total} รายการ`,
+                responsive: true,
+                showSizeChanger: true,
+              }}
+              scroll={{ x: "max-content" }}
+              size={window.innerWidth < 768 ? "small" : "middle"} // ปรับขนาดตารางตามขนาดหน้าจอ
+              rowClassName="whitespace-normal"
+            />
+          </div>
         )}
 
         {/* Modal สำหรับมอบหมายงาน */}
