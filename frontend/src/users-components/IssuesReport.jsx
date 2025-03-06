@@ -1,9 +1,23 @@
 import { useState, useEffect } from "react";
-import { Layout, Button, Input, theme, message, Spin, Row, Col } from "antd";
+import {
+  Layout,
+  Button,
+  Input,
+  theme,
+  message,
+  Spin,
+  Row,
+  Col,
+  Tabs,
+  Badge,
+} from "antd";
 import {
   PlusOutlined,
   SearchOutlined,
   LoadingOutlined,
+  ReloadOutlined,
+  HistoryOutlined,
+  FileTextOutlined,
 } from "@ant-design/icons";
 import IssueFormModal from "./IssueFormModal";
 import IssueCard from "./IssueCard";
@@ -23,6 +37,8 @@ const IssuesReport = () => {
   const [editingIssue, setEditingIssue] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [activeTabKey, setActiveTabKey] = useState("active"); // เพิ่ม state สำหรับ tab ที่กำลังใช้งาน
 
   // ใช้ข้อมูลผู้ใช้จาก context
   const { user } = useUser();
@@ -32,10 +48,16 @@ const IssuesReport = () => {
     fetchIssues();
   }, []);
 
-  // ดึงข้อมูลคำร้องทั้งหมดของผู้ใช้ปัจจุบัน
-  const fetchIssues = async () => {
+  // ดึงข้อมูลคำร้องทั้งหมดของผู้ใช้ปัจจุบัน รวมถึงคำร้องที่ถูกปฏิเสธและเสร็จสิ้นแล้ว
+  const fetchIssues = async (isRefreshing = false) => {
     try {
-      setLoading(true);
+      // ถ้าเป็นการรีเฟรช ให้ set state refreshing แทน loading
+      if (isRefreshing) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+
       const token = localStorage.getItem("token");
 
       const response = await axios.get(`${API_BASE_URL}/reports/user/me`, {
@@ -44,18 +66,23 @@ const IssuesReport = () => {
         },
       });
 
-      console.log("Fetched issues:", response.data);
+      console.log("Fetched all issues:", response.data);
 
       // ตรวจสอบรูปแบบการตอบกลับจาก API
+      let reportData = [];
       if (response.data && Array.isArray(response.data.data)) {
-        // Backend คืนค่าในรูปแบบ { data: [...] }
-        setIssues(response.data.data);
+        reportData = response.data.data;
       } else if (response.data && Array.isArray(response.data)) {
-        // กรณีเผื่อ API คืนข้อมูลเป็น Array โดยตรง
-        setIssues(response.data);
+        reportData = response.data;
       } else {
         console.warn("Unexpected API response format:", response.data);
-        setIssues([]);
+      }
+
+      setIssues(reportData);
+
+      // ถ้าเป็นการรีเฟรช แสดงข้อความสำเร็จ
+      if (isRefreshing) {
+        message.success("รีเฟรชข้อมูลสำเร็จ");
       }
     } catch (error) {
       console.error("Error fetching issues:", error);
@@ -68,10 +95,91 @@ const IssuesReport = () => {
         setIssues([]);
       }
     } finally {
+      // ปิดสถานะโหลดทั้ง loading และ refreshing
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
+  // ฟังก์ชันสำหรับจัดการการคลิกปุ่มรีเฟรช
+  const handleRefresh = () => {
+    fetchIssues(true);
+  };
+
+  // แยกข้อมูลตาม tab
+  const getIssuesByStatus = () => {
+    if (!issues || !Array.isArray(issues)) {
+      return {
+        active: [],
+        history: [],
+      };
+    }
+
+    // กรองตามคำค้นหา
+    const searchFiltered =
+      searchTerm.trim() === ""
+        ? issues
+        : issues.filter((issue) => {
+            const searchLower = searchTerm.toLowerCase();
+            return (
+              (issue.topic || "").toLowerCase().includes(searchLower) ||
+              (issue.description || "").toLowerCase().includes(searchLower)
+            );
+          });
+
+    // แยกข้อมูลตามสถานะ
+    const active = searchFiltered.filter(
+      (issue) => !["completed", "rejected"].includes(issue.status)
+    );
+
+    const history = searchFiltered.filter((issue) =>
+      ["completed", "rejected"].includes(issue.status)
+    );
+
+    return { active, history };
+  };
+
+  // นับจำนวนคำร้องแต่ละประเภท
+  const { active, history } = getIssuesByStatus();
+
+  // จัดการเมื่อเปลี่ยน tab
+  const handleTabChange = (key) => {
+    setActiveTabKey(key);
+  };
+
+  // สร้างรายการ tab
+  const items = [
+    {
+      key: "active",
+      label: (
+        <span>
+          <FileTextOutlined />
+          คำร้องที่ดำเนินการอยู่
+          <Badge
+            count={active.length}
+            style={{ marginLeft: "8px", backgroundColor: "#262362" }}
+            overflowCount={99}
+          />
+        </span>
+      ),
+    },
+    {
+      key: "history",
+      label: (
+        <span>
+          <HistoryOutlined />
+          ประวัติคำร้อง
+          <Badge
+            count={history.length}
+            style={{ marginLeft: "8px", backgroundColor: "#8c8c8c" }}
+            overflowCount={99}
+          />
+        </span>
+      ),
+    },
+  ];
+
+  // ฟังก์ชัน add, edit, delete ยังคงเหมือนเดิม
   const handleAddIssue = () => {
     setEditingIssue(null);
     setIsModalVisible(true);
@@ -82,51 +190,8 @@ const IssuesReport = () => {
     setIsModalVisible(true);
   };
 
-  const handleDeleteIssue = async (issue) => {
-    try {
-      const token = localStorage.getItem("token");
-
-      // ใช้ issueId จาก API response หรือ ใช้ _id ถ้าไม่มี issueId
-      const issueId = issue.issueId || issue._id || issue.id;
-
-      if (!issueId) {
-        message.error("ไม่พบ ID ของคำร้อง");
-        return;
-      }
-
-      // ใช้ URL endpoint ตามที่ backend กำหนด
-      await axios.delete(`${API_BASE_URL}/reports/delete/${issueId}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      // อัพเดตรายการคำร้องหลังจากลบ
-      setIssues(
-        issues.filter(
-          (i) => i.issueId !== issueId && i._id !== issueId && i.id !== issueId
-        )
-      );
-      message.success("ลบคำร้องสำเร็จ");
-    } catch (error) {
-      console.error("Error deleting report:", error);
-
-      // แสดงข้อความผิดพลาดที่ได้จาก API ถ้ามี
-      if (error.response && error.response.data) {
-        message.error(
-          `ไม่สามารถลบคำร้องได้: ${
-            error.response.data.message ||
-            error.response.data.error ||
-            "เกิดข้อผิดพลาดที่เซิร์ฟเวอร์"
-          }`
-        );
-      } else {
-        message.error("ไม่สามารถลบคำร้องได้");
-      }
-    }
-  };
-
   const handleModalOk = async (formData) => {
+    // ...existing code...
     try {
       const token = localStorage.getItem("token");
 
@@ -140,9 +205,6 @@ const IssuesReport = () => {
           return;
         }
 
-        console.log(`Updating issue with ID: ${issueId}`);
-
-        // ใช้ URL endpoint ตามที่ backend กำหนด
         await axios.put(`${API_BASE_URL}/reports/edit/${issueId}`, formData, {
           headers: {
             "Content-Type": "multipart/form-data",
@@ -153,9 +215,6 @@ const IssuesReport = () => {
         message.success("แก้ไขคำร้องสำเร็จ");
       } else {
         // กรณีสร้างคำร้องใหม่
-        console.log("Creating new issue");
-
-        // ใช้ URL endpoint ตามที่ backend กำหนด
         await axios.post(`${API_BASE_URL}/reports/create/me`, formData, {
           headers: {
             "Content-Type": "multipart/form-data",
@@ -164,6 +223,8 @@ const IssuesReport = () => {
         });
 
         message.success("สร้างคำร้องสำเร็จ");
+        // หลังจากสร้างคำร้อง ให้กลับไปที่ tab คำร้องที่ดำเนินการอยู่
+        setActiveTabKey("active");
       }
 
       // โหลดข้อมูลใหม่หลังจากการเปลี่ยนแปลง
@@ -173,19 +234,9 @@ const IssuesReport = () => {
       setIsModalVisible(false);
     } catch (error) {
       console.error("Error saving report:", error);
-
-      // แสดงข้อความผิดพลาดที่ได้จาก API ถ้ามี
-      if (error.response && error.response.data) {
-        message.error(
-          `ไม่สามารถบันทึกคำร้องได้: ${
-            error.response.data.message ||
-            error.response.data.error ||
-            "เกิดข้อผิดพลาดที่เซิร์ฟเวอร์"
-          }`
-        );
-      } else {
-        message.error("ไม่สามารถบันทึกคำร้องได้");
-      }
+      message.error(
+        error.response?.data?.message || "ไม่สามารถบันทึกคำร้องได้"
+      );
     }
   };
 
@@ -193,21 +244,91 @@ const IssuesReport = () => {
     setIsModalVisible(false);
   };
 
-  // กรองคำร้องตามคำค้นหา - แก้ไขให้ตรงกับชื่อฟิลด์ในข้อมูลที่ได้จาก API
-  const filteredIssues = issues.filter((issue) => {
-    const searchLower = searchTerm.toLowerCase();
+  const handleDeleteIssue = async (issue) => {
+    try {
+      const token = localStorage.getItem("token");
+      const issueId = issue.issueId || issue._id || issue.id;
+
+      if (!issueId) {
+        message.error("ไม่พบ ID ของคำร้อง");
+        return;
+      }
+
+      await axios.delete(`${API_BASE_URL}/reports/delete/${issueId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      // อัพเดตรายการคำร้องโดยลบคำร้องที่มี ID ตรงกัน
+      setIssues(
+        issues.filter(
+          (i) => i.issueId !== issueId && i._id !== issueId && i.id !== issueId
+        )
+      );
+
+      message.success("ลบคำร้องสำเร็จ");
+    } catch (error) {
+      console.error("Error deleting report:", error);
+      message.error(error.response?.data?.message || "ไม่สามารถลบคำร้องได้");
+    }
+  };
+
+  // ฟังก์ชันแสดงคำร้องตาม tab ที่เลือก
+  const renderIssues = () => {
+    const issuesToShow = activeTabKey === "active" ? active : history;
+
+    if (loading) {
+      return (
+        <div className="flex justify-center items-center py-16">
+          <Spin indicator={<LoadingOutlined style={{ fontSize: 24 }} spin />} />
+        </div>
+      );
+    }
+
+    if (issuesToShow.length === 0) {
+      return (
+        <div className="flex justify-center items-center py-16 text-gray-500">
+          {searchTerm
+            ? "ไม่พบคำร้องที่ตรงกับคำค้นหา"
+            : activeTabKey === "active"
+            ? "คุณยังไม่มีคำร้องที่กำลังดำเนินการอยู่ กดปุ่ม 'เพิ่มคำร้อง' เพื่อสร้างคำร้องใหม่"
+            : "ไม่พบประวัติคำร้องของคุณ"}
+        </div>
+      );
+    }
+
     return (
-      (issue.topic || "").toLowerCase().includes(searchLower) ||
-      (issue.description || "").toLowerCase().includes(searchLower)
+      <Row gutter={[16, 16]}>
+        {issuesToShow.map((issue) => (
+          <Col
+            xs={24}
+            sm={24}
+            md={12}
+            lg={8}
+            xl={8}
+            key={issue._id || issue.id}>
+            <IssueCard
+              issue={issue}
+              // ส่ง onEdit เฉพาะสำหรับคำร้องที่อยู่ใน tab active เท่านั้น
+              onEdit={activeTabKey === "active" ? handleEditIssue : null}
+              // ส่ง onDelete สำหรับทั้งสองแท็บ เพื่อให้ลบได้ในทั้งสองแท็บ
+              onDelete={handleDeleteIssue}
+              // กำหนด readOnly ให้เป็นจริงเฉพาะเมื่ออยู่ในแท็บ history
+              readOnly={activeTabKey === "history"}
+            />
+          </Col>
+        ))}
+      </Row>
     );
-  });
+  };
 
   return (
     <Layout>
       <Content
         className="rounded-lg"
         style={{
-          minHeight: "75vh", // ปรับจาก fixed height เป็น minHeight ให้รองรับเนื้อหาที่ยาว
+          minHeight: "75vh",
           margin: "3px 10px",
           padding: 24,
           borderRadius: borderRadiusLG,
@@ -217,65 +338,76 @@ const IssuesReport = () => {
         <div className="sticky top-0 bg-white z-30 pb-4">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
             <h2 className="text-xl font-medium">คำร้องของฉัน</h2>
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full md:w-auto">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full md:w-auto">
               <Input
-                placeholder="ค้นหาคำร้อง"
+                placeholder="ค้นหาคำร้อง..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 style={{ width: "100%", maxWidth: "300px" }}
                 prefix={<SearchOutlined />}
               />
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                onClick={handleAddIssue}
-                style={{
-                  backgroundColor: "#262362",
-                  transition: "background-color 0.3s",
-                }}
-                onMouseEnter={(e) =>
-                  (e.target.style.backgroundColor = "#193CB8")
-                }
-                onMouseLeave={(e) =>
-                  (e.target.style.backgroundColor = "#262362")
-                }>
-                เพิ่มคำร้อง
-              </Button>
+
+              {/* กลุ่มปุ่ม - แสดงในแถวเดียวกันเสมอ */}
+              <div className="flex gap-2">
+                {/* ปุ่มรีเฟรช */}
+                <Button
+                  type="primary"
+                  onClick={handleRefresh}
+                  loading={refreshing}
+                  style={{
+                    backgroundColor: "#262362",
+                    transition: "background-color 0.3s",
+                    border: "none",
+                    borderRadius: "50%",
+                    height: "32px",
+                    width: "32px",
+                  }}
+                  onMouseEnter={(e) =>
+                    (e.target.style.backgroundColor = "#193CB8")
+                  }
+                  onMouseLeave={(e) =>
+                    (e.target.style.backgroundColor = "#262362")
+                  }
+                  title="รีเฟรชข้อมูล">
+                  <ReloadOutlined />
+                </Button>
+
+                {/* แสดงปุ่มเพิ่มคำร้องเฉพาะใน tab คำร้องที่กำลังดำเนินการ */}
+                {activeTabKey === "active" && (
+                  <Button
+                    type="primary"
+                    onClick={handleAddIssue}
+                    icon={<PlusOutlined />}
+                    style={{
+                      backgroundColor: "#262362",
+                      transition: "background-color 0.3s",
+                      border: "none",
+                    }}
+                    onMouseEnter={(e) =>
+                      (e.target.style.backgroundColor = "#193CB8")
+                    }
+                    onMouseLeave={(e) =>
+                      (e.target.style.backgroundColor = "#262362")
+                    }>
+                    เพิ่มคำร้อง
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
+
+          {/* เพิ่ม Tabs สำหรับแยกประเภทคำร้อง */}
+          <Tabs
+            activeKey={activeTabKey}
+            items={items}
+            onChange={handleTabChange}
+            style={{ marginTop: "16px" }}
+            type="card"
+          />
         </div>
 
-        {loading ? (
-          <div className="flex justify-center items-center py-16">
-            <Spin
-              indicator={<LoadingOutlined style={{ fontSize: 24 }} spin />}
-            />
-          </div>
-        ) : filteredIssues.length === 0 ? (
-          <div className="flex justify-center items-center py-16 text-gray-500">
-            {searchTerm
-              ? "ไม่พบคำร้องที่ตรงกับคำค้นหา"
-              : "คุณยังไม่มีคำร้อง กดปุ่ม 'เพิ่มคำร้อง' เพื่อสร้างคำร้องใหม่"}
-          </div>
-        ) : (
-          <Row gutter={[16, 16]}>
-            {filteredIssues.map((issue) => (
-              <Col
-                xs={24}
-                sm={24}
-                md={12}
-                lg={8}
-                xl={8}
-                key={issue._id || issue.id}>
-                <IssueCard
-                  issue={issue}
-                  onEdit={handleEditIssue}
-                  onDelete={handleDeleteIssue}
-                />
-              </Col>
-            ))}
-          </Row>
-        )}
+        {/* แสดงคำร้องตาม tab ที่เลือก */}
+        {renderIssues()}
 
         <IssueFormModal
           visible={isModalVisible}

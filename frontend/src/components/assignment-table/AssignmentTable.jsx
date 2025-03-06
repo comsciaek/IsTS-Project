@@ -458,7 +458,7 @@ const AssignmentTable = () => {
       filters: [
         { text: "รอดำเนินการ", value: "pending" },
         { text: "อนุมัติแล้ว", value: "approved" },
-        { text: "ถูกปฏิเสธ", value: "rejected" },
+        { text: "เสร็จสิ้น", value: "completed" },
       ],
       onFilter: (value, record) => record.status === value,
       render: (status) => (

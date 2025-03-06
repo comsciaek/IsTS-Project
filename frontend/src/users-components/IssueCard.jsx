@@ -15,6 +15,7 @@ import {
   FileOutlined,
   FileWordOutlined,
   ClockCircleOutlined,
+  UserOutlined,
 } from "@ant-design/icons";
 import PropTypes from "prop-types";
 import dayjs from "dayjs";
@@ -36,21 +37,31 @@ const statusColors = {
   approved: "green",
 };
 
-const IssueCard = ({ issue, onEdit, onDelete }) => {
+const IssueCard = ({ issue, onEdit, onDelete, readOnly = false }) => {
   // ดึงข้อมูลผู้ใช้จาก UserContext
   const { user } = useUser();
 
-  // สร้างเมนูสำหรับตัวเลือกบนการ์ด
+  // สร้างเมนูสำหรับตัวเลือกบนการ์ด - ปรับให้รองรับโหมด readOnly
   const menu = (
     <Menu>
-      <Menu.Item key="edit" onClick={() => onEdit(issue)}>
-        แก้ไขคำร้อง
-      </Menu.Item>
-      <Menu.Item key="delete" danger onClick={() => onDelete(issue)}>
-        ลบคำร้อง
-      </Menu.Item>
+      {/* แสดงตัวเลือกแก้ไขเฉพาะเมื่อไม่ใช่โหมด readOnly และมี onEdit */}
+      {!readOnly && onEdit && (
+        <Menu.Item key="edit" onClick={() => onEdit(issue)}>
+          แก้ไขคำร้อง
+        </Menu.Item>
+      )}
+
+      {/* แสดงตัวเลือกลบเสมอถ้ามี onDelete แม้จะเป็น readOnly */}
+      {onDelete && (
+        <Menu.Item key="delete" danger onClick={() => onDelete(issue)}>
+          ลบคำร้อง
+        </Menu.Item>
+      )}
     </Menu>
   );
+
+  // ปรับจากไอคอน EyeOutlined เป็น MoreOutlined เสมอ เพื่อให้สื่อว่ามีเมนู
+  const menuIcon = <MoreOutlined />;
 
   // ดึงข้อมูลและตั้งค่าตัวแปรเริ่มต้น (กรณีรูปแบบข้อมูลต่างกัน) - แก้ไขให้ตรงกับ API
   const title = issue.topic || issue.title || issue.issue || "ไม่มีหัวข้อ";
@@ -61,6 +72,11 @@ const IssueCard = ({ issue, onEdit, onDelete }) => {
   // ข้อมูลผู้ใช้จะเก็บแยกอยู่แล้ว ไม่มีในคำร้อง
   const employeeName = user?.name || user?.employeeId || "ผู้ใช้งาน";
   const profileImage = user?.profileImage || user?.profilePicture;
+
+  // ข้อมูลผู้รับผิดชอบ (Admin/SuperAdmin)
+  const assignedAdmin = issue.assignedAdmin || null;
+  const hasAssignedAdmin =
+    assignedAdmin !== null && typeof assignedAdmin === "object";
 
   // สำหรับไฟล์แนบ
   const fileUrl = issue.file || ""; // backend เก็บเป็น file (ไม่ใช่ files array)
@@ -78,7 +94,7 @@ const IssueCard = ({ issue, onEdit, onDelete }) => {
   const displayStatus = statusMapping[status] || status;
   const statusColor = statusColors[status] || "default";
 
-  const formattedDate = dayjs(date).format("YYYY-MM-DD HH:mm");
+  const formattedDate = dayjs(date).format("YYYY-MM-DD ");
 
   // ตรวจสอบประเภทไฟล์แนบ
   const getFileTypeFromUrl = (url) => {
@@ -106,10 +122,13 @@ const IssueCard = ({ issue, onEdit, onDelete }) => {
       }
       extra={
         <Dropdown overlay={menu} trigger={["click"]}>
-          <Button type="text" icon={<MoreOutlined />} />
+          <Button type="text" icon={menuIcon} />
         </Dropdown>
       }
-      className="w-full h-full shadow-md rounded-lg overflow-hidden hover:shadow-lg transition-shadow">
+      className={`w-full h-full shadow-md rounded-lg overflow-hidden hover:shadow-lg transition-shadow ${
+        readOnly ? "bg-gray-50" : ""
+      }`}>
+      {/* ข้อมูลผู้แจ้ง */}
       <div className="flex flex-wrap items-center mb-4 gap-2">
         <Avatar src={profileImage} size="large" className="mr-2" />
         <div className="min-w-0 flex-grow">
@@ -126,11 +145,12 @@ const IssueCard = ({ issue, onEdit, onDelete }) => {
         <Tooltip title={formattedDate}>
           <div className="flex items-center text-xs text-gray-400 ml-auto">
             <ClockCircleOutlined className="mr-1" />
-            {dayjs(date).format("YYYY-MM-DD")}
+            {dayjs(date).format("DD/MM/YYYY")}
           </div>
         </Tooltip>
       </div>
 
+      {/* คำอธิบาย */}
       <div className="mb-4">
         <Paragraph
           ellipsis={{ rows: 3, expandable: true, symbol: "อ่านเพิ่มเติม" }}
@@ -139,13 +159,44 @@ const IssueCard = ({ issue, onEdit, onDelete }) => {
         </Paragraph>
       </div>
 
+      {/* แถวด้านล่าง - แสดงสถานะ (ซ้าย) และผู้รับผิดชอบ (ขวา) */}
       <div className="flex justify-between items-center flex-wrap gap-2">
-        <Tag color={statusColor} className="px-2 py-1 mr-0">
+        {/* สถานะด้านซ้าย */}
+        <Tag color={statusColor} className="px-2 py-1">
           {displayStatus}
         </Tag>
+
+        {/* ผู้รับผิดชอบด้านขวา */}
+        {hasAssignedAdmin && (
+          <Tooltip
+            title={`ผู้รับผิดชอบ: ${
+              assignedAdmin.firstName && assignedAdmin.lastName
+                ? `${assignedAdmin.firstName} ${assignedAdmin.lastName}`
+                : assignedAdmin.name || "ผู้ดูแลระบบ"
+            }`}
+            placement="bottom">
+            <div className="flex items-center">
+              <Text className="text-xs text-gray-500 mr-1">ผู้รับผิดชอบ:</Text>
+              <Avatar
+                src={assignedAdmin.profileImage || assignedAdmin.profilePicture}
+                icon={
+                  !(
+                    assignedAdmin.profileImage || assignedAdmin.profilePicture
+                  ) && <UserOutlined />
+                }
+                size="small"
+              />
+              <Text strong className="text-xs ml-1 hidden sm:inline">
+                {assignedAdmin.firstName && assignedAdmin.lastName
+                  ? `${assignedAdmin.firstName} ${assignedAdmin.lastName}`
+                  : assignedAdmin.name || "ผู้ดูแลระบบ"}
+              </Text>
+            </div>
+          </Tooltip>
+        )}
       </div>
 
-      {/* แสดงไฟล์แนบ (เปลี่ยนจาก files array เป็น file เดี่ยว) */}
+      {/* แสดงไฟล์แนบ */}
       {fileUrl && (
         <div className="mt-4 border-t pt-3">
           <Text strong className="text-sm mb-2 block">
@@ -176,22 +227,33 @@ const IssueCard = ({ issue, onEdit, onDelete }) => {
 
 IssueCard.propTypes = {
   issue: PropTypes.shape({
-    issueId: PropTypes.string, // เพิ่ม issueId ตามที่ backend ใช้
+    issueId: PropTypes.string,
     _id: PropTypes.string,
     id: PropTypes.string,
     userId: PropTypes.string,
-    topic: PropTypes.string, // เปลี่ยนจาก title เป็น topic ตามที่ backend ใช้
+    topic: PropTypes.string,
     title: PropTypes.string,
     issue: PropTypes.string,
     description: PropTypes.string,
     date: PropTypes.string,
-    file: PropTypes.string, // เปลี่ยนจาก files array เป็น file string
+    file: PropTypes.string,
     status: PropTypes.string,
     createdAt: PropTypes.string,
     updatedAt: PropTypes.string,
+    assignedAdmin: PropTypes.shape({
+      _id: PropTypes.string,
+      id: PropTypes.string,
+      firstName: PropTypes.string,
+      lastName: PropTypes.string,
+      name: PropTypes.string,
+      role: PropTypes.string,
+      profileImage: PropTypes.string,
+      profilePicture: PropTypes.string,
+    }),
   }).isRequired,
-  onEdit: PropTypes.func.isRequired,
-  onDelete: PropTypes.func.isRequired,
+  onEdit: PropTypes.func,
+  onDelete: PropTypes.func,
+  readOnly: PropTypes.bool,
 };
 
 export default IssueCard;

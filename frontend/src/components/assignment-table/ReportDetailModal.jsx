@@ -65,11 +65,13 @@ const ReportDetailModal = ({ visible, onCancel, record, onAssign }) => {
       <div className="mt-4">
         <Title level={5}>ไฟล์แนบ</Title>
         {fileType === "image" ? (
-          <Image
-            src={record.file}
-            alt="Attachment"
-            style={{ maxWidth: "100%", maxHeight: "300px" }}
-          />
+          <div className="border rounded p-2">
+            <Image
+              src={record.file}
+              alt="Attachment"
+              style={{ maxWidth: "100%", maxHeight: "300px" }}
+            />
+          </div>
         ) : (
           <Button
             type="primary"
@@ -103,9 +105,7 @@ const ReportDetailModal = ({ visible, onCancel, record, onAssign }) => {
       <div className="mb-4">
         <Descriptions column={1} bordered size="small">
           <Descriptions.Item label="วันที่แจ้งปัญหา">
-            {record.date
-              ? dayjs(record.date).format("DD/MM/YYYY HH:mm")
-              : "ไม่ระบุ"}
+            {record.date ? dayjs(record.date).format("DD/MM/YYYY") : "ไม่ระบุ"}
           </Descriptions.Item>
           <Descriptions.Item label="พนักงานผู้แจ้ง">
             <Space>

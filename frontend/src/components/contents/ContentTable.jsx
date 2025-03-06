@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Layout,
   Table,
@@ -9,111 +9,237 @@ import {
   theme,
   Avatar,
   Modal,
+  Tag,
+  Input,
+  Badge,
+  Tooltip,
+  Empty,
+  Image,
+  Divider, // เพิ่มการนำเข้า Image component
 } from "antd";
 import {
   EllipsisOutlined,
-  EditOutlined,
-  DeleteOutlined,
-  PlusCircleOutlined,
   MessageOutlined,
   ReloadOutlined,
+  FileTextOutlined,
+  UserOutlined,
+  InfoOutlined,
 } from "@ant-design/icons";
-import IssueModal from "./IssueModal"; // Import the new component
-import { Link } from "react-router"; // Import Link from react-router-dom
-import SearchColumn from "./SearchColumn";
-import StatusColumn from "./StatusColumn";
-import TableSkeleton from "../skeletons/TableSkeleton"; // Import TableSkeleton
+import { Link } from "react-router";
+import TableSkeleton from "../skeletons/TableSkeleton";
+import axios from "axios";
+import dayjs from "dayjs";
+import { useUser } from "../../context/UserContext";
 
 const { Content } = Layout;
-const { confirm } = Modal;
+
+const { Search } = Input;
+
+// API Base URL
+const API_BASE_URL = "http://172.18.43.39:5000/api";
 
 const ContentTable = () => {
   const {
     token: { colorBgContainer, borderRadiusLG },
   } = theme.useToken();
 
+  const { user } = useUser();
+
   const [dataSource, setDataSource] = useState([]);
+  const [filteredData, setFilteredData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingRecord, setEditingRecord] = useState(null);
 
-  const fetchData = () => {
-    setLoading(true);
-    // Simulate data fetching
-    setTimeout(() => {
-      setDataSource(
-        Array.from({ length: 46 }).map((_, i) => ({
-          key: i,
-          id: `101 ${i}`,
-          issue: "Login failure",
-          date: "2025-02-05",
-          name: "John Doe",
-          profilePic: `https://i.pravatar.cc/150?img=${i}`, // Add profile picture URL
-          status: "เสร็จสิ้น", // Resolved in Thai
-        }))
+  // เพิ่มฟังก์ชันดึงข้อมูลคำร้องที่มอบหมายให้กับผู้ใช้ที่ล็อกอินอยู่
+  const fetchAssignedReports = useCallback(async () => {
+    try {
+      setLoading(true);
+
+      // ตรวจสอบว่ามี user และ user.id หรือไม่
+      if (!user || (!user.id && !user._id)) {
+        message.error("ไม่พบข้อมูลผู้ใช้");
+        setLoading(false);
+        return;
+      }
+
+      const token = localStorage.getItem("token");
+      const userId = user.id || user._id;
+
+      console.log("Fetching reports assigned to user ID:", user.id || user._id);
+
+      // เรียกใช้ API เพื่อดึงคำร้องที่มอบหมายให้กับผู้ใช้นี้
+      const response = await axios.get(
+        `${API_BASE_URL}/reports/admin/assigned/${userId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
       );
+
+      console.log("Assigned reports response:", response.data);
+
+      // ดึงข้อมูลคำร้องจากการตอบกลับของ API
+      let assignedReports = [];
+      if (response.data && Array.isArray(response.data.data)) {
+        assignedReports = response.data.data;
+      } else if (response.data && Array.isArray(response.data)) {
+        assignedReports = response.data;
+      } else {
+        console.warn("Unexpected API response format:", response.data);
+      }
+
+      // แปลงข้อมูลให้อยู่ในรูปแบบที่เหมาะสมสำหรับตาราง
+      const formattedData = assignedReports.map((report, index) => ({
+        key: report.issueId || report._id || index,
+        id: report.issueId || report._id,
+        issue: report.topic || report.title || report.issue || `Issue ${index}`,
+        description: report.description || "",
+        date: report.date || report.createdAt,
+        status: report.status || "รอดำเนินการ",
+        file: report.file || "",
+
+        // ข้อมูลผู้แจ้ง
+        name: report.userId?.firstName
+          ? `${report.userId.firstName} ${report.userId.lastName || ""}`
+          : report.userId?.employeeName || "ไม่ระบุชื่อ",
+        department: report.userId?.department || "ไม่ระบุแผนก",
+        position: report.userId?.position || "",
+        email: report.userId.email || "",
+        phoneNumber: report.userId.phoneNumber || "",
+        profilePic:
+          report.userId?.profileImage || report.userId?.profilePicture || "",
+
+        // เก็บข้อมูล original เพื่อใช้ในการแสดงรายละเอียด
+        originalData: report,
+      }));
+
+      console.log("Formatted assigned reports:", formattedData);
+
+      // กรองเอาเฉพาะรายการที่ไม่ได้ถูกปฏิเสธ
+      const filteredReports = formattedData.filter(
+        (report) => report.status !== "rejected"
+      );
+
+      setDataSource(filteredReports);
+      setFilteredData(filteredReports);
+    } catch (error) {
+      console.error("Error fetching assigned reports:", error);
+      message.error("ไม่สามารถดึงข้อมูลคำร้องที่มอบหมายได้");
+      setDataSource([]);
+      setFilteredData([]);
+    } finally {
       setLoading(false);
-    }, 1000); // Simulate a 1-second loading time
-  };
+    }
+  }, [user]);
 
+  // เรียกดึงข้อมูลเมื่อมีการเปลี่ยนแปลง user หรือ component mount
   useEffect(() => {
-    fetchData();
-  }, []);
+    fetchAssignedReports();
+  }, [fetchAssignedReports]);
 
-  const handleStatusChange = (key, newStatus) => {
-    const newData = dataSource.map((item) => {
-      if (item.key === key) {
-        return { ...item, status: newStatus };
-      }
-      return item;
-    });
-    setDataSource(newData);
-    message.success(`Status changed to ${newStatus}`);
+  // ฟังก์ชันสำหรับค้นหา
+  const handleSearch = (value) => {
+    if (!value) {
+      setFilteredData(dataSource);
+      return;
+    }
+
+    const lowercasedValue = value.toLowerCase();
+    const filtered = dataSource.filter(
+      (item) =>
+        (item.issue && item.issue.toLowerCase().includes(lowercasedValue)) ||
+        (item.description &&
+          item.description.toLowerCase().includes(lowercasedValue)) ||
+        (item.name && item.name.toLowerCase().includes(lowercasedValue)) ||
+        (item.department &&
+          item.department.toLowerCase().includes(lowercasedValue))
+    );
+
+    setFilteredData(filtered);
   };
 
-  const handleDelete = (key) => {
-    confirm({
-      title: "Are you sure you want to delete this item?",
-      onOk() {
-        const newData = dataSource.filter((item) => item.key !== key);
+  // แปลงสถานะเป็นภาษาไทยและกำหนดสี
+  const getStatusText = (status) => {
+    const statusMapping = {
+      pending: "รอดำเนินการ",
+      approved: "อนุมัติแล้ว",
+      rejected: "ถูกปฏิเสธ",
+      completed: "เสร็จสิ้น",
+    };
+    return statusMapping[status] || status;
+  };
+
+  const getStatusColor = (status) => {
+    const statusColors = {
+      pending: "orange",
+      approved: "green",
+      rejected: "red",
+      completed: "green",
+      รอดำเนินการ: "orange",
+      อนุมัติแล้ว: "green",
+      ถูกปฏิเสธ: "red",
+      เสร็จสิ้น: "green",
+    };
+    return statusColors[status] || "default";
+  };
+
+  // อัพเดตสถานะคำร้อง
+  const handleStatusChange = async (record, newStatus) => {
+    try {
+      const token = localStorage.getItem("token");
+      const issueId = record.id;
+
+      // ส่งคำขอ API เพื่ออัพเดตสถานะ
+      await axios.put(
+        `${API_BASE_URL}/reports/edit/${issueId}`,
+        { status: newStatus },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (newStatus === "rejected") {
+        // ถ้าสถานะใหม่เป็น "rejected" ให้ลบรายการนั้นออกจากตาราง
+        const newData = dataSource.filter((item) => item.key !== record.key);
         setDataSource(newData);
-        message.success("Request deleted successfully");
-      },
-    });
-  };
+        setFilteredData(filteredData.filter((item) => item.key !== record.key));
 
-  const handleReject = (key) => {
-    const newData = dataSource.map((item) => {
-      if (item.key === key) {
-        return { ...item, status: "ถูกปฏิเสธ" }; // Rejected in Thai
+        message.success(`รายการถูกปฏิเสธและซ่อนออกจากตาราง`);
+      } else {
+        // อัพเดตข้อมูลในตารางตามปกติ
+        const newData = dataSource.map((item) => {
+          if (item.key === record.key) {
+            return { ...item, status: newStatus };
+          }
+          return item;
+        });
+
+        setDataSource(newData);
+        setFilteredData(
+          filteredData.map((item) => {
+            if (item.key === record.key) {
+              return { ...item, status: newStatus };
+            }
+            return item;
+          })
+        );
+
+        message.success(`อัพเดตสถานะเป็น ${getStatusText(newStatus)} สำเร็จ`);
       }
-      return item;
-    });
-    setDataSource(newData);
-    message.success("Issue rejected successfully");
+    } catch (error) {
+      console.error("Error updating status:", error);
+      message.error("ไม่สามารถอัพเดตสถานะได้");
+    }
   };
 
-  const showModal = (record) => {
+  // แสดง Modal รายละเอียด
+  const showDetailModal = (record) => {
     setEditingRecord(record);
     setIsModalVisible(true);
-  };
-
-  const handleOk = (values) => {
-    const newData = [...dataSource];
-    const formattedValues = {
-      ...values,
-      date: values.date ? values.date.format("YYYY-MM-DD") : null,
-    };
-    if (editingRecord) {
-      const index = newData.findIndex((item) => item.key === editingRecord.key);
-      newData[index] = { ...editingRecord, ...formattedValues };
-    } else {
-      const newId = `101 ${dataSource.length + 1}`; // Auto-generate Issue ID
-      newData.push({ ...formattedValues, id: newId, key: dataSource.length });
-    }
-    setDataSource(newData);
-    setIsModalVisible(false);
-    setEditingRecord(null);
   };
 
   const handleCancel = () => {
@@ -121,37 +247,117 @@ const ContentTable = () => {
     setEditingRecord(null);
   };
 
-  const handleAdd = () => {
-    setEditingRecord(null);
-    setIsModalVisible(true);
+  // ฟังก์ชันเพิ่มเติมสำหรับตรวจสอบประเภทไฟล์
+  const getFileType = (fileUrl) => {
+    if (!fileUrl) return null;
+
+    const extension = fileUrl.split(".").pop().toLowerCase();
+
+    if (["jpg", "jpeg", "png", "gif"].includes(extension)) {
+      return "image";
+    } else if (extension === "pdf") {
+      return "pdf";
+    } else if (["doc", "docx"].includes(extension)) {
+      return "word";
+    }
+
+    return "other";
   };
 
+  // ฟังก์ชันเพิ่มเติมสำหรับแสดงไฟล์แนบ
+  const renderAttachment = (fileUrl) => {
+    if (!fileUrl) return null;
+
+    const fileType = getFileType(fileUrl);
+
+    return (
+      <div className="mt-4">
+        <h4 className="mb-2 font-semibold">ไฟล์แนบ</h4>
+        {fileType === "image" ? (
+          <div className="border rounded p-2">
+            <Image
+              src={fileUrl}
+              alt="Attachment"
+              style={{ maxWidth: "100%", maxHeight: "300px" }}
+            />
+          </div>
+        ) : (
+          <Button
+            type="primary"
+            icon={<FileTextOutlined />}
+            href={fileUrl}
+            target="_blank"
+            rel="noopener noreferrer">
+            ดูไฟล์แนบ
+          </Button>
+        )}
+      </div>
+    );
+  };
+
+  // คอลัมน์ของตาราง
   const columns = [
     {
       title: "Issue",
       dataIndex: "issue",
       key: "issue",
-      width: "20%",
-      ...SearchColumn("issue"),
+      width: "25%",
+      ellipsis: true,
+      render: (text, record) => (
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="font-semibold">{text}</span>
+            {record.file && (
+              <Tooltip title="มีไฟล์แนบ">
+                <Badge status="processing" color="blue" />
+              </Tooltip>
+            )}
+          </div>
+          <div style={{ fontSize: "12px", color: "#666", marginTop: "4px" }}>
+            {record.description && record.description.length > 60
+              ? `${record.description.substring(0, 60)}...`
+              : record.description}
+          </div>
+          <Button
+            type="link"
+            size="small"
+            onClick={() => showDetailModal(record)}
+            style={{ padding: "0", height: "auto", marginTop: "4px" }}>
+            <span className="text-blue-500 text-xs flex items-center">
+              <FileTextOutlined style={{ marginRight: "4px" }} />
+              ดูรายละเอียดเพิ่มเติม
+            </span>
+          </Button>
+        </div>
+      ),
+      responsive: ["xs", "sm", "md", "lg", "xl"],
     },
     {
       title: "Date",
       dataIndex: "date",
       key: "date",
-      width: "10%",
-      ...SearchColumn("date", true),
+      width: "12%",
+      render: (date) => dayjs(date).format("DD/MM/YYYY"),
+      responsive: ["sm", "md", "lg", "xl"],
     },
     {
-      title: "Emlpoyees",
+      title: "Employees",
       dataIndex: "name",
       key: "name",
-      width: "10%",
-      ...SearchColumn("name"),
+      width: "20%",
       render: (text, record) => (
         <Space>
-          <Avatar src={record.profilePic} />
-          {text}
-          <Link to={"/messages"}>
+          <Avatar
+            src={record.profilePic}
+            icon={!record.profilePic && <UserOutlined />}
+          />
+          <div className="hidden sm:block">
+            <div style={{ fontWeight: "500" }}>{text}</div>
+            <div style={{ fontSize: "12px", color: "#666" }}>
+              {record.department}
+            </div>
+          </div>
+          <Link to={"/messages"} className="ml-2">
             <Button
               style={{ borderRadius: "50%", height: "30px", width: "30px" }}
               icon={<MessageOutlined />}
@@ -159,46 +365,58 @@ const ContentTable = () => {
           </Link>
         </Space>
       ),
+      responsive: ["xs", "sm", "md", "lg", "xl"],
     },
     {
       title: "Status",
       dataIndex: "status",
       key: "status",
-      width: "11%",
-      render: (text, record) => (
-        <StatusColumn
-          text={text}
-          record={record}
-          handleStatusChange={handleStatusChange}
-        />
+      width: "12%",
+      filters: [
+        { text: "รอดำเนินการ", value: "pending" },
+        { text: "อนุมัติแล้ว", value: "approved" },
+        { text: "เสร็จสิ้น", value: "completed" },
+      ],
+      onFilter: (value, record) => record.status === value,
+      render: (status) => (
+        <Tag color={getStatusColor(status)}>{getStatusText(status)}</Tag>
       ),
+      responsive: ["xs", "sm", "md", "lg", "xl"],
     },
     {
       title: "Actions",
-      key: "6",
+      key: "action",
       width: "10%",
       render: (_, record) => (
         <Space>
           <Button
             style={{ borderRadius: "50%", height: "30px", width: "30px" }}
-            onClick={() => showModal(record)}
-            icon={<EditOutlined />}
+            onClick={() => showDetailModal(record)}
+            icon={<InfoOutlined />}
           />
-          <Button
-            style={{ borderRadius: "50%", height: "30px" }}
-            size="small"
-            onClick={() => handleDelete(record.key)}
-            danger>
-            <DeleteOutlined />
-          </Button>
           <Dropdown
             menu={{
               items: [
                 {
                   key: "1",
-                  label: "Reject Issue",
+                  label: "อนุมัติคำร้อง",
+                  onClick: () => handleStatusChange(record, "approved"),
+                },
+                {
+                  key: "2",
+                  label: "รอดำเนินการ",
+                  onClick: () => handleStatusChange(record, "pending"),
+                },
+                {
+                  key: "3",
+                  label: "เสร็จสิ้น",
+                  onClick: () => handleStatusChange(record, "completed"),
+                },
+                {
+                  key: "4",
+                  label: "ปฏิเสธคำร้อง",
                   danger: true,
-                  onClick: () => handleReject(record.key),
+                  onClick: () => handleStatusChange(record, "rejected"),
                 },
               ],
             }}>
@@ -209,6 +427,7 @@ const ContentTable = () => {
           </Dropdown>
         </Space>
       ),
+      responsive: ["xs", "sm", "md", "lg", "xl"],
     },
   ];
 
@@ -221,53 +440,120 @@ const ContentTable = () => {
           borderRadius: borderRadiusLG,
           background: colorBgContainer,
         }}>
-        <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <Button
-            onMouseEnter={(e) => (e.target.style.backgroundColor = "#193CB8")}
-            onMouseLeave={(e) => (e.target.style.backgroundColor = "#262362")}
-            type="primary"
-            onClick={handleAdd}
-            style={{
-              marginBottom: 16,
-              backgroundColor: "#262362",
-              transition: "background-color 0.3s",
-              border: "none",
-            }}>
-            <PlusCircleOutlined /> เพิ่มปัญหา
-          </Button>
-          <Button
-            onMouseEnter={(e) => (e.target.style.backgroundColor = "#193CB8")}
-            onMouseLeave={(e) => (e.target.style.backgroundColor = "#262362")}
-            type="primary"
-            onClick={fetchData}
-            style={{
-              marginBottom: 16,
-              backgroundColor: "#262362",
-              transition: "background-color 0.3s",
-              border: "none",
-              borderRadius: "50%",
-              height: "32px",
-              width: "32px",
-            }}>
-            <ReloadOutlined />
-          </Button>
+        <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-2">
+          {/* ช่องค้นหา */}
+          <div className="w-full sm:w-auto">
+            <Search
+              placeholder="ค้นหาคำร้อง..."
+              allowClear
+              onSearch={handleSearch}
+              onChange={(e) => handleSearch(e.target.value)}
+              style={{ width: "100%" }}
+            />
+          </div>
+
+          {/* ปุ่มรีเฟรช */}
+          <div>
+            <Button
+              type="primary"
+              onClick={fetchAssignedReports}
+              style={{
+                backgroundColor: "#262362",
+                transition: "background-color 0.3s",
+                border: "none",
+                borderRadius: "50%",
+                height: "32px",
+                width: "32px",
+              }}
+              onMouseEnter={(e) => (e.target.style.backgroundColor = "#193CB8")}
+              onMouseLeave={(e) =>
+                (e.target.style.backgroundColor = "#262362")
+              }>
+              <ReloadOutlined />
+            </Button>
+          </div>
         </div>
+
         {loading ? (
           <TableSkeleton />
-        ) : (
-          <Table
-            dataSource={dataSource}
-            columns={columns}
-            pagination={{ pageSize: 10 }}
-            scroll={{ x: "max-content", y: 450 }} // Add horizontal and vertical scroll
+        ) : dataSource.length === 0 ? (
+          <Empty
+            description="ไม่พบคำร้องที่มอบหมายให้คุณ"
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
           />
+        ) : (
+          <div className="overflow-x-auto">
+            <Table
+              dataSource={filteredData}
+              columns={columns}
+              pagination={{
+                pageSize: 10,
+                showTotal: (total) => `ทั้งหมด ${total} รายการ`,
+                responsive: true,
+                showSizeChanger: true,
+              }}
+              scroll={{ x: "max-content" }}
+              size={window.innerWidth < 768 ? "small" : "middle"}
+              rowClassName="whitespace-normal"
+            />
+          </div>
         )}
-        <IssueModal
-          visible={isModalVisible}
-          onOk={handleOk}
-          onCancel={handleCancel}
-          editingRecord={editingRecord}
-        />
+
+        {editingRecord && (
+          <Modal
+            title={<span>{editingRecord.issue}</span>}
+            open={isModalVisible}
+            onCancel={handleCancel}
+            footer={[
+              <Button key="close" onClick={handleCancel}>
+                ปิด
+              </Button>,
+            ]}
+            width={700}>
+            <Divider style={{ margin: "16px 0" }} />
+            {/* แสดงรายละเอียดของคำร้อง */}
+            <div className="mb-4">
+              <h4 className="mb-2 font-semibold">รายละเอียด</h4>
+              <p>{editingRecord.description}</p>
+            </div>
+            <Divider style={{ margin: "16px 0" }} />
+            <div className="mb-4 ">
+              <h4 className="mb-4 font-semibold">ผู้แจ้ง</h4>
+              <Space className="flex flex-col space-x-30 ml-2 ">
+                <Avatar src={editingRecord.profilePic} />
+                <div className="flex flex-col space-y-1 ml-2">
+                  <div className="font-medium text-base">
+                    {editingRecord.name}
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    {editingRecord.department}
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {editingRecord.email}
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {editingRecord.phoneNumber}
+                  </div>
+                </div>
+              </Space>
+            </div>
+            <Divider style={{ margin: "16px 0" }} />
+            <div className="mb-4">
+              <h4 className="mb-2 font-semibold">สถานะ</h4>
+              <Tag color={getStatusColor(editingRecord.status)}>
+                {getStatusText(editingRecord.status)}
+              </Tag>
+            </div>
+            <Divider style={{ margin: "16px 0" }} />
+            <div className="mb-4">
+              <h4 className="mb-2 font-semibold">วันที่แจ้ง</h4>
+              <p>{dayjs(editingRecord.date).format("DD/MM/YYYY")}</p>
+            </div>
+            <Divider style={{ margin: "16px 0" }} />
+            {/* แก้ไขการแสดงไฟล์แนบให้ใช้ renderAttachment function */}
+            {editingRecord.file && renderAttachment(editingRecord.file)}
+          </Modal>
+        )}
       </Content>
     </Layout>
   );

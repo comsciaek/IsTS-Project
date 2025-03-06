@@ -47,7 +47,7 @@ const ContentReports = () => {
           key: i,
           id: `101 ${i}`,
           issue: `Issue ${timeRange} ${i}`,
-          date: dayjs().format("YYYY-MM-DD"),
+          date: dayjs().format("DD/MM/YYYY"),
           employee: {
             name: "John Doe",
             avatar: "https://dummyimage.com/40x40/000/fff",

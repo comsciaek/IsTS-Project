@@ -382,7 +382,7 @@ const AccountSettings = () => {
               backgroundColor: "#262362",
               borderColor: "#262362",
             }}>
-            บันทึกการเปลี่ยนแปลง
+            Save Changes
           </Button>
         </Form.Item>
       </Form>
