@@ -28,8 +28,13 @@ const reportSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'approved', 'rejected','inprogress'],
+    enum: ['pending', 'approved', 'rejected','completed'],
     default: 'pending',
+  },
+  assignedAdmin: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User', // อ้างอิงถึง User model (Admin หรือ SuperAdmin)
+    default: null, // เริ่มต้นไม่มีผู้รับผิดชอบ
   },
   createdAt: {
     type: Date,

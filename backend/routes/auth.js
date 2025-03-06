@@ -3,7 +3,6 @@ import jwt from 'jsonwebtoken';
 import nodemailer from 'nodemailer';
 import User from '../model/User.js';
 import { protect } from '../auth/middleware.js';
-
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -182,16 +181,23 @@ router.post('/forgot-password', async (req, res) => {
     const resetToken = generateToken(user._id);
     const resetLink = `http://localhost:5173/reset-password?token=${resetToken}`;
 
-    console.log('Sending email to:', user.email);
-    console.log('Reset Link:', resetLink);
+    // console.log('Sending email to:', user.email);
+    // console.log('Reset Link:', resetLink);
 
-    await transporter.sendMail({
-      from: process.env.EMAIL_USER,
+    transporter.sendMail({
+      from: `"IsTS Project" <${process.env.EMAIL_USER}>`,
       to: user.email,
       subject: 'Password Reset Request',
-      html: `<p>Click <a href="${resetLink}">here</a> to reset your password. This link expires in 24 hours.</p>`,
+      html: `
+        <h3>Password Reset Request</h3>
+        <p>Hello ${user.firstName},</p>
+        <p>You requested a password reset. Click the link below to reset your password:</p>
+        <p><a href="${resetLink}">Reset Password</a></p>
+        <p>This link will expire in 24 hours.</p>
+        <p>If you didn't request this, please ignore this email.</p>
+        <p>Best regards,<br>Your App Team</p>
+      `,
     });
-
     return res.status(200).json({ message: 'Reset link sent to your email' });
   } catch (error) {
     console.error('Email sending error:', error);
