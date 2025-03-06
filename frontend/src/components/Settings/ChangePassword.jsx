@@ -81,7 +81,7 @@ const ChangePassword = () => {
           }}
           onMouseEnter={(e) => (e.target.style.backgroundColor = "#193CB8")}
           onMouseLeave={(e) => (e.target.style.backgroundColor = "#262362")}>
-          Reset Password
+          เปลี่ยนรหัสผ่าน
         </Button>
       </Form.Item>
     </Form>

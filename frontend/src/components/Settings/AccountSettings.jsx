@@ -336,12 +336,12 @@ const AccountSettings = () => {
         <Row gutter={16}>
           <Col xs={24} md={12}>
             <Form.Item name="employeeId" label="รหัสพนักงาน">
-              <Input disabled placeholder="รหัสพนักงาน" />
+              <Input readOnly placeholder="รหัสพนักงาน" />
             </Form.Item>
           </Col>
           <Col xs={24} md={12}>
             <Form.Item name="email" label="อีเมล">
-              <Input disabled placeholder="อีเมล" />
+              <Input readOnly placeholder="อีเมล" />
             </Form.Item>
           </Col>
         </Row>
@@ -349,12 +349,12 @@ const AccountSettings = () => {
         <Row gutter={16}>
           <Col xs={24} md={12}>
             <Form.Item name="department" label="แผนก">
-              <Input disabled placeholder="แผนก" />
+              <Input readOnly placeholder="แผนก" />
             </Form.Item>
           </Col>
           <Col xs={24} md={12}>
             <Form.Item name="position" label="ตำแหน่ง">
-              <Input disabled placeholder="ตำแหน่ง" />
+              <Input readOnly placeholder="ตำแหน่ง" />
             </Form.Item>
           </Col>
         </Row>

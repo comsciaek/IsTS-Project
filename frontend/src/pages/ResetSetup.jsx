@@ -63,7 +63,7 @@ const ResetSetup = () => {
 
   if (loading) {
     return (
-      <Layout style={{ height: "50vh" }}>
+      <Layout style={{ height: "100vh",width: "100vw"}}>
         <Content
           style={{
             display: "flex",

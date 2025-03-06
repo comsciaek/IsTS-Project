@@ -6,6 +6,7 @@ import {
   DownOutlined,
   MessageOutlined,
   LayoutOutlined,
+  UserOutlined,
 } from "@ant-design/icons";
 import { Link, NavLink, useLocation, useNavigate } from "react-router"; // Change to react-router-dom
 import logo from "../../assets/jib-logo-2.png";
@@ -151,9 +152,12 @@ const UsersSidebar = () => {
                 style={{ marginLeft: "16px" }}>
                 <Space className="text-white">
                   {user?.profileImage || user?.profilePicture ? (
-                    <Avatar src={user.profileImage || user.profilePicture} />
+                    <Avatar
+                      src={user.profileImage || user.profilePicture}
+                      
+                    />
                   ) : (
-                    <Avatar>{getUserInitial(user)}</Avatar>
+                    <Avatar icon={!user.profileImage && <UserOutlined />}>{getUserInitial(user)}</Avatar>
                   )}
                   <div
                     style={{
