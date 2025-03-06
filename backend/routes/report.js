@@ -187,7 +187,7 @@ router.get('/admin/assigned/:id', protect, authorizeAdminOrSuperAdmin, async (re
     const adminId = req.user.id; // ID ของ Admin หรือ SuperAdmin ปัจจุบัน
 
     const reports = await Report.find({ assignedAdmin: adminId }).sort({ createdAt: -1 })
-      .populate('userId', 'firstName lastName department profileImage') // รวมข้อมูลผู้ใช้ที่สร้างรายงาน
+      .populate('userId', 'firstName lastName department profileImage phoneNumber email') // รวมข้อมูลผู้ใช้ที่สร้างรายงาน
       .populate('assignedAdmin', 'firstName lastName role profileImage'); // รวมข้อมูลผู้รับผิดชอบ (ตัว Admin เอง)
 
     if (!reports.length) {
@@ -202,6 +202,8 @@ router.get('/admin/assigned/:id', protect, authorizeAdminOrSuperAdmin, async (re
         lastName: report.userId.lastName,
         department: report.userId.department,
         profileImage: report.userId.profileImage,
+        phoneNumber: report.userId.phoneNumber,
+        email : report.userId.email
       } : null,
       topic: report.topic,
       description: report.description,
@@ -282,7 +284,7 @@ router.put('/edit/:issueId', protect, upload.single('file'), async (req, res) =>
           message: 'Only SuperAdmin or Admin can update the status',
         });
       }
-      if (!['pending', 'approved', 'rejected'].includes(status)) {
+      if (!['pending', 'approved', 'rejected','completed'].includes(status)) {
         return res.status(400).json({
           message: 'Status must be one of: pending, approved, or rejected',
         });
