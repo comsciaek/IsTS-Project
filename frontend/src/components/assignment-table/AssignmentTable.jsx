@@ -122,9 +122,9 @@ const AssignmentTable = () => {
         transformReportData(report, index)
       );
 
-      // กรองออกรายการที่ถูกปฏิเสธ (status: rejected)
+      // กรองออกรายการที่มีสถานะเป็น "rejected" หรือ "completed"
       const filteredData = formattedData.filter(
-        (item) => item.status !== "rejected"
+        (item) => item.status !== "rejected" && item.status !== "completed"
       );
 
       setDataSource(filteredData);
@@ -221,13 +221,17 @@ const AssignmentTable = () => {
         }
       );
 
-      if (newStatus === "rejected") {
-        // ถ้าสถานะใหม่เป็น "rejected" ให้ลบรายการนั้นออกจากตาราง
+      // ถ้าสถานะใหม่เป็น "rejected" หรือ "completed" ให้ลบรายการนั้นออกจากตาราง
+      if (newStatus === "rejected" || newStatus === "completed") {
         const newData = dataSource.filter((item) => item.key !== record.key);
         setDataSource(newData);
         setFilteredData(filteredData.filter((item) => item.key !== record.key));
 
-        message.success(`รายการถูกปฏิเสธ`);
+        const statusText =
+          newStatus === "completed" ? "เสร็จสิ้น" : "ถูกปฏิเสธ";
+        message.success(
+          `รายการถูกปรับสถานะเป็น ${statusText} และย้ายไปยังรายงาน`
+        );
       } else {
         // อัพเดตข้อมูลในตารางตามปกติ
         const newData = dataSource.map((item) => {
@@ -422,7 +426,7 @@ const AssignmentTable = () => {
       responsive: ["sm", "md", "lg", "xl"], // ไม่แสดงในขนาด xs (มือถือ)
     },
     {
-      title: "Employees",
+      title: "Submitters",
       dataIndex: "employeeName",
       key: "employeeName",
       width: "20%",

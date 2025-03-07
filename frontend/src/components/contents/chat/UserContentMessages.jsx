@@ -1,12 +1,11 @@
 import { useState, useEffect, useLayoutEffect } from "react";
 import { Layout, Row, Col, Card, Button } from "antd";
 import { ArrowLeftOutlined } from "@ant-design/icons";
-import ChatList from "./ChatList";
-import ChatWindow from "./ChatWindow";
+import UserChatList from "./UserChatList";
+import ChatWindowUser from "./ChatWindowUser";
 import { useSocket } from "../../../context/SocketContext";
 
-
-const ContentMessages = () => {
+const UserContentMessages = () => {
   const [selectedChat, setSelectedChat] = useState(null);
   const { socket } = useSocket();
   const [isMobile, setIsMobile] = useState(false);
@@ -26,8 +25,8 @@ const ContentMessages = () => {
   }, []);
 
   // ฟังก์ชันสำหรับเลือกแชท
-  const handleSelectChat = (contact) => {
-    setSelectedChat(contact);
+  const handleSelectChat = (chat) => {
+    setSelectedChat(chat);
   };
 
   // ฟังก์ชันสำหรับปิดแชท
@@ -40,13 +39,14 @@ const ContentMessages = () => {
     if (!socket) return;
 
     const handleIssueStatusChanged = (data) => {
-      if (
-        selectedChat &&
-        selectedChat.issueId === data.issueId &&
-        (data.status === "completed" || data.status === "rejected")
-      ) {
-        // ปิดแชทที่กำลังดูอยู่ถ้าคำร้องถูกปิดหรือถูกปฏิเสธ
-        setSelectedChat(null);
+      if (selectedChat && selectedChat.issueId === data.issueId) {
+        if (data.status === "completed" || data.status === "rejected") {
+          // กรณีคำร้องถูกปิดหรือถูกปฏิเสธ ให้อัพเดทสถานะในแชททันที
+          setSelectedChat((prev) => ({ ...prev, status: data.status }));
+        } else {
+          // อัพเดทสถานะอื่นๆ ตามปกติ
+          setSelectedChat((prev) => ({ ...prev, status: data.status }));
+        }
       }
     };
 
@@ -70,9 +70,7 @@ const ContentMessages = () => {
               onClick={handleCloseChat}
               className="mr-2"
             />
-            <span className="font-medium truncate">
-              {selectedChat.topic || selectedChat.name}
-            </span>
+            <span className="font-medium truncate">{selectedChat.topic}</span>
           </div>
         )}
 
@@ -92,7 +90,7 @@ const ContentMessages = () => {
               overflow: "hidden",
               display: isMobile && selectedChat ? "none" : "block",
             }}>
-            <ChatList
+            <UserChatList
               onSelectChat={handleSelectChat}
               selectedChat={selectedChat}
             />
@@ -109,7 +107,7 @@ const ContentMessages = () => {
               display: isMobile && !selectedChat ? "none" : "block",
               overflow: "hidden",
             }}>
-            <ChatWindow
+            <ChatWindowUser
               chat={selectedChat}
               onClose={handleCloseChat}
               isMobile={isMobile}
@@ -121,4 +119,4 @@ const ContentMessages = () => {
   );
 };
 
-export default ContentMessages;
+export default UserContentMessages;

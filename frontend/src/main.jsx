@@ -1,22 +1,25 @@
-import { StrictMode } from "react";
-import { createRoot } from "react-dom/client";
-import "./index.css";
+import React from "react";
+import ReactDOM, { createRoot } from "react-dom/client";
 import App from "./App.jsx";
+import "./index.css";
 import { BrowserRouter } from "react-router";
+import { ConfigProvider, unstableSetRender } from "antd";
 import { UserProvider } from "./context/UserContext";
-import "@ant-design/v5-patch-for-react-19";
-import { unstableSetRender } from "antd";
+import { SocketProvider } from "./context/SocketContext";
 
-createRoot(document.getElementById("root")).render(
-  <StrictMode>
-    <BrowserRouter>
-      <UserProvider>
-        <App />
-      </UserProvider>
-    </BrowserRouter>
-  </StrictMode>
+ReactDOM.createRoot(document.getElementById("root")).render(
+  <React.StrictMode>
+    <ConfigProvider>
+      <BrowserRouter>
+        <UserProvider>
+          <SocketProvider>
+            <App />
+          </SocketProvider>
+        </UserProvider>
+      </BrowserRouter>
+    </ConfigProvider>
+  </React.StrictMode>
 );
-
 unstableSetRender((node, container) => {
   container._reactRoot ||= createRoot(container);
   const root = container._reactRoot;

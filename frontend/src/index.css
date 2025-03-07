@@ -74,3 +74,31 @@
   top: 100%;
   font-size: 12px;
 }
+
+/* เพิ่มสไตล์สำหรับความปลอดภัยขณะแสดงผลบนมือถือที่มีรอยบาก หรือ safe area */
+@supports (padding: max(0px)) {
+  .pb-safe {
+    padding-bottom: max(env(safe-area-inset-bottom), 0.5rem);
+  }
+}
+
+/* ลดขนาดตัวอักษรแบบละเอียดยิ่งขึ้นสำหรับโทรศัพท์มือถือ */
+.text-2xs {
+  font-size: 0.65rem;
+  line-height: 0.85rem;
+}
+
+/* เพิ่มสไตล์สำหรับการย่อข้อความที่ยาวเกินไป */
+.mobile-truncate {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+}
+
+@media (min-width: 640px) {
+  .mobile-truncate {
+    max-width: 100%;
+    white-space: normal;
+  }
+}

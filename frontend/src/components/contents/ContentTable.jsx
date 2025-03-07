@@ -51,7 +51,7 @@ const ContentTable = () => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingRecord, setEditingRecord] = useState(null);
 
-  // เพิ่มฟังก์ชันดึงข้อมูลคำร้องที่มอบหมายให้กับผู้ใช้ที่ล็อกอินอยู่
+  // อัพเดตฟังก์ชันดึงข้อมูลคำร้องที่มอบหมายให้กับผู้ใช้ที่ล็อกอินอยู่
   const fetchAssignedReports = useCallback(async () => {
     try {
       setLoading(true);
@@ -117,9 +117,10 @@ const ContentTable = () => {
 
       console.log("Formatted assigned reports:", formattedData);
 
-      // กรองเอาเฉพาะรายการที่ไม่ได้ถูกปฏิเสธ
+      // กรองเอาเฉพาะรายการที่ไม่ได้ถูกปฏิเสธหรือเสร็จสิ้น
       const filteredReports = formattedData.filter(
-        (report) => report.status !== "rejected"
+        (report) =>
+          report.status !== "rejected" && report.status !== "completed"
       );
 
       setDataSource(filteredReports);
@@ -202,13 +203,18 @@ const ContentTable = () => {
         }
       );
 
-      if (newStatus === "rejected") {
-        // ถ้าสถานะใหม่เป็น "rejected" ให้ลบรายการนั้นออกจากตาราง
+      // ถ้าสถานะใหม่เป็น "completed" หรือ "rejected" ให้ลบรายการนั้นออกจากตาราง
+      if (newStatus === "completed" || newStatus === "rejected") {
+        // ลบรายการนั้นออกจากตาราง
         const newData = dataSource.filter((item) => item.key !== record.key);
         setDataSource(newData);
         setFilteredData(filteredData.filter((item) => item.key !== record.key));
 
-        message.success(`รายการถูกปฏิเสธและซ่อนออกจากตาราง`);
+        const statusText =
+          newStatus === "completed" ? "เสร็จสิ้น" : "ถูกปฏิเสธ";
+        message.success(
+          `รายการถูกปรับสถานะเป็น ${statusText} และถูกย้ายไปยังรายงาน`
+        );
       } else {
         // อัพเดตข้อมูลในตารางตามปกติ
         const newData = dataSource.map((item) => {
@@ -341,7 +347,7 @@ const ContentTable = () => {
       responsive: ["sm", "md", "lg", "xl"],
     },
     {
-      title: "Employees",
+      title: "Submitters",
       dataIndex: "name",
       key: "name",
       width: "20%",
@@ -374,7 +380,7 @@ const ContentTable = () => {
       width: "12%",
       filters: [
         { text: "รอดำเนินการ", value: "pending" },
-        { text: "อนุมัติแล้ว", value: "approved" },
+
         { text: "เสร็จสิ้น", value: "completed" },
       ],
       onFilter: (value, record) => record.status === value,
@@ -399,21 +405,16 @@ const ContentTable = () => {
               items: [
                 {
                   key: "1",
-                  label: "อนุมัติคำร้อง",
-                  onClick: () => handleStatusChange(record, "approved"),
-                },
-                {
-                  key: "2",
                   label: "รอดำเนินการ",
                   onClick: () => handleStatusChange(record, "pending"),
                 },
                 {
-                  key: "3",
+                  key: "2",
                   label: "เสร็จสิ้น",
                   onClick: () => handleStatusChange(record, "completed"),
                 },
                 {
-                  key: "4",
+                  key: "3",
                   label: "ปฏิเสธคำร้อง",
                   danger: true,
                   onClick: () => handleStatusChange(record, "rejected"),

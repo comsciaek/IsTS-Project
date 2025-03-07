@@ -27,7 +27,7 @@ const TopCard = () => (
         variant={true}
         style={{ background: "linear-gradient(to right, #e08b6d, #e5c05b)" }}>
         <Statistic
-          title={<span style={{ color: "#ffffff" }}>กำลังดำเนินการ</span>}
+          title={<span style={{ color: "#ffffff" }}>ถูกปฏิเสธ</span>}
           valueStyle={{
             color: "#ffffff",
           }}
