@@ -429,7 +429,7 @@ const ChatWindow = ({ chat, onClose, isMobile }) => {
   return (
     <div className="flex flex-col h-full">
       {/* ส่วนหัวแชท (เพิ่มปุ่ม ... ที่มุมขวาบน) */}
-      <div className="flex flex-col p-3 sm:p-4 border-b relative">
+      <div className="flex flex-col p-3 sm:p-4 border-b-gray-400 shadow-md relative">
         <div className="flex items-center justify-between">
           <div className="flex items-center">
             <Avatar
@@ -506,7 +506,7 @@ const ChatWindow = ({ chat, onClose, isMobile }) => {
                       className={`rounded-lg py-1.5 sm:py-2 px-3 sm:px-4 break-words text-sm sm:text-base ${
                         isSelf
                           ? "bg-blue-500 text-white"
-                          : "bg-white border shadow-sm"
+                          : "bg-white shadow-sm"
                       }`}>
                       {message.text}
                     </div>
@@ -526,9 +526,12 @@ const ChatWindow = ({ chat, onClose, isMobile }) => {
       </div>
 
       {/* ส่วนส่งข้อความ */}
-      <div className={`p-2 sm:p-3 border-t ${isMobile ? "pb-safe" : ""}`}>
+      <div
+        className={`p-2 sm:p-3 border-b-gray-400 shadow-md border-t ${
+          isMobile ? "pb-safe" : ""
+        }`}>
         {fileList.length > 0 && (
-          <div className="mb-2 bg-gray-50 p-2 rounded border flex items-center justify-between">
+          <div className="mb-2 bg-gray-50 p-2 rounded  flex items-center justify-between">
             <div className="flex items-center">
               {getFileIconByType(fileList[0].name)}
               <span className="ml-2 text-xs sm:text-sm truncate max-w-[150px] sm:max-w-xs">

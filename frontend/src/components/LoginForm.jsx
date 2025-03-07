@@ -125,8 +125,6 @@ const LoginForm = () => {
         localStorage.setItem("token", data.token || "");
         updateUser(userData);
 
-        message.success("ยินดีต้อนรับสู่ระบบ Issue Support and Tracking!");
-
         // กำหนดว่าจะเปลี่ยนเส้นทางไปที่ใดตามบทบาทผู้ใช้
         const role = userData.role;
 

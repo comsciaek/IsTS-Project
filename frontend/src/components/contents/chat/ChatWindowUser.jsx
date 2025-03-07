@@ -371,7 +371,7 @@ const ChatWindowUser = ({ chat, isMobile }) => {
   return (
     <div className="flex flex-col h-full">
       {/* ส่วนหัวแชท */}
-      <div className="flex flex-col p-4 border-b relative">
+      <div className="flex flex-col p-4 border-b-gray-400 shadow-md relative">
         <div className="flex items-center justify-between">
           <div className="flex items-center">
             <Avatar
@@ -450,7 +450,7 @@ const ChatWindowUser = ({ chat, isMobile }) => {
                       className={`rounded-lg py-2 px-4 break-words ${
                         isSelf
                           ? "bg-blue-500 text-white"
-                          : "bg-white border shadow-sm"
+                          : "bg-white shadow-sm"
                       }`}>
                       {message.text}
                     </div>
@@ -470,7 +470,7 @@ const ChatWindowUser = ({ chat, isMobile }) => {
       </div>
 
       {/* ส่วนส่งข้อความ */}
-      <div className={`p-2 sm:p-3 border-t ${isMobile ? "pb-safe" : ""}`}>
+      <div className={`p-2 sm:p-3 border-b-gray-400 shadow-md borer-t ${isMobile ? "pb-safe" : ""}`}>
         {fileList.length > 0 && (
           <div className="mb-2 bg-gray-50 p-2 rounded border flex items-center justify-between">
             <div className="flex items-center">

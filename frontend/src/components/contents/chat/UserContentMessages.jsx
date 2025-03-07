@@ -63,7 +63,7 @@ const UserContentMessages = () => {
         style={{ height: "100%" }}
         bodyStyle={{ height: "100%", padding: "0" }}>
         {isMobile && selectedChat && (
-          <div className="p-2 bg-gray-100 border-b flex items-center">
+          <div className="p-2 bg-gray-100 border-b-gray-400  flex items-center">
             <Button
               icon={<ArrowLeftOutlined />}
               type="text"
