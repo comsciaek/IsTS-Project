@@ -23,18 +23,18 @@ const reportSchema = new mongoose.Schema({
     default: Date.now,
   },
   file: {
-    type: String, // เก็บ URL หรือพาธของไฟล์
+    type: String,
     default: '',
   },
   status: {
     type: String,
-    enum: ['pending', 'approved', 'rejected','completed'],
+    enum: ['pending', 'approved', 'rejected', 'completed'],
     default: 'pending',
   },
   assignedAdmin: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User', // อ้างอิงถึง User model (Admin หรือ SuperAdmin)
-    default: null, // เริ่มต้นไม่มีผู้รับผิดชอบ
+    ref: 'User',
+    default: null,
   },
   createdAt: {
     type: Date,

@@ -1,6 +1,7 @@
 import express from 'express';
 import Report from '../model/Report.js';
-import User from '../model/User.js'; // ตรวจสอบว่า import User model อยู่
+import User from '../model/User.js';
+import Chat from '../model/Chat.js';
 import { protect, authorizeAdminOrSuperAdmin } from '../auth/middleware.js';
 import multer from 'multer';
 import fs from 'fs';
@@ -22,11 +23,22 @@ const storage = multer.diskStorage({
   },
 });
 
-const upload = multer({ storage: storage });
+// ตั้งค่าโฟลเดอร์สำหรับเก็บไฟล์แชท
+const chatStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = './uploads/chat';
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(file.originalname);
+    cb(null, `chat_${req.user.id}_${uniqueSuffix}${ext}`);
+  },
+});
 
-// ตรวจสอบว่าไฟล์เป็นไฟล์ที่อนุญาต (เช่น PDF, DOC, ฯลฯ)
+// ตรวจสอบว่าไฟล์เป็นไฟล์ที่อนุญาต (เช่น JPEG, PNG, PDF, DOC, DOCX)
 const fileFilter = (req, file, cb) => {
-  const allowedTypes = ['image/jpeg', 'image/png', 'application/pdf', 'application/doc', 'application/docx'];
+  const allowedTypes = ['image/jpeg', 'image/png', 'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
   if (allowedTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
@@ -34,35 +46,36 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
+const upload = multer({ storage: storage, fileFilter });
+const chatUpload = multer({ storage: chatStorage, fileFilter });
+
 const reportsUploadDir = './uploads/reports';
+const chatUploadDir = './uploads/chat';
 if (!fs.existsSync(reportsUploadDir)) {
   fs.mkdirSync(reportsUploadDir, { recursive: true });
 }
+if (!fs.existsSync(chatUploadDir)) {
+  fs.mkdirSync(chatUploadDir, { recursive: true });
+}
 
-// Route สำหรับสร้างรายงานใหม่ (ต้องล็อกอินก่อน)
+// Route สำหรับสร้างรายงานใหม่
 router.post('/create/me', protect, upload.single('file'), async (req, res) => {
   try {
-    const userId = req.user.id; // ได้จาก middleware protect
+    const userId = req.user.id;
     const { topic, description, date } = req.body;
 
-    // ตรวจสอบว่ามี topic, description, date หรือไม่
     if (!topic || !description || !date) {
-      return res.status(400).json({
-        message: 'Topic, description, and date are required',
-      });
+      return res.status(400).json({ message: 'Topic, description, and date are required' });
     }
 
-    // แปลง date เป็น Date object (ถ้าเป็น string)
     const reportDate = new Date(date);
     if (isNaN(reportDate.getTime())) {
-      return res.status(400).json({
-        message: 'Invalid date format',
-      });
+      return res.status(400).json({ message: 'Invalid date format' });
     }
 
     let fileUrl = '';
     if (req.file) {
-      fileUrl = `http://172.18.43.39:5000/uploads/reports/${req.file.filename}`; // สร้าง URL สำหรับไฟล์
+      fileUrl = `http://172.18.43.39:5000/uploads/reports/${req.file.filename}`;
     }
 
     const report = await Report.create({
@@ -81,7 +94,7 @@ router.post('/create/me', protect, upload.single('file'), async (req, res) => {
       date: report.date,
       file: report.file,
       status: report.status,
-      assignedAdmin: report.assignedAdmin, // รวมข้อมูลผู้รับผิดชอบ
+      assignedAdmin: report.assignedAdmin,
       createdAt: report.createdAt,
     };
 
@@ -90,19 +103,16 @@ router.post('/create/me', protect, upload.single('file'), async (req, res) => {
       data: reportResponse,
     });
   } catch (error) {
-    return res.status(500).json({
-      message: 'Internal Server Error',
-      error: error.message,
-    });
+    return res.status(500).json({ message: 'Internal Server Error', error: error.message });
   }
 });
 
-// Route สำหรับดึงรายงานทั้งหมดของผู้ใช้ปัจจุบัน (ต้องล็อกอินก่อน)
+// Route สำหรับดึงรายงานของผู้ใช้ปัจจุบัน
 router.get('/user/me', protect, async (req, res) => {
   try {
     const userId = req.user.id;
 
-    const reports = await Report.find({ userId }).sort({ createdAt: -1 }).populate('assignedAdmin', 'firstName lastName role profileImage'); // รวมข้อมูลผู้รับผิดชอบและ profileImage
+    const reports = await Report.find({ userId }).sort({ createdAt: -1 }).populate('assignedAdmin', 'firstName lastName role profileImage');
     if (!reports.length) {
       return res.status(404).json({ message: 'No reports found for this user' });
     }
@@ -120,7 +130,7 @@ router.get('/user/me', protect, async (req, res) => {
         firstName: report.assignedAdmin.firstName,
         lastName: report.assignedAdmin.lastName,
         role: report.assignedAdmin.role,
-        profileImage: report.assignedAdmin.profileImage, // รวม profileImage ของ assignedAdmin
+        profileImage: report.assignedAdmin.profileImage,
       } : null,
       createdAt: report.createdAt,
     }));
@@ -130,17 +140,14 @@ router.get('/user/me', protect, async (req, res) => {
       data: reportsResponse,
     });
   } catch (error) {
-    return res.status(500).json({
-      message: 'Internal Server Error',
-      error: error.message,
-    });
+    return res.status(500).json({ message: 'Internal Server Error', error: error.message });
   }
 });
 
 // Route สำหรับดึงรายงานทั้งหมด (เฉพาะ SuperAdmin และ Admin)
 router.get('/admin/all', protect, authorizeAdminOrSuperAdmin, async (req, res) => {
   try {
-    const reports = await Report.find().sort({ createdAt: -1 }).populate('userId', 'firstName lastName department profileImage').populate('assignedAdmin', 'firstName lastName role profileImage'); // รวมข้อมูลผู้ใช้, ผู้รับผิดชอบ, และ profileImage
+    const reports = await Report.find().sort({ createdAt: -1 }).populate('userId', 'firstName lastName department profileImage').populate('assignedAdmin', 'firstName lastName role profileImage');
     if (!reports.length) {
       return res.status(404).json({ message: 'No reports found' });
     }
@@ -164,7 +171,7 @@ router.get('/admin/all', protect, authorizeAdminOrSuperAdmin, async (req, res) =
         firstName: report.assignedAdmin.firstName,
         lastName: report.assignedAdmin.lastName,
         role: report.assignedAdmin.role,
-        profileImage: report.assignedAdmin.profileImage, // รวม profileImage ของ assignedAdmin
+        profileImage: report.assignedAdmin.profileImage,
       } : null,
       createdAt: report.createdAt,
     }));
@@ -174,21 +181,18 @@ router.get('/admin/all', protect, authorizeAdminOrSuperAdmin, async (req, res) =
       data: reportsResponse,
     });
   } catch (error) {
-    return res.status(500).json({
-      message: 'Internal Server Error',
-      error: error.message,
-    });
+    return res.status(500).json({ message: 'Internal Server Error', error: error.message });
   }
 });
 
-// Route สำหรับดึงรายงานที่ถูกกำหนดให้ Admin ปัจจุบัน (เฉพาะ SuperAdmin และ Admin)
+// Route สำหรับดึงรายงานที่ถูกกำหนดให้ Admin ปัจจุบัน
 router.get('/admin/assigned/:id', protect, authorizeAdminOrSuperAdmin, async (req, res) => {
   try {
-    const adminId = req.user.id; // ID ของ Admin หรือ SuperAdmin ปัจจุบัน
+    const adminId = req.user.id;
 
     const reports = await Report.find({ assignedAdmin: adminId }).sort({ createdAt: -1 })
-      .populate('userId', 'firstName lastName department profileImage phoneNumber email') // รวมข้อมูลผู้ใช้ที่สร้างรายงาน
-      .populate('assignedAdmin', 'firstName lastName role profileImage'); // รวมข้อมูลผู้รับผิดชอบ (ตัว Admin เอง)
+      .populate('userId', 'firstName lastName department profileImage phoneNumber email')
+      .populate('assignedAdmin', 'firstName lastName role profileImage');
 
     if (!reports.length) {
       return res.status(404).json({ message: 'No assigned reports found for this admin' });
@@ -203,7 +207,7 @@ router.get('/admin/assigned/:id', protect, authorizeAdminOrSuperAdmin, async (re
         department: report.userId.department,
         profileImage: report.userId.profileImage,
         phoneNumber: report.userId.phoneNumber,
-        email : report.userId.email
+        email: report.userId.email,
       } : null,
       topic: report.topic,
       description: report.description,
@@ -215,7 +219,7 @@ router.get('/admin/assigned/:id', protect, authorizeAdminOrSuperAdmin, async (re
         firstName: report.assignedAdmin.firstName,
         lastName: report.assignedAdmin.lastName,
         role: report.assignedAdmin.role,
-        profileImage: report.assignedAdmin.profileImage, // รวม profileImage ของ assignedAdmin
+        profileImage: report.assignedAdmin.profileImage,
       } : null,
       createdAt: report.createdAt,
     }));
@@ -225,80 +229,58 @@ router.get('/admin/assigned/:id', protect, authorizeAdminOrSuperAdmin, async (re
       data: reportsResponse,
     });
   } catch (error) {
-    return res.status(500).json({
-      message: 'Internal Server Error',
-      error: error.message,
-    });
+    return res.status(500).json({ message: 'Internal Server Error', error: error.message });
   }
 });
 
-// Route สำหรับแก้ไขรายงาน (ต้องล็อกอินก่อน, ผู้ใช้เอง, SuperAdmin, หรือ Admin)
+// Route สำหรับแก้ไขรายงาน
 router.put('/edit/:issueId', protect, upload.single('file'), async (req, res) => {
   try {
-    const reportIssueId = req.params.issueId;
+    const issueId = req.params.issueId;
     const userId = req.user.id;
 
-    // ตรวจสอบว่า reportIssueId เป็น ObjectId ที่ถูกต้อง
-    if (!mongoose.Types.ObjectId.isValid(reportIssueId)) {
-      return res.status(400).json({ message: 'Invalid report ID' });
+    if (!mongoose.Types.ObjectId.isValid(issueId)) {
+      return res.status(400).json({ message: 'Invalid issue ID' });
     }
 
-    // หารายงานจาก reportIssueId
-    const report = await Report.findById(reportIssueId);
+    const report = await Report.findById(issueId);
     if (!report) {
       return res.status(404).json({ message: 'Report not found' });
     }
 
-    // ตรวจสอบสิทธิ์: ผู้ใช้เอง, SuperAdmin, หรือ Admin
     if (report.userId.toString() !== userId && req.user.role !== 'SuperAdmin' && req.user.role !== 'Admin') {
-      return res.status(403).json({
-        message: 'You are not authorized to edit this report',
-      });
+      return res.status(403).json({ message: 'You are not authorized to edit this report' });
     }
 
     const { topic, description, date, status, assignedAdmin } = req.body;
 
-    // ตรวจสอบว่ามีการอัปเดตข้อมูลหรือไม่
     if (!topic && !description && !date && !status && !assignedAdmin && !req.file) {
-      return res.status(400).json({
-        message: 'At least one field (topic, description, date, status, assignedAdmin, or file) is required',
-      });
+      return res.status(400).json({ message: 'At least one field (topic, description, date, status, assignedAdmin, or file) is required' });
     }
 
-    // แปลง date เป็น Date object (ถ้าเป็น string)
     let reportDate = report.date;
     if (date) {
       reportDate = new Date(date);
       if (isNaN(reportDate.getTime())) {
-        return res.status(400).json({
-          message: 'Invalid date format',
-        });
+        return res.status(400).json({ message: 'Invalid date format' });
       }
     }
 
-    // ตรวจสอบและอัปเดต status (เฉพาะ SuperAdmin/Admin)
     let reportStatus = report.status;
     if (status) {
       if (req.user.role !== 'SuperAdmin' && req.user.role !== 'Admin') {
-        return res.status(403).json({
-          message: 'Only SuperAdmin or Admin can update the status',
-        });
+        return res.status(403).json({ message: 'Only SuperAdmin or Admin can update the status' });
       }
-      if (!['pending', 'approved', 'rejected','completed'].includes(status)) {
-        return res.status(400).json({
-          message: 'Status must be one of: pending, approved, or rejected',
-        });
+      if (!['pending', 'approved', 'rejected', 'completed'].includes(status)) {
+        return res.status(400).json({ message: 'Status must be one of: pending, approved, rejected, or completed' });
       }
       reportStatus = status;
     }
 
-    // ตรวจสอบและอัปเดต assignedAdmin (เฉพาะ SuperAdmin/Admin)
     let reportAssignedAdmin = report.assignedAdmin;
     if (assignedAdmin) {
       if (req.user.role !== 'SuperAdmin' && req.user.role !== 'Admin') {
-        return res.status(403).json({
-          message: 'Only SuperAdmin or Admin can assign an admin',
-        });
+        return res.status(403).json({ message: 'Only SuperAdmin or Admin can assign an admin' });
       }
       if (!mongoose.Types.ObjectId.isValid(assignedAdmin)) {
         return res.status(400).json({ message: 'Invalid admin ID' });
@@ -310,23 +292,20 @@ router.put('/edit/:issueId', protect, upload.single('file'), async (req, res) =>
       reportAssignedAdmin = assignedAdmin;
     }
 
-    let fileUrl = report.file; // เก็บค่าไฟล์เดิมไว้ก่อน
+    let fileUrl = report.file;
     if (req.file) {
-      // ลบไฟล์เก่าจากโฟลเดอร์ ./uploads/reports ถ้ามี
       if (report.file) {
-        const oldFileName = report.file.split('/').pop(); // ดึงชื่อไฟล์เก่าจาก URL
+        const oldFileName = report.file.split('/').pop();
         const oldFilePath = path.join(reportsUploadDir, oldFileName);
         if (fs.existsSync(oldFilePath)) {
-          fs.unlinkSync(oldFilePath); // ลบไฟล์เก่า
+          fs.unlinkSync(oldFilePath);
         }
       }
-
-      fileUrl = `http://172.18.43.39:5000/uploads/reports/${req.file.filename}`; // สร้าง URL สำหรับไฟล์ใหม่
+      fileUrl = `http://172.18.43.39:5000/uploads/reports/${req.file.filename}`;
     }
 
-    // อัปเดตข้อมูลใน MongoDB
     const updatedReport = await Report.findByIdAndUpdate(
-      reportIssueId,
+      issueId,
       {
         topic: topic || report.topic,
         description: description || report.description,
@@ -335,6 +314,190 @@ router.put('/edit/:issueId', protect, upload.single('file'), async (req, res) =>
         status: reportStatus,
         assignedAdmin: reportAssignedAdmin,
       },
+      { new: true, runValidators: true }
+    ).populate('assignedAdmin', 'firstName lastName role profileImage');
+
+    if (reportStatus === 'completed') {
+      const chats = await Chat.find({ issueId });
+      const deletedChats = await Chat.deleteMany({ issueId });
+      console.log(`Deleted ${deletedChats.deletedCount} chat messages for report ${issueId}`);
+
+      // ลบไฟล์ที่เกี่ยวข้องกับรายงาน
+      if (updatedReport.file) {
+        const reportFileName = updatedReport.file.split('/').pop();
+        const reportFilePath = path.join(reportsUploadDir, reportFileName);
+        if (fs.existsSync(reportFilePath)) {
+          fs.unlinkSync(reportFilePath);
+        }
+      }
+
+      // ลบไฟล์ที่แนบในแชท
+      for (const chat of chats) {
+        if (chat.file) {
+          const chatFileName = chat.file.split('/').pop();
+          const chatFilePath = path.join(chatUploadDir, chatFileName);
+          if (fs.existsSync(chatFilePath)) {
+            fs.unlinkSync(chatFilePath);
+          }
+        }
+      }
+
+      req.app.locals.io.to(issueId).emit('chatClosed', {
+        issueId,
+        message: 'This report chat has been closed and messages have been deleted.',
+      });
+    }
+
+    const reportResponse = {
+      issueId: updatedReport._id,
+      userId: updatedReport.userId,
+      topic: updatedReport.topic,
+      description: updatedReport.description,
+      date: updatedReport.date,
+      file: updatedReport.file,
+      status: updatedReport.status,
+      assignedAdmin: updatedReport.assignedAdmin ? {
+        id: updatedReport.assignedAdmin._id,
+        firstName: updatedReport.assignedAdmin.firstName,
+        lastName: updatedReport.assignedAdmin.lastName,
+        role: updatedReport.assignedAdmin.role,
+        profileImage: updatedReport.assignedAdmin.profileImage,
+      } : null,
+      createdAt: updatedReport.createdAt,
+    };
+
+    return res.status(200).json({
+      message: 'Report updated successfully',
+      data: reportResponse,
+    });
+  } catch (error) {
+    return res.status(500).json({ message: 'Internal Server Error', error: error.message });
+  }
+});
+
+// Route สำหรับดึงประวัติแชท
+router.get('/chat/:issueId', protect, async (req, res) => {
+  try {
+    const issueId = req.params.issueId;
+    const userId = req.user.id;
+
+    if (!mongoose.Types.ObjectId.isValid(issueId)) {
+      return res.status(400).json({ message: 'Invalid issue ID' });
+    }
+
+    const report = await Report.findById(issueId);
+    if (!report) {
+      return res.status(404).json({ message: 'Report not found' });
+    }
+
+    if (report.userId.toString() !== userId && report.assignedAdmin?.toString() !== userId) {
+      return res.status(403).json({ message: 'You are not authorized to view this chat' });
+    }
+
+    const chats = await Chat.find({ issueId }).sort({ createdAt: 1 }).populate('senderId', 'firstName lastName role profileImage');
+
+    const chatsResponse = chats.map(chat => {
+      let fileName = '';
+      let fileType = '';
+      if (chat.file) {
+        fileName = chat.file.split('/').pop(); // ดึงชื่อไฟล์จาก URL
+        // สมมติว่าเรามีข้อมูล MIME type จากการอัปโหลด (ต้องปรับในส่วน upload หากต้องการแบบแม่นยำ)
+        fileType = fileName.endsWith('.jpg') || fileName.endsWith('.jpeg') ? 'image/jpeg' :
+                  fileName.endsWith('.png') ? 'image/png' :
+                  fileName.endsWith('.pdf') ? 'application/pdf' :
+                  fileName.endsWith('.doc') ? 'application/msword' :
+                  fileName.endsWith('.docx') ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' : '';
+      }
+
+      return {
+        id: chat._id,
+        issueId: chat.issueId,
+        senderId: {
+          _id: chat.senderId._id,
+          firstName: chat.senderId.firstName,
+          lastName: chat.senderId.lastName || '',
+          role: chat.senderId.role,
+          profileImage: chat.senderId.profileImage,
+        },
+        message: chat.message || '',
+        fileUrl: chat.file || '',
+        fileName: fileName,
+        fileType: fileType,
+        createdAt: chat.createdAt,
+      };
+    });
+
+    return res.status(200).json({
+      message: 'Chat history retrieved successfully',
+      data: chatsResponse,
+    });
+  } catch (error) {
+    return res.status(500).json({ message: 'Internal Server Error', error: error.message });
+  }
+});
+
+// Route สำหรับลบรายงาน
+router.delete('/delete/:issueId', protect, async (req, res) => {
+  try {
+    const reportIssueId = req.params.issueId;
+    const userId = req.user.id;
+
+    if (!mongoose.Types.ObjectId.isValid(reportIssueId)) {
+      return res.status(400).json({ message: 'Invalid report ID' });
+    }
+
+    const report = await Report.findById(reportIssueId);
+    if (!report) {
+      return res.status(404).json({ message: 'Report not found' });
+    }
+
+    if (report.userId.toString() !== userId && req.user.role !== 'SuperAdmin' && req.user.role !== 'Admin') {
+      return res.status(403).json({ message: 'You are not authorized to delete this report' });
+    }
+
+    if (report.file) {
+      const fileName = report.file.split('/').pop();
+      const filePath = path.join(reportsUploadDir, fileName);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    }
+
+    await Report.findByIdAndDelete(reportIssueId);
+
+    return res.status(200).json({ message: 'Report deleted successfully' });
+  } catch (error) {
+    return res.status(500).json({ message: 'Internal Server Error', error: error.message });
+  }
+});
+
+// Route สำหรับกำหนดผู้รับผิดชอบ
+router.put('/assign/:issueId', protect, authorizeAdminOrSuperAdmin, async (req, res) => {
+  try {
+    const reportIssueId = req.params.issueId;
+    const { adminId } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(reportIssueId)) {
+      return res.status(400).json({ message: 'Invalid report ID' });
+    }
+
+    const report = await Report.findById(reportIssueId);
+    if (!report) {
+      return res.status(404).json({ message: 'Report not found' });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(adminId)) {
+      return res.status(400).json({ message: 'Invalid admin ID' });
+    }
+
+    const admin = await User.findById(adminId);
+    if (!admin || (admin.role !== 'Admin' && admin.role !== 'SuperAdmin')) {
+      return res.status(400).json({ message: 'Assigned user must be an Admin or SuperAdmin' });
+    }
+
+    const updatedReport = await Report.findByIdAndUpdate(
+      reportIssueId,
+      { assignedAdmin: adminId },
       { new: true, runValidators: true }
     ).populate('assignedAdmin', 'firstName lastName role profileImage');
 
@@ -351,119 +514,7 @@ router.put('/edit/:issueId', protect, upload.single('file'), async (req, res) =>
         firstName: updatedReport.assignedAdmin.firstName,
         lastName: updatedReport.assignedAdmin.lastName,
         role: updatedReport.assignedAdmin.role,
-        profileImage: updatedReport.assignedAdmin.profileImage, // รวม profileImage ของ assignedAdmin
-      } : null,
-      createdAt: updatedReport.createdAt,
-    };
-
-    return res.status(200).json({
-      message: 'Report updated successfully',
-      data: reportResponse,
-    });
-  } catch (error) {
-    return res.status(500).json({
-      message: 'Internal Server Error',
-      error: error.message,
-    });
-  }
-});
-
-// Route สำหรับลบรายงาน (ต้องล็อกอินก่อน, ผู้ใช้เอง, SuperAdmin, หรือ Admin)
-router.delete('/delete/:issueId', protect, async (req, res) => {
-  try {
-    const reportIssueId = req.params.issueId;
-    const userId = req.user.id;
-
-    // ตรวจสอบว่า reportIssueId เป็น ObjectId ที่ถูกต้อง
-    if (!mongoose.Types.ObjectId.isValid(reportIssueId)) {
-      return res.status(400).json({ message: 'Invalid report ID' });
-    }
-
-    // หารายงานจาก reportIssueId
-    const report = await Report.findById(reportIssueId);
-    if (!report) {
-      return res.status(404).json({ message: 'Report not found' });
-    }
-
-    // ตรวจสอบสิทธิ์: ผู้ใช้เอง, SuperAdmin, หรือ Admin
-    if (report.userId.toString() !== userId && req.user.role !== 'SuperAdmin' && req.user.role !== 'Admin') {
-      return res.status(403).json({
-        message: 'You are not authorized to delete this report',
-      });
-    }
-
-    // ลบไฟล์แนบ (ถ้ามี) จากโฟลเดอร์ ./uploads/reports
-    if (report.file) {
-      const fileName = report.file.split('/').pop(); // ดึงชื่อไฟล์จาก URL
-      const filePath = path.join(reportsUploadDir, fileName);
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath); // ลบไฟล์จากโฟลเดอร์
-      }
-    }
-
-    // ลบรายงานจาก MongoDB
-    await Report.findByIdAndDelete(reportIssueId);
-
-    return res.status(200).json({
-      message: 'Report deleted successfully',
-    });
-  } catch (error) {
-    return res.status(500).json({
-      message: 'Internal Server Error',
-      error: error.message,
-    });
-  }
-});
-
-// Route สำหรับกำหนดผู้รับผิดชอบ (เฉพาะ SuperAdmin และ Admin)
-router.put('/assign/:issueId', protect, authorizeAdminOrSuperAdmin, async (req, res) => {
-  try {
-    const reportIssueId = req.params.issueId;
-    const { adminId } = req.body; // รับ adminId จาก body (ObjectId ของ Admin)
-
-    // ตรวจสอบว่า reportIssueId เป็น ObjectId ที่ถูกต้อง
-    if (!mongoose.Types.ObjectId.isValid(reportIssueId)) {
-      return res.status(400).json({ message: 'Invalid report ID' });
-    }
-
-    // หารายงานจาก reportIssueId
-    const report = await Report.findById(reportIssueId);
-    if (!report) {
-      return res.status(404).json({ message: 'Report not found' });
-    }
-
-    // ตรวจสอบว่า adminId เป็น ObjectId ที่ถูกต้อง
-    if (!mongoose.Types.ObjectId.isValid(adminId)) {
-      return res.status(400).json({ message: 'Invalid admin ID' });
-    }
-
-    // หา Admin จาก adminId และตรวจสอบว่าเป็น Admin หรือ SuperAdmin
-    const admin = await User.findById(adminId);
-    if (!admin || (admin.role !== 'Admin' && admin.role !== 'SuperAdmin')) {
-      return res.status(400).json({ message: 'Assigned user must be an Admin or SuperAdmin' });
-    }
-
-    // อัปเดตผู้รับผิดชอบใน MongoDB โดยไม่เปลี่ยน status
-    const updatedReport = await Report.findByIdAndUpdate(
-      reportIssueId,
-      { assignedAdmin: adminId },
-      { new: true, runValidators: true }
-    ).populate('assignedAdmin', 'firstName lastName role profileImage');
-
-    const reportResponse = {
-      issueId: updatedReport._id,
-      userId: updatedReport.userId,
-      topic: updatedReport.topic,
-      description: updatedReport.description,
-      date: updatedReport.date,
-      file: updatedReport.file,
-      status: updatedReport.status, // รักษาค่า status เดิม
-      assignedAdmin: updatedReport.assignedAdmin ? {
-        id: updatedReport.assignedAdmin._id,
-        firstName: updatedReport.assignedAdmin.firstName,
-        lastName: updatedReport.assignedAdmin.lastName,
-        role: updatedReport.assignedAdmin.role,
-        profileImage: updatedReport.assignedAdmin.profileImage, // รวม profileImage ของ assignedAdmin
+        profileImage: updatedReport.assignedAdmin.profileImage,
       } : null,
       createdAt: updatedReport.createdAt,
     };
@@ -473,10 +524,130 @@ router.put('/assign/:issueId', protect, authorizeAdminOrSuperAdmin, async (req, 
       data: reportResponse,
     });
   } catch (error) {
-    return res.status(500).json({
-      message: 'Internal Server Error',
-      error: error.message,
+    return res.status(500).json({ message: 'Internal Server Error', error: error.message });
+  }
+});
+
+// Route สำหรับส่งข้อความในแชท (เพิ่มการรองรับไฟล์)
+router.post('/chat/:issueId/message', protect, chatUpload.single('file'), async (req, res) => {
+  try {
+    const issueId = req.params.issueId;
+    const userId = req.user.id;
+    const { message } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(issueId)) {
+      return res.status(400).json({ message: 'Invalid issue ID' });
+    }
+
+    const report = await Report.findById(issueId);
+    if (!report) {
+      return res.status(404).json({ message: 'Report not found' });
+    }
+
+    if (report.userId.toString() !== userId && report.assignedAdmin?.toString() !== userId) {
+      return res.status(403).json({ message: 'You are not authorized to send messages in this chat' });
+    }
+
+    let fileUrl = '';
+    if (req.file) {
+      fileUrl = `http://172.18.43.39:5000/uploads/chat/${req.file.filename}`;
+    }
+
+    const newMessage = await Chat.create({
+      issueId,
+      senderId: userId,
+      message: message || '',
+      file: fileUrl,
     });
+
+    const populatedMessage = await Chat.findById(newMessage._id).populate('senderId', 'firstName lastName role profileImage');
+    let fileName = '';
+    let fileType = '';
+    if (populatedMessage.file) {
+      fileName = populatedMessage.file.split('/').pop();
+      fileType = fileName.endsWith('.jpg') || fileName.endsWith('.jpeg') ? 'image/jpeg' :
+                fileName.endsWith('.png') ? 'image/png' :
+                fileName.endsWith('.pdf') ? 'application/pdf' :
+                fileName.endsWith('.doc') ? 'application/msword' :
+                fileName.endsWith('.docx') ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' : '';
+    }
+
+    req.app.locals.io.to(issueId).emit('newMessage', {
+      id: populatedMessage._id,
+      issueId: populatedMessage.issueId,
+      senderId: {
+        _id: populatedMessage.senderId._id,
+        firstName: populatedMessage.senderId.firstName,
+        lastName: populatedMessage.senderId.lastName || '',
+        role: populatedMessage.senderId.role,
+        profileImage: populatedMessage.senderId.profileImage,
+      },
+      message: populatedMessage.message,
+      fileUrl: populatedMessage.file,
+      fileName: fileName,
+      fileType: fileType,
+      createdAt: populatedMessage.createdAt,
+    });
+
+    return res.status(201).json({
+      message: 'Message sent successfully',
+      data: {
+        id: populatedMessage._id,
+        issueId: populatedMessage.issueId,
+        senderId: populatedMessage.senderId._id,
+        message: populatedMessage.message,
+        fileUrl: populatedMessage.file,
+        fileName: fileName,
+        fileType: fileType,
+        createdAt: populatedMessage.createdAt,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ message: 'Internal Server Error', error: error.message });
+  }
+});
+
+// Route สำหรับดึงจำนวนข้อความที่ยังไม่ได้อ่าน
+router.get('/chat/:issueId/unread-count', protect, async (req, res) => {
+  try {
+    const issueId = req.params.issueId;
+    const userId = req.user.id; // ผู้ใช้ที่ล็อกอิน
+
+    if (!mongoose.Types.ObjectId.isValid(issueId)) {
+      return res.status(400).json({ message: 'Invalid issue ID' });
+    }
+
+    const report = await Report.findById(issueId);
+    if (!report) {
+      return res.status(404).json({ message: 'Report not found' });
+    }
+
+    if (report.userId.toString() !== userId && report.assignedAdmin?.toString() !== userId) {
+      return res.status(403).json({ message: 'You are not authorized to view this chat' });
+    }
+
+    // ดึงข้อความทั้งหมดใน issueId และเรียงตาม createdAt
+    const chats = await Chat.find({ issueId }).sort({ createdAt: -1 }).populate('senderId', 'firstName lastName');
+
+    // คำนวณ unreadCount (สมมติว่า unread ถ้าไม่ใช่ข้อความของผู้ใช้ปัจจุบัน)
+    const unreadCount = chats.filter(chat => chat.senderId._id.toString() !== userId.toString()).length;
+
+    // ดึงข้อความล่าสุด
+    const lastMessage = chats.length > 0 ? {
+      message: chats[0].message,
+      createdAt: chats[0].createdAt,
+    } : null;
+
+    return res.status(200).json({
+      message: 'Unread count and last message retrieved successfully',
+      data: {
+        unreadCount,
+        lastMessage,
+      },
+    });
+  } catch (error) {
+    console.error(`Error fetching unread count for issue ${req.params.issueId}:`, error);
+    return res.status(500).json({ message: 'Internal Server Error', error: error.message });
   }
 });
 
