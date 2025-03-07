@@ -390,7 +390,7 @@ const UserChatList = ({ onSelectChat, selectedChat }) => {
   return (
     <div className="chat-list-container h-full flex flex-col">
       {/* ส่วนค้นหา */}
-      <div className="p-3 border-b">
+      <div className="p-3 border-b-gray-300 border-b">
         <Search
           placeholder="ค้นหาคำร้อง..."
           prefix={<SearchOutlined />}
