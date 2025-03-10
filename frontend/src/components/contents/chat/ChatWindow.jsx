@@ -475,7 +475,7 @@ const ChatWindow = ({ chat, onClose, isMobile }) => {
       </div>
 
       {/* ส่วนแสดงข้อความ */}
-      <div className="flex-1 p-3 sm:p-4 overflow-y-auto bg-gray-50">
+      <div className="flex-1 p-4 overflow-y-auto bg-gray-50">
         {loading ? (
           <div className="flex justify-center items-center h-full">
             <Spin tip="กำลังโหลดข้อความ..." />
@@ -533,7 +533,7 @@ const ChatWindow = ({ chat, onClose, isMobile }) => {
 
       {/* ส่วนส่งข้อความ */}
       <div
-        className={`p-2 sm:p-3 border-b-gray-400 shadow-md border-t ${
+        className={`p-2 sm:p-3 border-b-gray-400 shadow-md borer-t ${
           isMobile ? "pb-safe" : ""
         }`}>
         {fileList.length > 0 && (

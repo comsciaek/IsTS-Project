@@ -19,7 +19,6 @@ const ReportDetailModal = ({ visible, onCancel, record, onAssign }) => {
     const statusMapping = {
       pending: "รอดำเนินการ",
       approved: "อนุมัติแล้ว",
-      "in-progress": "กำลังดำเนินการ",
       completed: "เสร็จสิ้น",
       rejected: "ถูกปฏิเสธ",
     };
@@ -31,7 +30,6 @@ const ReportDetailModal = ({ visible, onCancel, record, onAssign }) => {
     const statusColors = {
       pending: "orange",
       approved: "green",
-      "in-progress": "blue",
       completed: "green",
       rejected: "red",
     };

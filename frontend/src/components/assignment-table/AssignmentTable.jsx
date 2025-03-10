@@ -334,10 +334,10 @@ const AssignmentTable = () => {
             <CheckCircleOutlined /> อนุมัติ
           </Menu.Item>
         )}
-        {record.status !== "pending" && (
+        {record.status !== "รอดำเนินการ" && (
           <Menu.Item
             key="inProgress"
-            onClick={() => onStatusChange(record, "pending")}>
+            onClick={() => onStatusChange(record, "รอดำเนินการ")}>
             {" "}
             {/* แก้ไขจาก in-progress เป็น pending */}
             <EditOutlined /> รอดำเนินการ

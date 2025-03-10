@@ -127,7 +127,7 @@ const UserChatList = ({ onSelectChat, selectedChat }) => {
           return {
             issueId: issue._id || issue.issueId,
             topic: issue.topic || issue.title || "ไม่มีหัวข้อ",
-            status: issue.status || "pending",
+            status: issue.status || "รอดำเนินการ",
             date: issue.date || issue.createdAt,
             lastActive: issue.updatedAt || issue.createdAt,
             unreadCount: chatInfo.unreadCount || 0,
