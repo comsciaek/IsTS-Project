@@ -393,11 +393,15 @@ const ChatWindowUser = ({ chat, isMobile }) => {
           <div className="text-xs text-gray-500">
             สถานะ:{" "}
             <span
-              className={
+              className={`font-medium ${
                 chat.status === "completed"
                   ? "text-green-500"
-                  : "text-orange-500"
-              }>
+                  : chat.status === "approved"
+                  ? "text-green-500"
+                  : chat.status === "rejected"
+                  ? "text-red-500"
+                  : "text-orange-500" // pending หรือสถานะอื่นๆ
+              }`}>
               {chat.status === "completed"
                 ? "เสร็จสิ้น"
                 : chat.status === "approved"
