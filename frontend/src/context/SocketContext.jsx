@@ -2,142 +2,91 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { io } from "socket.io-client";
 import PropTypes from "prop-types";
 import { useUser } from "./UserContext";
-import axios from "axios";
 
-const SocketContext = createContext();
+// สร้าง context
+export const SocketContext = createContext();
 
-export const useSocket = () => {
-  return useContext(SocketContext);
-};
+// URL ของ Socket.io server
+const SOCKET_URL = "http://172.18.43.39:5000";
 
 export const SocketProvider = ({ children }) => {
   const [socket, setSocket] = useState(null);
+  const [isConnected, setIsConnected] = useState(false);
   const { user } = useUser();
 
   useEffect(() => {
-    // เชื่อมต่อ socket เมื่อผู้ใช้เข้าสู่ระบบ
-    if (user && (user.id || user._id)) {
+    // เชื่อมต่อ socket เมื่อมี user
+    if (user && user.id) {
       const token = localStorage.getItem("token");
-      const newSocket = io("http://172.18.43.39:5000", {
+
+      if (!token) {
+        console.warn("No token available for socket authentication");
+        return;
+      }
+
+      // สร้าง socket instance
+      const socketInstance = io(SOCKET_URL, {
         auth: {
-          token: token,
+          token,
         },
-        query: {
+        reconnection: true,
+        reconnectionAttempts: 5,
+        reconnectionDelay: 1000,
+      });
+
+      // ดักจับเหตุการณ์ต่างๆ
+      socketInstance.on("connect", () => {
+        console.log("Socket.io connected with ID:", socketInstance.id);
+        setIsConnected(true);
+
+        // แจ้ง server เกี่ยวกับข้อมูลผู้ใช้
+        socketInstance.emit("userConnected", {
           userId: user.id || user._id,
           role: user.role,
-        },
+        });
       });
 
-      // เหตุการณ์เมื่อเชื่อมต่อสำเร็จ
-      newSocket.on("connect", () => {
-        console.log("Socket connected:", newSocket.id);
-
-        // เข้าร่วม socket rooms สำหรับคำร้องที่เกี่ยวข้อง
-        if (user.role === "Admin" || user.role === "SuperAdmin") {
-          // ถ้าเป็น Admin หรือ SuperAdmin ให้เรียก API เพื่อดึงคำร้องที่ถูกมอบหมาย
-          const fetchAssignedReports = async () => {
-            try {
-              const response = await axios.get(
-                `http://172.18.43.39:5000/api/reports/admin/assigned/${
-                  user.id || user._id
-                }`,
-                {
-                  headers: { Authorization: `Bearer ${token}` },
-                }
-              );
-
-              // ดึง issueId จากแต่ละคำร้อง
-              const assignedIssueIds =
-                response.data?.data?.map(
-                  (report) => report._id || report.issueId
-                ) || [];
-
-              // เข้าร่วมแต่ละห้องด้วย issueId
-              assignedIssueIds.forEach((issueId) => {
-                if (issueId) {
-                  // แก้ไขการส่งข้อมูลให้เข้ากับการรับของ server
-                  newSocket.emit("join", { room: issueId });
-                  console.log(`Joined room for issue: ${issueId}`);
-                }
-              });
-            } catch (err) {
-              console.error(
-                "Error fetching assigned reports for socket rooms:",
-                err
-              );
-            }
-          };
-
-          fetchAssignedReports();
-        } else if (user.role === "User") {
-          // ถ้าเป็น User ให้เรียก API เพื่อดึงคำร้องที่สร้างโดยผู้ใช้
-          const fetchUserReports = async () => {
-            try {
-              const response = await axios.get(
-                `http://172.18.43.39:5000/api/reports/user/me`,
-                {
-                  headers: { Authorization: `Bearer ${token}` },
-                }
-              );
-
-              // ดึง issueId จากแต่ละคำร้อง
-              const userIssueIds =
-                response.data?.data?.map(
-                  (report) => report._id || report.issueId
-                ) || [];
-
-              // เข้าร่วมแต่ละห้องด้วย issueId
-              userIssueIds.forEach((issueId) => {
-                if (issueId) {
-                  // แก้ไขการส่งข้อมูลให้เข้ากับการรับของ server
-                  newSocket.emit("join", { room: issueId });
-                  console.log(`Joined room for issue: ${issueId}`);
-                }
-              });
-            } catch (err) {
-              console.error(
-                "Error fetching user reports for socket rooms:",
-                err
-              );
-            }
-          };
-
-          fetchUserReports();
-        }
+      socketInstance.on("connect_error", (error) => {
+        console.error("Socket.io connection error:", error);
+        setIsConnected(false);
       });
 
-      // เหตุการณ์เมื่อมีข้อผิดพลาด
-      newSocket.on("connect_error", (err) => {
-        console.error("Socket connection error:", err.message);
+      socketInstance.on("disconnect", (reason) => {
+        console.log("Socket.io disconnected. Reason:", reason);
+        setIsConnected(false);
       });
 
-      // เหตุการณ์เมื่อถูกตัดการเชื่อมต่อ
-      newSocket.on("disconnect", (reason) => {
-        console.log("Socket disconnected:", reason);
+      // เพิ่มเหตุการณ์สำหรับรับข้อความ
+      socketInstance.on("messageReceived", (data) => {
+        console.log("New message received via socket:", data);
       });
 
-      setSocket(newSocket);
+      // เพิ่ม event listener อื่นๆ ตามที่จำเป็น
 
-      // ทำความสะอาดเมื่อคอมโพเนนท์ถูก unmounted
+      // เก็บ socket instance ใน state
+      setSocket(socketInstance);
+
+      // Cleanup function เมื่อ component unmount
       return () => {
-        newSocket.disconnect();
+        console.log("Disconnecting socket");
+        socketInstance.disconnect();
+        setSocket(null);
+        setIsConnected(false);
       };
     }
   }, [user]);
 
-  // ค่าที่จะส่งออกไปใน context
-  const value = {
-    socket,
-    isConnected: socket?.connected || false,
-  };
-
   return (
-    <SocketContext.Provider value={value}>{children}</SocketContext.Provider>
+    <SocketContext.Provider value={{ socket, isConnected }}>
+      {children}
+    </SocketContext.Provider>
   );
 };
 
+// PropTypes validation
 SocketProvider.propTypes = {
   children: PropTypes.node.isRequired,
 };
 
-export default SocketContext;
+// Custom hook
+export const useSocket = () => useContext(SocketContext);

@@ -373,6 +373,7 @@ const Reports = () => {
           </Button>
         </div>
 
+        {/* ปรับปรุงส่วนนี้ให้เป็น responsive มากขึ้น */}
         <div className="mb-4 flex flex-col sm:flex-row gap-4">
           <Input
             placeholder="ค้นหารายงาน..."
@@ -381,35 +382,40 @@ const Reports = () => {
             prefix={<SearchOutlined />}
             style={{ maxWidth: 300 }}
           />
-          <div className="flex gap-2">
-            <span className="self-center whitespace-nowrap text-gray-400">
-              เลือกสถานะ :
-            </span>
-            <Select
-              value={statusFilter}
-              onChange={(value) => setStatusFilter(value)}
-              style={{ width: 150 }}
-              placeholder="สถานะ">
-              <Option value="all">สถานะทั้งหมด</Option>
-              <Option value="completed">เสร็จสิ้น</Option>
-              <Option value="rejected">ถูกปฏิเสธ</Option>
-            </Select>
+          {/* จัดกลุ่มตัวกรองเป็นแนวตั้งในมุมมองมือถือ */}
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="flex items-center gap-2">
+              <span className="whitespace-nowrap text-gray-400">
+                เลือกสถานะ :
+              </span>
+              <Select
+                value={statusFilter}
+                onChange={(value) => setStatusFilter(value)}
+                style={{ width: 150 }}
+                placeholder="สถานะ">
+                <Option value="all">สถานะทั้งหมด</Option>
+                <Option value="completed">เสร็จสิ้น</Option>
+                <Option value="rejected">ถูกปฏิเสธ</Option>
+              </Select>
+            </div>
 
-            {/* เพิ่มตัวเลือกกรองตามช่วงเวลา */}
-            <span className="self-center whitespace-nowrap text-gray-400">
-              เลือกช่วงเวลา :
-            </span>
-            <Select
-              value={dateFilter}
-              onChange={(value) => setDateFilter(value)}
-              style={{ width: 150 }}
-              placeholder="ช่วงเวลา"
-              suffixIcon={<CalendarOutlined />}>
-              <Option value="all">ทั้งหมด</Option>
-              <Option value="daily">รายวัน</Option>
-              <Option value="weekly">รายสัปดาห์</Option>
-              <Option value="monthly">รายเดือน</Option>
-            </Select>
+            {/* ตัวเลือกกรองตามช่วงเวลา - จะอยู่ด้านล่างในมุมมองมือถือ */}
+            <div className="flex items-center gap-2">
+              <span className="whitespace-nowrap text-gray-400">
+                เลือกช่วงเวลา :
+              </span>
+              <Select
+                value={dateFilter}
+                onChange={(value) => setDateFilter(value)}
+                style={{ width: 150 }}
+                placeholder="ช่วงเวลา"
+                suffixIcon={<CalendarOutlined />}>
+                <Option value="all">ทั้งหมด</Option>
+                <Option value="daily">รายวัน</Option>
+                <Option value="weekly">รายสัปดาห์</Option>
+                <Option value="monthly">รายเดือน</Option>
+              </Select>
+            </div>
           </div>
         </div>
 

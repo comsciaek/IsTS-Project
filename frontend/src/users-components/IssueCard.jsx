@@ -31,7 +31,6 @@ const statusColors = {
   ถูกปฏิเสธ: "red",
   อนุมัติแล้ว: "green",
   pending: "orange",
-  "in-progress": "blue",
   completed: "green",
   rejected: "red",
   approved: "green",
@@ -70,7 +69,10 @@ const IssueCard = ({ issue, onEdit, onDelete, readOnly = false }) => {
   const status = issue.status || "รอดำเนินการ";
 
   // ข้อมูลผู้ใช้จะเก็บแยกอยู่แล้ว ไม่มีในคำร้อง
-  const employeeName = user?.name || user?.employeeId || "ผู้ใช้งาน";
+  const employeeName =
+    user?.firstName && user?.lastName
+      ? `${user.firstName} ${user.lastName}`
+      : user?.name || "ผู้ใช้งาน";
   const profileImage = user?.profileImage || user?.profilePicture;
 
   // ข้อมูลผู้รับผิดชอบ (Admin/SuperAdmin)
@@ -85,7 +87,6 @@ const IssueCard = ({ issue, onEdit, onDelete, readOnly = false }) => {
   // แปลงสถานะภาษาอังกฤษเป็นภาษาไทย
   const statusMapping = {
     pending: "รอดำเนินการ",
-    "in-progress": "กำลังดำเนินการ",
     completed: "เสร็จสิ้น",
     rejected: "ถูกปฏิเสธ",
     approved: "อนุมัติแล้ว",

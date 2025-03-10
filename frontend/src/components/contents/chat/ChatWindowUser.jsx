@@ -264,73 +264,73 @@ const ChatWindowUser = ({ chat, isMobile }) => {
     try {
       setUploading(true);
       const token = localStorage.getItem("token");
-      // ลบตัวแปร userId ที่ไม่ได้ใช้งาน
+      const userId = user.id || user._id;
 
-      const formData = new FormData();
-
-      if (newMessage.trim()) {
-        formData.append("message", newMessage.trim());
-      } else {
-        formData.append("message", "");
-      }
-
-      if (fileList.length > 0 && fileList[0].originFileObj) {
-        formData.append("file", fileList[0].originFileObj);
-      }
-
-      // ใช้ endpoint สำหรับ user
-      const response = await axios.post(
-        `http://172.18.43.39:5000/api/reports/chat/${chat.issueId}/message`,
-        formData,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "multipart/form-data",
-          },
-        }
-      );
-
-      console.log("Message sent response:", response.data);
-
-      // เก็บข้อมูลข้อความที่ส่งไปสำหรับการตรวจสอบ
+      // ข้อมูลสำหรับ socket
       const messageData = {
-        id: response.data?.data?.id || Date.now().toString(),
+        issueId: chat.issueId,
         message: newMessage.trim(),
-        fileUrl: response.data?.data?.fileUrl,
-        fileName: fileList.length > 0 ? fileList[0].name : null,
-        createdAt: response.data?.data?.createdAt || new Date().toISOString(),
+        senderId: userId,
+        senderName:
+          user.name || `${user.firstName || ""} ${user.lastName || ""}`.trim(),
+        senderProfileImage: user.profileImage || user.profilePicture,
+        createdAt: new Date().toISOString(),
+      };
+
+      // ถ้ามีไฟล์
+      if (fileList.length > 0 && fileList[0].originFileObj) {
+        const file = fileList[0].originFileObj;
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("issueId", chat.issueId); // เพิ่ม issueId ใน formData
+
+        try {
+          const response = await axios.post(
+            "http://172.18.43.39:5000/api/upload/chat",
+            formData,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "multipart/form-data",
+              },
+            }
+          );
+
+          console.log("File uploaded successfully:", response.data);
+          // เพิ่มข้อมูลไฟล์ลงในข้อความที่จะส่งผ่าน socket
+          if (response.data && response.data.fileUrl) {
+            messageData.fileUrl = response.data.fileUrl;
+            messageData.fileName = file.name;
+          }
+        } catch (error) {
+          console.error(
+            "Error uploading file:",
+            error.response ? error.response.data : error.message
+          );
+          message.error("ไม่สามารถอัพโหลดไฟล์ได้ โปรดลองอีกครั้ง");
+          // แม้ว่าอัพโหลดไฟล์จะล้มเหลว เราก็ยังส่งข้อความได้
+        }
+      }
+
+      // ส่งข้อความผ่าน socket
+      socket.emit("sendMessage", messageData);
+
+      // ข้อความ optimistic แสดงในหน้าจอก่อน
+      const localMessageId = `temp-${Date.now()}`;
+      const optimisticMessage = {
+        id: localMessageId,
+        text: newMessage.trim(),
+        senderId: userId,
+        createdAt: new Date().toISOString(),
+        issueId: chat.issueId,
+        fileUrl: messageData.fileUrl,
+        fileName: messageData.fileName,
+        _isOptimistic: true,
       };
 
       // เคลียร์ข้อมูล input หลังส่งข้อความเสร็จ
       setNewMessage("");
       setFileList([]);
-
-      // ส่งข้อความผ่าน socket
-      if (socket && socket.connected) {
-        socket.emit("sendMessage", {
-          issueId: chat.issueId,
-          message: newMessage.trim(),
-          fileUrl: response.data?.data?.fileUrl,
-          fileName: fileList.length > 0 ? fileList[0].name : null,
-        });
-      }
-
-      // ไม่ต้องอัพเดต UI ทันที รอให้ socket ส่งข้อมูลกลับมาแทน
-      // ซึ่งจะช่วยป้องกันการแสดงข้อความซ้ำซ้อน
-
-      // อย่างไรก็ตาม ถ้าต้องการแสดงผลทันที (optimistic update) โดยไม่ซ้ำซ้อน
-      // สามารถทำการอัพเดต UI ด้วยตัวเองและเก็บ ID ข้อความไว้
-      const localMessageId = `temp-${Date.now()}`;
-      const optimisticMessage = {
-        id: localMessageId, // ใช้ ID ชั่วคราว
-        text: newMessage.trim(),
-        senderId: user.id || user._id,
-        createdAt: new Date().toISOString(),
-        issueId: chat.issueId,
-        fileUrl: messageData.fileUrl,
-        fileName: messageData.fileName,
-        _isOptimistic: true, // เพิ่ม flag สำหรับระบุว่าเป็นข้อความ optimistic
-      };
 
       // เพิ่มข้อความชั่วคราวลงในรายการ
       setMessages((prevMessages) => [...prevMessages, optimisticMessage]);
@@ -448,9 +448,7 @@ const ChatWindowUser = ({ chat, isMobile }) => {
                     }>
                     <div
                       className={`rounded-lg py-2 px-4 break-words ${
-                        isSelf
-                          ? "bg-blue-500 text-white"
-                          : "bg-white shadow-sm"
+                        isSelf ? "bg-blue-500 text-white" : "bg-white shadow-sm"
                       }`}>
                       {message.text}
                     </div>
@@ -470,7 +468,10 @@ const ChatWindowUser = ({ chat, isMobile }) => {
       </div>
 
       {/* ส่วนส่งข้อความ */}
-      <div className={`p-2 sm:p-3 border-b-gray-400 shadow-md borer-t ${isMobile ? "pb-safe" : ""}`}>
+      <div
+        className={`p-2 sm:p-3 border-b-gray-400 shadow-md borer-t ${
+          isMobile ? "pb-safe" : ""
+        }`}>
         {fileList.length > 0 && (
           <div className="mb-2 bg-gray-50 p-2 rounded border flex items-center justify-between">
             <div className="flex items-center">

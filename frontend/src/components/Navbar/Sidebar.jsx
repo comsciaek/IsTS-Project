@@ -6,7 +6,6 @@ import {
   LogoutOutlined,
   DownOutlined,
   MessageOutlined,
-  PieChartOutlined,
   LayoutOutlined,
   UserOutlined,
 } from "@ant-design/icons";
@@ -15,7 +14,7 @@ import logo from "../../assets/jib-logo-2.png";
 import { Content } from "antd/es/layout/layout";
 import { Outlet } from "react-router";
 import NotiFications from "../NotiFications";
-import { ShieldCheck } from "lucide-react";
+import { Flag, ShieldCheck } from "lucide-react";
 import { getUserDisplayName, getUserInitial } from "../../utils/userUtils";
 import { useUser } from "../../context/UserContext";
 
@@ -53,7 +52,7 @@ const Sidebar = () => {
       },
       {
         key: "4",
-        icon: <PieChartOutlined />,
+        icon: <Flag size={16} />,
         label: <NavLink to="/reports">Reports</NavLink>,
         allowedroles: ["SuperAdmin"],
       },

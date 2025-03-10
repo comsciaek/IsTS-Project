@@ -243,67 +243,75 @@ const ChatWindow = ({ chat, onClose, isMobile }) => {
       const token = localStorage.getItem("token");
       const userId = user.id || user._id;
 
-      // สร้าง FormData สำหรับส่งข้อความและไฟล์
-      const formData = new FormData();
-
-      // เพิ่มข้อความถ้ามี
-      if (newMessage.trim()) {
-        formData.append("message", newMessage.trim());
-      } else {
-        formData.append("message", ""); // กรณีส่งแค่ไฟล์ไม่มีข้อความ
-      }
-
-      // เพิ่มไฟล์ถ้ามี
-      if (fileList.length > 0 && fileList[0].originFileObj) {
-        formData.append("file", fileList[0].originFileObj);
-      }
-
-      console.log("Sending message payload:", formData);
-
-      // แก้ไขส่วนที่มีข้อผิดพลาด: ตรง URL endpoint มีคำว่า "message" ซ้ำซ้อน
-      const response = await axios.post(
-        `http://172.18.43.39:5000/api/reports/chat/${chat.issueId}/message`,
-        formData,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "multipart/form-data",
-          },
-        }
-      );
-
-      console.log("Message sent response:", response.data);
-
-      // สร้าง object สำหรับแสดงผลบน UI
+      // ข้อมูลสำหรับ socket
       const messageData = {
-        id: response.data?.data?.id || Date.now().toString(),
+        issueId: chat.issueId,
+        message: newMessage.trim(),
+        senderId: userId,
+        senderName:
+          user.name || `${user.firstName || ""} ${user.lastName || ""}`.trim(),
+        senderProfileImage: user.profileImage || user.profilePicture,
+        createdAt: new Date().toISOString(),
+      };
+
+      // ถ้ามีไฟล์
+      if (fileList.length > 0 && fileList[0].originFileObj) {
+        const file = fileList[0].originFileObj;
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("issueId", chat.issueId); // เพิ่ม issueId ใน formData
+
+        try {
+          const response = await axios.post(
+            "http://172.18.43.39:5000/api/upload/chat",
+            formData,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "multipart/form-data",
+              },
+            }
+          );
+
+          console.log("File uploaded successfully:", response.data);
+          // เพิ่มข้อมูลไฟล์ลงในข้อความที่จะส่งผ่าน socket
+          if (response.data && response.data.fileUrl) {
+            messageData.fileUrl = response.data.fileUrl;
+            messageData.fileName = file.name;
+          }
+        } catch (error) {
+          console.error(
+            "Error uploading file:",
+            error.response ? error.response.data : error.message
+          );
+          message.error("ไม่สามารถอัพโหลดไฟล์ได้ โปรดลองอีกครั้ง");
+          // แม้ว่าอัพโหลดไฟล์จะล้มเหลว เราก็ยังส่งข้อความได้
+        }
+      }
+
+      // ส่งข้อความผ่าน socket
+      socket.emit("sendMessage", messageData);
+
+      // แสดงข้อความชั่วคราวในหน้าจอ (optimistic update)
+      const optimisticMessage = {
+        id: Date.now().toString(),
         text: newMessage.trim(),
         senderId: userId,
         senderName:
           user.name || `${user.firstName || ""} ${user.lastName || ""}`.trim(),
         senderProfileImage: user.profileImage || user.profilePicture,
-        createdAt: response.data?.data?.createdAt || new Date().toISOString(),
+        createdAt: new Date().toISOString(),
         issueId: chat.issueId,
-        fileUrl: response.data?.data?.fileUrl,
-        fileName: fileList.length > 0 ? fileList[0].name : null,
+        fileUrl: messageData.fileUrl,
+        fileName: messageData.fileName,
+        _isOptimistic: true,
       };
+
+      setMessages((prevMessages) => [...prevMessages, optimisticMessage]);
 
       // ล้างฟอร์ม
       setNewMessage("");
       setFileList([]);
-
-      // ส่งข้อความผ่าน socket ใช้ชื่อ event: "sendMessage" แทน "send_message"
-      if (socket && socket.connected) {
-        socket.emit("sendMessage", {
-          issueId: chat.issueId,
-          message: newMessage.trim(),
-          fileUrl: response.data?.data?.fileUrl,
-          fileName: fileList.length > 0 ? fileList[0].name : null,
-        });
-      }
-
-      // เพิ่มข้อความในหน้าจอ (optimistic update)
-      setMessages((prevMessages) => [...prevMessages, messageData]);
     } catch (error) {
       console.error("Error sending message:", error);
       if (error.response?.data?.message) {
@@ -504,9 +512,7 @@ const ChatWindow = ({ chat, onClose, isMobile }) => {
                     }>
                     <div
                       className={`rounded-lg py-1.5 sm:py-2 px-3 sm:px-4 break-words text-sm sm:text-base ${
-                        isSelf
-                          ? "bg-blue-500 text-white"
-                          : "bg-white shadow-sm"
+                        isSelf ? "bg-blue-500 text-white" : "bg-white shadow-sm"
                       }`}>
                       {message.text}
                     </div>
