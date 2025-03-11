@@ -78,7 +78,13 @@ const IssuesReport = () => {
         console.warn("Unexpected API response format:", response.data);
       }
 
-      setIssues(reportData);
+      // เพิ่มการแม็ปค่า rating ที่อาจจะเป็น null ให้เป็น 0
+      const processedReportData = reportData.map((report) => ({
+        ...report,
+        rating: report.rating || 0,
+      }));
+
+      setIssues(processedReportData);
 
       // ถ้าเป็นการรีเฟรช แสดงข้อความสำเร็จ
       if (isRefreshing) {

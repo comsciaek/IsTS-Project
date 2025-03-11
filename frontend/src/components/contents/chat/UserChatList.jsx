@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { List, Avatar, Badge, Spin, Empty, Input } from "antd";
 import {
   UserOutlined,
-  SearchOutlined,
   PaperClipOutlined,
 } from "@ant-design/icons";
 import axios from "axios";
@@ -393,7 +392,6 @@ const UserChatList = ({ onSelectChat, selectedChat }) => {
       <div className="p-3 border-b-gray-300 border-b">
         <Search
           placeholder="ค้นหาคำร้อง..."
-          prefix={<SearchOutlined />}
           value={searchText}
           onChange={(e) => handleSearch(e.target.value)}
           onSearch={handleSearch}
@@ -425,6 +423,7 @@ const UserChatList = ({ onSelectChat, selectedChat }) => {
               }`}
               onClick={() => handleSelectChat(issue)}>
               <List.Item.Meta
+                className="p-2"
                 avatar={
                   <Badge
                     count={issue.unreadCount || 0}

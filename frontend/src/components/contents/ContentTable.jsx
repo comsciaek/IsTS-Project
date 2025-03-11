@@ -347,7 +347,7 @@ const ContentTable = () => {
       responsive: ["sm", "md", "lg", "xl"],
     },
     {
-      title: "Submitters",
+      title: "Submitter",
       dataIndex: "name",
       key: "name",
       width: "20%",
@@ -380,8 +380,7 @@ const ContentTable = () => {
       width: "12%",
       filters: [
         { text: "รอดำเนินการ", value: "pending" },
-
-        { text: "เสร็จสิ้น", value: "completed" },
+        { text: "อนุมัติแล้ว", value: "approved" },
       ],
       onFilter: (value, record) => record.status === value,
       render: (status) => (

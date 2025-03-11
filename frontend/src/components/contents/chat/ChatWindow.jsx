@@ -499,7 +499,7 @@ const ChatWindow = ({ chat, onClose, isMobile }) => {
                     src={message.senderProfileImage}
                     icon={!message.senderProfileImage && <UserOutlined />}
                     size={isMobile ? "small" : "default"}
-                    className="mr-2 mt-1"
+                    className="mr-2 mt-1 "
                   />
                 )}
                 <div>

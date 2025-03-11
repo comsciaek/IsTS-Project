@@ -383,7 +383,7 @@ const AssignmentTable = () => {
   // คอลัมน์ของตาราง
   const columns = [
     {
-      title: "Issues",
+      title: "Issue",
       dataIndex: "topic",
       key: "topic",
       width: "25%",
@@ -426,7 +426,7 @@ const AssignmentTable = () => {
       responsive: ["sm", "md", "lg", "xl"], // ไม่แสดงในขนาด xs (มือถือ)
     },
     {
-      title: "Submitters",
+      title: "Submitter",
       dataIndex: "employeeName",
       key: "employeeName",
       width: "20%",

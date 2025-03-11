@@ -61,9 +61,10 @@ const ContentMessages = () => {
     <Layout style={{ height: "calc(100vh - 150px)" }}>
       <Card
         style={{ height: "100%" }}
-        bodyStyle={{ height: "100%", padding: "0" }}>
+        bodyStyle={{ height: "100%", padding: "0" }}
+        className="overflow-hidden shadow-md">
         {isMobile && selectedChat && (
-          <div className="p-2 bg-gray-100 border-b-gray-400  flex items-center">
+          <div className="p-2 bg-white border-b border-gray-200 flex items-center shadow-sm">
             <Button
               icon={<ArrowLeftOutlined />}
               type="text"
@@ -91,7 +92,8 @@ const ContentMessages = () => {
               borderRight: "1px solid #f0f0f0",
               overflow: "hidden",
               display: isMobile && selectedChat ? "none" : "block",
-            }}>
+            }}
+            className="bg-gray-50">
             <ChatList
               onSelectChat={handleSelectChat}
               selectedChat={selectedChat}

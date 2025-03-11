@@ -1,10 +1,6 @@
 import { useState, useEffect } from "react";
-import { List, Avatar, Badge, Spin, Empty, Input } from "antd";
-import {
-  UserOutlined,
-  SearchOutlined,
-  PaperClipOutlined,
-} from "@ant-design/icons";
+import { Avatar, Badge, Spin, Empty, Input, List } from "antd";
+import { UserOutlined, PaperClipOutlined } from "@ant-design/icons";
 import axios from "axios";
 import { useSocket } from "../../../context/SocketContext";
 import { useUser } from "../../../context/UserContext";
@@ -301,7 +297,6 @@ const ChatList = ({ onSelectChat, selectedChat }) => {
       <div className="p-3 border-b-gray-300 border-b">
         <Search
           placeholder="ค้นหาชื่อ หรือแผนก..."
-          prefix={<SearchOutlined />}
           value={searchText}
           onChange={(e) => handleSearch(e.target.value)}
           onSearch={handleSearch}
@@ -333,6 +328,7 @@ const ChatList = ({ onSelectChat, selectedChat }) => {
               }`}
               onClick={() => handleSelectChat(contact)}>
               <List.Item.Meta
+                className="p-2"
                 avatar={
                   <Badge
                     count={contact.unreadCount || 0}

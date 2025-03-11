@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Layout,
   Table,
@@ -15,6 +15,7 @@ import {
   Modal,
   Divider,
   Image,
+  Rate,
 } from "antd";
 import {
   UserOutlined,
@@ -29,7 +30,6 @@ import {
 } from "@ant-design/icons";
 import axios from "axios";
 import dayjs from "dayjs";
-// ลบการนำเข้า useUser ที่ไม่ได้ใช้งาน
 
 const { Content } = Layout;
 const { Title, Text } = Typography;
@@ -46,17 +46,12 @@ const Reports = () => {
   const [searchText, setSearchText] = useState("");
   // เพิ่ม state สำหรับตัวกรองตามช่วงเวลา
   const [dateFilter, setDateFilter] = useState("all");
-
   // เพิ่ม state สำหรับ Modal รายละเอียด
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [selectedReport, setSelectedReport] = useState(null);
 
   // ดึงข้อมูลรายงานทั้งหมด
-  useEffect(() => {
-    fetchReports();
-  }, []);
-
-  const fetchReports = async () => {
+  const fetchReports = useCallback(async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem("token");
@@ -124,6 +119,7 @@ const Reports = () => {
             }
           : null,
         file: report.file || "",
+        rating: report.rating || 0, // เพิ่มการดึงคะแนนรีวิว
       }));
 
       setReports(formattedReports);
@@ -135,7 +131,7 @@ const Reports = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   // ฟิลเตอร์รายงานตามสถานะ ช่วงเวลา และข้อความค้นหา
   useEffect(() => {
@@ -187,7 +183,12 @@ const Reports = () => {
     }
 
     setFilteredReports(result);
-  }, [reports, statusFilter, searchText, dateFilter]); // เพิ่ม dateFilter เป็น dependency
+  }, [reports, statusFilter, searchText, dateFilter]);
+
+  // โหลดข้อมูลเมื่อ component mount
+  useEffect(() => {
+    fetchReports();
+  }, [fetchReports]); // เพิ่ม fetchReports เป็น dependency
 
   // คอลัมน์ของตาราง
   const columns = [
@@ -270,6 +271,19 @@ const Reports = () => {
       },
     },
     {
+      title: "Ratings",
+      dataIndex: "rating",
+      key: "rating",
+      render: (rating) =>
+        rating ? (
+          <Rate disabled defaultValue={rating} allowHalf />
+        ) : (
+          <span className="text-gray-400">ยังไม่มีคะแนน</span>
+        ),
+      responsive: ["sm", "md", "lg", "xl"],
+      sorter: (a, b) => (a.rating || 0) - (b.rating || 0),
+    },
+    {
       title: "Details",
       key: "actions",
       render: (_, record) => (
@@ -350,6 +364,37 @@ const Reports = () => {
     );
   };
 
+  // สร้างแผนภูมิและตารางคะแนน (ถ้าต้องการ)
+  const renderRatingStats = () => {
+    // กรองรายงานที่มีคะแนน
+    const ratedReports = reports.filter((report) => report.rating > 0);
+
+    if (ratedReports.length === 0) {
+      return (
+        <div className="text-center text-gray-500 p-4">
+          ยังไม่มีคะแนนรีวิวจากพนักงาน
+        </div>
+      );
+    }
+
+    // คำนวณค่าเฉลี่ยคะแนน
+    const averageRating =
+      ratedReports.reduce((acc, report) => acc + report.rating, 0) /
+      ratedReports.length;
+
+    return (
+      <div className="flex flex-col items-center mb-4">
+        <div className="text-lg font-medium text-gray-700 mb-2">
+          คะแนนรีวิวเฉลี่ย: {averageRating.toFixed(1)}
+        </div>
+        <Rate disabled allowHalf defaultValue={averageRating} />
+        <div className="text-sm text-gray-500 mt-1">
+          จาก {ratedReports.length} คะแนน
+        </div>
+      </div>
+    );
+  };
+
   return (
     <Layout>
       <Content
@@ -382,6 +427,7 @@ const Reports = () => {
             prefix={<SearchOutlined />}
             style={{ maxWidth: 300 }}
           />
+
           {/* จัดกลุ่มตัวกรองเป็นแนวตั้งในมุมมองมือถือ */}
           <div className="flex flex-col sm:flex-row gap-2">
             <div className="flex items-center gap-2">
@@ -419,6 +465,9 @@ const Reports = () => {
           </div>
         </div>
 
+        {/* แสดงคะแนนรีวิวเฉลี่ย */}
+        {renderRatingStats()}
+
         <Card>
           {loading ? (
             <div className="text-center py-10">
@@ -450,6 +499,7 @@ const Reports = () => {
           {selectedReport && (
             <>
               <Divider style={{ margin: "16px 0" }} />
+
               {/* แสดงสถานะ */}
               <div className="mb-4">
                 <h4 className="mb-2 font-semibold">สถานะ</h4>
@@ -464,6 +514,7 @@ const Reports = () => {
               </div>
 
               <Divider style={{ margin: "16px 0" }} />
+
               {/* แสดงรายละเอียด */}
               <div className="mb-4">
                 <h4 className="mb-2 font-semibold">รายละเอียด</h4>
@@ -471,6 +522,7 @@ const Reports = () => {
               </div>
 
               <Divider style={{ margin: "16px 0" }} />
+
               {/* แสดงข้อมูลผู้แจ้ง */}
               <div className="mb-4">
                 <h4 className="mb-2 font-semibold">ผู้แจ้ง</h4>
@@ -528,10 +580,25 @@ const Reports = () => {
               )}
 
               <Divider style={{ margin: "16px 0" }} />
+
               {/* แสดงวันที่ */}
               <div className="mb-4">
                 <h4 className="mb-2 font-semibold">วันที่แจ้งปัญหา</h4>
                 <p>{dayjs(selectedReport.date).format("DD/MM/YYYY")}</p>
+              </div>
+              <Divider style={{ margin: "16px 0" }} />
+              {/* แสดงคะแนนรีวิว */}
+              <div className="mb-4">
+                <h4 className="mb-2 font-semibold">คะแนนรีวิว</h4>
+                {selectedReport.rating > 0 ? (
+                  <Rate
+                    disabled
+                    defaultValue={selectedReport.rating}
+                    allowHalf
+                  />
+                ) : (
+                  <span className="text-gray-400">ยังไม่มีคะแนน</span>
+                )}
               </div>
 
               {/* แสดงไฟล์แนบ ถ้ามี */}
