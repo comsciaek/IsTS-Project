@@ -211,15 +211,15 @@ router.post('/forgot-password', async (req, res) => {
 // Route รีเซ็ตรหัสผ่าน (Reset Password)
 router.post('/reset-password', async (req, res) => {
   try {
-    const { token, password, confirmPassword } = req.body;
+    const { token, newPassword, confirmNewPassword } = req.body;
 
-    if (!token || !password || !confirmPassword) {
+    if (!token || !newPassword || !confirmNewPassword) {
       return res.status(400).json({
         message: 'Token, password, and confirm password are required',
       });
     }
 
-    if (password !== confirmPassword) {
+    if (newPassword !== confirmNewPassword) {
       return res.status(400).json({ message: 'Passwords do not match' });
     }
 
@@ -230,8 +230,8 @@ router.post('/reset-password', async (req, res) => {
       return res.status(400).json({ message: 'Invalid token YOK' });
     }
 
-    user.password = password;
-    user.confirmPassword = confirmPassword;
+    user.password = newPassword;
+    user.confirmNewPassword = newPassword;
     console.log(user.password) // ไว้ดูรหัสตอนไอนายเปลี่ยน
     await user.save();
 
