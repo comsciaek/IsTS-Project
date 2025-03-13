@@ -21,10 +21,16 @@ const chatSchema = new mongoose.Schema({
     type: String,
     default: '', // เก็บ URL ของไฟล์ เช่น http://172.18.43.39:5000/uploads/chat/filename.jpg
   },
+  readBy: [
+    { type: mongoose.Schema.Types.ObjectId, 
+      ref: 'User', 
+      default: [] }
+    ],
   createdAt: {
     type: Date,
     default: Date.now,
   },
+
 });
 
 const Chat = mongoose.model('Chat', chatSchema);

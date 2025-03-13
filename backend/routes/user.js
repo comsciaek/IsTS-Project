@@ -47,7 +47,10 @@ router.get('/me', protect, async (req, res) => {
       profileImage: user.profileImage,
       role: user.role,
       createdAt: user.createdAt,
+      rating: user.rating,
     };
+
+
 
     return res.status(200).json({
       message: 'User profile retrieved successfully',
@@ -79,7 +82,9 @@ router.get('/profile', protect, async (req, res) => {
       profileImage: user.profileImage,
       role: user.role,
       createdAt: user.createdAt,
+      rating: user.rating,
     };
+
 
     return res.status(200).json({
       message: 'User profile retrieved successfully',
@@ -92,6 +97,7 @@ router.get('/profile', protect, async (req, res) => {
     });
   }
 });
+
 // Route สำหรับดึงข้อมูลและอัปเดตโปรไฟล์ผู้ใช้ตาม userId (ต้องล็อกอินก่อน)
 router.put('/profile/:id', protect, (req, res, next) => {
 

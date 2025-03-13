@@ -40,6 +40,12 @@ const reportSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+  rating: {
+    type: Number,
+    min: 1,
+    max: 5,
+    default: null, // null ถ้ายังไม่ได้ให้คะแนน
+  },
 });
 
 const Report = mongoose.model('Report', reportSchema);

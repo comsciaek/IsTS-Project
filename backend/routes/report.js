@@ -7,6 +7,7 @@ import multer from 'multer';
 import fs from 'fs';
 import path from 'path';
 import mongoose from 'mongoose';
+import { io } from '../index.js';
 
 const router = express.Router();
 
@@ -22,6 +23,7 @@ const storage = multer.diskStorage({
     cb(null, `report_${req.user.id}_${uniqueSuffix}${ext}`); // ชื่อไฟล์: report_<userId>_<timestamp>_<random>.<ext>
   },
 });
+
 
 // ตั้งค่าโฟลเดอร์สำหรับเก็บไฟล์แชท
 const chatStorage = multer.diskStorage({
@@ -133,6 +135,7 @@ router.get('/user/me', protect, async (req, res) => {
         profileImage: report.assignedAdmin.profileImage,
       } : null,
       createdAt: report.createdAt,
+      rating: report.rating,
     }));
 
     return res.status(200).json({
@@ -173,6 +176,7 @@ router.get('/admin/all', protect, authorizeAdminOrSuperAdmin, async (req, res) =
         role: report.assignedAdmin.role,
         profileImage: report.assignedAdmin.profileImage,
       } : null,
+      rating: report.rating,
       createdAt: report.createdAt,
     }));
 
@@ -528,82 +532,67 @@ router.put('/assign/:issueId', protect, authorizeAdminOrSuperAdmin, async (req, 
   }
 });
 
-// Route สำหรับส่งข้อความในแชท (เพิ่มการรองรับไฟล์)
-router.post('/chat/:issueId/message', protect, chatUpload.single('file'), async (req, res) => {
+// Route สำหรับให้คะแนน
+router.put('/rate/:issueId', protect, async (req, res) => {
   try {
-    const issueId = req.params.issueId;
-    const userId = req.user.id;
-    const { message } = req.body;
+    const { issueId } = req.params;
+    const { rating } = req.body;
 
+    // ตรวจสอบว่า issueId ถูกต้อง
     if (!mongoose.Types.ObjectId.isValid(issueId)) {
       return res.status(400).json({ message: 'Invalid issue ID' });
     }
 
+    // ตรวจสอบคะแนน
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({ message: 'Rating must be between 1 and 5' });
+    }
+
+    // ค้นหารายงาน
     const report = await Report.findById(issueId);
     if (!report) {
       return res.status(404).json({ message: 'Report not found' });
     }
 
-    if (report.userId.toString() !== userId && report.assignedAdmin?.toString() !== userId) {
-      return res.status(403).json({ message: 'You are not authorized to send messages in this chat' });
+    // ตรวจสอบสถานะของรายงาน
+    if (report.status !== 'completed') {
+      return res.status(400).json({ message: 'Report must be completed before rating' });
     }
 
-    let fileUrl = '';
-    if (req.file) {
-      fileUrl = `http://172.18.43.39:5000/uploads/chat/${req.file.filename}`;
+    // ตรวจสอบว่าให้คะแนนไปแล้วหรือไม่
+    if (report.rating !== null) {
+      return res.status(400).json({ message: 'This report has already been rated' });
     }
 
-    const newMessage = await Chat.create({
-      issueId,
-      senderId: userId,
-      message: message || '',
-      file: fileUrl,
-    });
-
-    const populatedMessage = await Chat.findById(newMessage._id).populate('senderId', 'firstName lastName role profileImage');
-    let fileName = '';
-    let fileType = '';
-    if (populatedMessage.file) {
-      fileName = populatedMessage.file.split('/').pop();
-      fileType = fileName.endsWith('.jpg') || fileName.endsWith('.jpeg') ? 'image/jpeg' :
-                fileName.endsWith('.png') ? 'image/png' :
-                fileName.endsWith('.pdf') ? 'application/pdf' :
-                fileName.endsWith('.doc') ? 'application/msword' :
-                fileName.endsWith('.docx') ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' : '';
+    // ดึง userId จาก token
+    const userId = req.user.id;
+    if (!userId) {
+      return res.status(401).json({ message: 'User not authenticated' });
     }
 
-    req.app.locals.io.to(issueId).emit('newMessage', {
-      id: populatedMessage._id,
-      issueId: populatedMessage.issueId,
-      senderId: {
-        _id: populatedMessage.senderId._id,
-        firstName: populatedMessage.senderId.firstName,
-        lastName: populatedMessage.senderId.lastName || '',
-        role: populatedMessage.senderId.role,
-        profileImage: populatedMessage.senderId.profileImage,
-      },
-      message: populatedMessage.message,
-      fileUrl: populatedMessage.file,
-      fileName: fileName,
-      fileType: fileType,
-      createdAt: populatedMessage.createdAt,
-    });
+    // ตรวจสอบว่าเป็นผู้สร้างรายงานหรือไม่
+    if (report.userId.toString() !== userId) {
+      return res.status(403).json({ message: 'Only the report creator can rate this report' });
+    }
 
-    return res.status(201).json({
-      message: 'Message sent successfully',
-      data: {
-        id: populatedMessage._id,
-        issueId: populatedMessage.issueId,
-        senderId: populatedMessage.senderId._id,
-        message: populatedMessage.message,
-        fileUrl: populatedMessage.file,
-        fileName: fileName,
-        fileType: fileType,
-        createdAt: populatedMessage.createdAt,
-      },
-    });
+    // บันทึกคะแนน
+    report.rating = rating;
+    await report.save();
+
+    // ส่งการแจ้งเตือนไปยัง admin (ถ้ามี)
+    const adminId = report.assignedAdmin?.toString();
+    if (adminId) {
+      io.to(adminId).emit('reportRated', {
+        issueId,
+        rating,
+        message: `Report ${issueId} has been rated with ${rating} stars`,
+      });
+    }
+
+    res.status(200).json({ message: 'Rating submitted successfully', rating });
   } catch (error) {
-    return res.status(500).json({ message: 'Internal Server Error', error: error.message });
+    console.error('Error submitting rating:', error.message);
+    res.status(500).json({ message: 'Internal Server Error', error: error.message });
   }
 });
 
@@ -611,7 +600,7 @@ router.post('/chat/:issueId/message', protect, chatUpload.single('file'), async 
 router.get('/chat/:issueId/unread-count', protect, async (req, res) => {
   try {
     const issueId = req.params.issueId;
-    const userId = req.user.id; // ผู้ใช้ที่ล็อกอิน
+    const userId = req.user.id;
 
     if (!mongoose.Types.ObjectId.isValid(issueId)) {
       return res.status(400).json({ message: 'Invalid issue ID' });
@@ -629,8 +618,8 @@ router.get('/chat/:issueId/unread-count', protect, async (req, res) => {
     // ดึงข้อความทั้งหมดใน issueId และเรียงตาม createdAt
     const chats = await Chat.find({ issueId }).sort({ createdAt: -1 }).populate('senderId', 'firstName lastName');
 
-    // คำนวณ unreadCount (สมมติว่า unread ถ้าไม่ใช่ข้อความของผู้ใช้ปัจจุบัน)
-    const unreadCount = chats.filter(chat => chat.senderId._id.toString() !== userId.toString()).length;
+    // นับข้อความที่ยังไม่ได้อ่าน (readBy ไม่มี userId ของผู้ใช้ปัจจุบัน)
+    const unreadCount = chats.filter(chat => !chat.readBy.includes(userId)).length;
 
     // ดึงข้อความล่าสุด
     const lastMessage = chats.length > 0 ? {
@@ -647,6 +636,40 @@ router.get('/chat/:issueId/unread-count', protect, async (req, res) => {
     });
   } catch (error) {
     console.error(`Error fetching unread count for issue ${req.params.issueId}:`, error);
+    return res.status(500).json({ message: 'Internal Server Error', error: error.message });
+  }
+});
+
+// Route สำหรับทำเครื่องหมายว่าอ่านข้อความทั้งหมด
+router.post('/chat/:issueId/mark-read', protect, async (req, res) => {
+  try {
+    const issueId = req.params.issueId;
+    const userId = req.user.id;
+
+    if (!mongoose.Types.ObjectId.isValid(issueId)) {
+      return res.status(400).json({ message: 'Invalid issue ID' });
+    }
+
+    const report = await Report.findById(issueId);
+    if (!report) {
+      return res.status(404).json({ message: 'Report not found' });
+    }
+
+    if (report.userId.toString() !== userId && report.assignedAdmin?.toString() !== userId) {
+      return res.status(403).json({ message: 'You are not authorized to view this chat' });
+    }
+
+    // อัปเดตทุกข้อความใน issueId โดยเพิ่ม userId เข้าไปใน readBy
+    await Chat.updateMany(
+      { issueId, readBy: { $ne: userId } }, // เฉพาะข้อความที่ยังไม่ได้อ่านโดยผู้ใช้
+      { $addToSet: { readBy: userId } } // เพิ่ม userId เข้าไปใน readBy
+    );
+
+    return res.status(200).json({
+      message: 'Messages marked as read successfully',
+    });
+  } catch (error) {
+    console.error(`Error marking messages as read for issue ${req.params.issueId}:`, error);
     return res.status(500).json({ message: 'Internal Server Error', error: error.message });
   }
 });
