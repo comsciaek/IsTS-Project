@@ -60,10 +60,12 @@ const IssuesReport = () => {
 
       const token = localStorage.getItem("token");
 
+      // Add a timeout to prevent long hanging requests
       const response = await axios.get(`${API_BASE_URL}/reports/user/me`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
+        timeout: 10000, // Add a 10 second timeout
       });
 
       // console.log("Fetched all issues:", response.data);
@@ -93,7 +95,11 @@ const IssuesReport = () => {
     } catch (error) {
       console.error("Error fetching issues:", error);
 
-      if (error.response && error.response.status === 404) {
+      if (error.code === "ERR_NETWORK" || error.message.includes("timeout")) {
+        message.error(
+          "ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้ โปรดลองอีกครั้งในภายหลัง"
+        );
+      } else if (error.response && error.response.status === 404) {
         // API ส่ง 404 เมื่อไม่พบข้อมูล ไม่ถือเป็น error
         setIssues([]);
       } else {
@@ -118,7 +124,6 @@ const IssuesReport = () => {
           : issue
       )
     );
-
   };
 
   // ฟังก์ชันสำหรับจัดการการคลิกปุ่มรีเฟรช
@@ -211,7 +216,6 @@ const IssuesReport = () => {
   };
 
   const handleModalOk = async (formData) => {
-    // ...existing code...
     try {
       const token = localStorage.getItem("token");
 
@@ -235,13 +239,18 @@ const IssuesReport = () => {
         message.success("แก้ไขคำร้องสำเร็จ");
       } else {
         // กรณีสร้างคำร้องใหม่
-        await axios.post(`${API_BASE_URL}/reports/create/me`, formData, {
-          headers: {
-            "Content-Type": "multipart/form-data",
-            Authorization: `Bearer ${token}`,
-          },
-        });
+        const response = await axios.post(
+          `${API_BASE_URL}/reports/create/me`,
+          formData,
+          {
+            headers: {
+              "Content-Type": "multipart/form-data",
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
 
+        console.log("Create report response:", response.data);
         message.success("สร้างคำร้องสำเร็จ");
         // หลังจากสร้างคำร้อง ให้กลับไปที่ tab คำร้องที่ดำเนินการอยู่
         setActiveTabKey("active");
@@ -254,9 +263,13 @@ const IssuesReport = () => {
       setIsModalVisible(false);
     } catch (error) {
       console.error("Error saving report:", error);
-      message.error(
-        error.response?.data?.message || "ไม่สามารถบันทึกคำร้องได้"
-      );
+      if (error.response?.data?.message) {
+        message.error(
+          `ไม่สามารถบันทึกคำร้องได้: ${error.response.data.message}`
+        );
+      } else {
+        message.error("ไม่สามารถบันทึกคำร้องได้");
+      }
     }
   };
 
