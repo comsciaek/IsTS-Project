@@ -51,7 +51,7 @@ const authorizeAdminOrSuperAdmin = (req, res, next) => {
       message: 'Only SuperAdmin or Admin is authorized to perform this action',
     });
   }
-
+ // console.log('role', role);
   next();
 };
 
