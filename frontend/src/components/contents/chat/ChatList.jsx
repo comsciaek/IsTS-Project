@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Avatar, Badge, Spin, Empty, Input, List } from "antd";
+import { Avatar, Badge, Spin, Empty, Input, List, message } from "antd";
 import { UserOutlined, PaperClipOutlined } from "@ant-design/icons";
 import axios from "axios";
 import { useSocket } from "../../../context/SocketContext";
@@ -142,7 +142,7 @@ const ChatList = ({ onSelectChat, selectedChat }) => {
           "Error fetching assigned issues:",
           error.response?.data || error.message
         );
-        antMessage.error("ไม่สามารถโหลดรายการคำร้องที่ได้รับมอบหมายได้");
+        message.error("ไม่สามารถโหลดข้อความได้ โปรดลองอีกครั้ง");
       } finally {
         setLoading(false);
       }
