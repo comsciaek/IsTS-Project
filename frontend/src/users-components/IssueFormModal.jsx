@@ -67,7 +67,7 @@ const IssueFormModal = ({ visible, onOk, onCancel, editingRecord }) => {
 
         // เพิ่มวันที่ในรูปแบบที่ API ต้องการ (เช่น ISO string)
         if (values.date) {
-          formData.append("date", values.date.format("YYYY-MM-DD"));
+          formData.append("date", values.date.format("DD/MM/YYYY"));
         }
 
         // เพิ่มไฟล์ (backend รองรับ 1 ไฟล์)
@@ -145,7 +145,7 @@ const IssueFormModal = ({ visible, onOk, onCancel, editingRecord }) => {
           name="date"
           label="วันที่"
           rules={[{ required: true, message: "กรุณาเลือกวันที่!" }]}>
-          <DatePicker style={{ width: "100%" }} format="YYYY-MM-DD" />
+          <DatePicker style={{ width: "100%" }} format="DD/MM/YYYY" />
         </Form.Item>
 
         <Form.Item label="แนบไฟล์">

@@ -138,7 +138,7 @@ const IssueCard = ({
   const displayStatus = statusMapping[status] || status;
   const statusColor = statusColors[status] || "default";
 
-  const formattedDate = dayjs(date).format("YYYY-MM-DD ");
+  const formattedDate = dayjs(date).format("DD/MM/YYYY ");
 
   // ตรวจสอบประเภทไฟล์แนบ
   const getFileTypeFromUrl = (url) => {

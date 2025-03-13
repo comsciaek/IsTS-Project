@@ -99,6 +99,7 @@ const RegisterForm = () => {
     { label: "118", value: "118" },
     { label: "119", value: "119" },
     { label: "120", value: "120" },
+    { label: "121", value: "121" },
 
     // Add more employee IDs as needed
   ];
