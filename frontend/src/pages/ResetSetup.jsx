@@ -19,11 +19,12 @@ const ResetSetup = () => {
   const [loading, setLoading] = useState(true);
   const [tokenValid, setTokenValid] = useState(false);
   const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState(""); // เพิ่มสถานะสำหรับข้อความสำเร็จ
   const [email, setEmail] = useState("");
 
   // Verify token on component mount
   useEffect(() => {
-    if (typeof token === "string") {
+    if (typeof token === "string" && token.trim() !== "") {
       try {
         const decodedToken = jwtDecode(token); // Use jwtDecode correctly
         setEmail(decodedToken.email);
@@ -39,23 +40,59 @@ const ResetSetup = () => {
   }, [token]);
 
   const resetPassword = async (values) => {
-    if (values.password !== values.confirmPassword) {
+    if (values.newPassword !== values.confirmNewPassword) {
       setError("รหัสผ่านไม่ตรงกัน");
+      setSuccessMessage(""); // ล้างข้อความสำเร็จ
+      return;
+    }
+
+    if (!token || !values.newPassword || !values.confirmNewPassword) {
+      setError("Token, password, and confirm password are required");
+      setSuccessMessage(""); // ล้างข้อความสำเร็จ
       return;
     }
 
     try {
       setLoading(true);
-      setError(null);
-      await axios.post("http://172.18.43.39:5000/api/auth/reset-password", {
-        token,
-        email,
-        newPassword: values.password,
+      setError("");
+      setSuccessMessage(""); // ล้างข้อความสำเร็จก่อนเริ่มการส่งคำขอ
+      
+      // ส่งข้อมูลให้ครบถ้วนตามที่ API ต้องการ
+      const response = await axios.post("http://172.18.43.39:5000/api/auth/reset-password", {
+        token: token,
+        email: email,
+        newPassword: values.newPassword,
+        confirmNewPassword: values.confirmNewPassword
       });
-      message.success("เปลี่ยนรหัสผ่านสำเร็จ!");
-      navigate("/login");
+      
+      // ตรวจสอบข้อความตอบกลับ
+      if (response.data && response.data.message && response.data.message.includes("successfully")) {
+        // ถ้าข้อความมีคำว่า "successfully" จะถือว่าสำเร็จ
+        setSuccessMessage(response.data.message || "เปลี่ยนรหัสผ่านสำเร็จ!");
+        message.success("เปลี่ยนรหัสผ่านสำเร็จ!");
+        
+        // เพิ่มการหน่วงเวลาก่อนนำทางไปยังหน้า login
+        setTimeout(() => {
+          navigate("/login");
+        }, 2000);
+      } else {
+        setError(response.data?.message || "เกิดข้อผิดพลาด กรุณาลองใหม่");
+      }
     } catch (err) {
-      setError(err.response?.data?.message || "เกิดข้อผิดพลาด กรุณาลองใหม่");
+      console.error("Reset password error:", err);
+      
+      // ตรวจสอบว่าข้อความใน error มีคำว่า "successfully" หรือไม่
+      if (err.response?.data?.message && err.response.data.message.includes("successfully")) {
+        setSuccessMessage(err.response.data.message);
+        message.success("เปลี่ยนรหัสผ่านสำเร็จ!");
+        
+        // เพิ่มการหน่วงเวลาก่อนนำทางไปยังหน้า login
+        setTimeout(() => {
+          navigate("/login");
+        }, 2000);
+      } else {
+        setError(err.response?.data?.message || "เกิดข้อผิดพลาด กรุณาลองใหม่");
+      }
     } finally {
       setLoading(false);
     }
@@ -110,15 +147,26 @@ const ResetSetup = () => {
             style={{ marginBottom: "24px" }}
           />
         )}
+        
+        {/* เพิ่ม Alert สำหรับแสดงข้อความสำเร็จ */}
+        {successMessage && (
+          <Alert
+            message="สำเร็จ"
+            description={successMessage}
+            type="success"
+            showIcon
+            style={{ marginBottom: "24px" }}
+          />
+        )}
 
-        {tokenValid && !error && (
+        {tokenValid && !successMessage && (
           <>
             <p style={{ marginBottom: "24px" }}>
               กรุณาสร้างรหัสผ่านใหม่สำหรับบัญชีของคุณ
             </p>
             <Form form={form} layout="vertical" onFinish={resetPassword}>
               <Form.Item
-                name="password"
+                name="newPassword"
                 label="รหัสผ่านใหม่"
                 rules={[
                   { required: true, message: "กรุณาใส่รหัสผ่านใหม่" },
@@ -137,14 +185,14 @@ const ResetSetup = () => {
                 />
               </Form.Item>
               <Form.Item
-                name="confirmPassword"
+                name="confirmNewPassword"
                 label="ยืนยันรหัสผ่าน"
-                dependencies={["password"]}
+                dependencies={["newPassword"]}
                 rules={[
                   { required: true, message: "กรุณายืนยันรหัสผ่าน" },
                   ({ getFieldValue }) => ({
                     validator(_, value) {
-                      if (!value || getFieldValue("password") === value) {
+                      if (!value || getFieldValue("newPassword") === value) {
                         return Promise.resolve();
                       }
                       return Promise.reject(
@@ -158,11 +206,6 @@ const ResetSetup = () => {
                   placeholder="ยืนยันรหัสผ่าน"
                 />
               </Form.Item>
-              {error && (
-                <div style={{ color: "red", marginBottom: "10px" }}>
-                  {error}
-                </div>
-              )}
               <Form.Item>
                 <Button
                   type="primary"
@@ -187,7 +230,7 @@ const ResetSetup = () => {
             </>
         )}
 
-        {!tokenValid && !loading && !error && (
+        {!tokenValid && !loading && !error && !successMessage && (
           <Alert
             message="ไม่พบโทเค็น"
             description="ไม่พบรหัสการรีเซ็ตรหัสผ่าน กรุณาขอลิงก์รีเซ็ตใหม่"
