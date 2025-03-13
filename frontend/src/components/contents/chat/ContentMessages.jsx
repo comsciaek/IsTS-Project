@@ -5,7 +5,6 @@ import ChatList from "./ChatList";
 import ChatWindow from "./ChatWindow";
 import { useSocket } from "../../../context/SocketContext";
 
-
 const ContentMessages = () => {
   const [selectedChat, setSelectedChat] = useState(null);
   const { socket } = useSocket();
@@ -60,8 +59,10 @@ const ContentMessages = () => {
   return (
     <Layout style={{ height: "calc(100vh - 150px)" }}>
       <Card
+        styles={{
+          body: { height: "100%", padding: "0" },
+        }}
         style={{ height: "100%" }}
-        bodyStyle={{ height: "100%", padding: "0" }}
         className="overflow-hidden shadow-md">
         {isMobile && selectedChat && (
           <div className="p-2 bg-white border-b border-gray-200 flex items-center shadow-sm">

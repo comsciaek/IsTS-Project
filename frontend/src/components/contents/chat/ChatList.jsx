@@ -319,6 +319,16 @@ const ChatList = ({ onSelectChat, selectedChat }) => {
     );
   };
 
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full">
+        <Spin size="large">
+          <div className="content" style={{ padding: "50px" }} />
+        </Spin>
+      </div>
+    );
+  }
+
   return (
     <div className="chat-list-container h-full flex flex-col">
       {/* ส่วนค้นหา */}

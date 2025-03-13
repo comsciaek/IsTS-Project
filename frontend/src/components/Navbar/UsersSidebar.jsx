@@ -152,12 +152,11 @@ const UsersSidebar = () => {
                 style={{ marginLeft: "16px" }}>
                 <Space className="text-white">
                   {user?.profileImage || user?.profilePicture ? (
-                    <Avatar
-                      src={user.profileImage || user.profilePicture}
-                      
-                    />
+                    <Avatar src={user.profileImage || user.profilePicture} />
                   ) : (
-                    <Avatar icon={!user.profileImage && <UserOutlined />}>{getUserInitial(user)}</Avatar>
+                    <Avatar icon={!user.profileImage && <UserOutlined />}>
+                      {getUserInitial(user)}
+                    </Avatar>
                   )}
                   <div
                     style={{

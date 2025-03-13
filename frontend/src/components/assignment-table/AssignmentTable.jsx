@@ -11,7 +11,6 @@ import {
   Tag,
   Input,
   Badge,
-  Menu,
   Dropdown,
 } from "antd";
 import {
@@ -334,44 +333,59 @@ const AssignmentTable = () => {
   }) => {
     const [dropdownVisible, setDropdownVisible] = useState(false);
 
-    const menu = (
-      <Menu>
-        <Menu.Item key="view" onClick={() => onViewDetail(record)}>
-          <FileTextOutlined /> ดูรายละเอียด
-        </Menu.Item>
-        <Menu.Item key="assign" onClick={() => onAssign(record)}>
-          <UserOutlined /> มอบหมายงาน
-        </Menu.Item>
-        <Menu.Divider />
-        {record.status !== "approved" && ( // แก้ไขจาก completed เป็น approved
-          <Menu.Item
-            key="approve"
-            onClick={() => onStatusChange(record, "approved")}>
-            {" "}
-            {/* แก้ไขจาก completed เป็น approved */}
+    const menuItems = [
+      {
+        key: "1",
+        label: (
+          <span onClick={() => onViewDetail(record)}>
+            <FileTextOutlined /> ดูรายละเอียด
+          </span>
+        ),
+      },
+      {
+        key: "2",
+        label: (
+          <span onClick={() => onAssign(record)}>
+            <UserOutlined /> มอบหมายงาน
+          </span>
+        ),
+      },
+      {
+        type: "divider",
+      },
+      {
+        key: "3",
+        label: (
+          <span onClick={() => onStatusChange(record, "approved")}>
             <CheckCircleOutlined /> อนุมัติ
-          </Menu.Item>
-        )}
-        {record.status !== "pending" && (
-          <Menu.Item
-            key="pending"
-            onClick={() => onStatusChange(record, "pending")}>
+          </span>
+        ),
+        disabled: record.status === "approved",
+      },
+      {
+        key: "4",
+        label: (
+          <span onClick={() => onStatusChange(record, "pending")}>
             <EditOutlined /> รอดำเนินการ
-          </Menu.Item>
-        )}
-        {record.status !== "rejected" && (
-          <Menu.Item
-            key="reject"
-            onClick={() => onStatusChange(record, "rejected")}>
+          </span>
+        ),
+        disabled: record.status === "pending",
+      },
+      {
+        key: "5",
+        label: (
+          <span onClick={() => onStatusChange(record, "rejected")}>
             <CloseCircleOutlined /> ปฏิเสธคำร้อง
-          </Menu.Item>
-        )}
-      </Menu>
-    );
+          </span>
+        ),
+        danger: true,
+        disabled: record.status === "rejected",
+      },
+    ];
 
     return (
       <Dropdown
-        overlay={menu}
+        menu={{ items: menuItems }}
         trigger={["click"]}
         open={dropdownVisible}
         onOpenChange={setDropdownVisible}>
