@@ -66,7 +66,7 @@ const ContentTable = () => {
       const token = localStorage.getItem("token");
       const userId = user.id || user._id;
 
-      console.log("Fetching reports assigned to user ID:", user.id || user._id);
+      // console.log("Fetching reports assigned to user ID:", user.id || user._id);
 
       // เรียกใช้ API เพื่อดึงคำร้องที่มอบหมายให้กับผู้ใช้นี้
       const response = await axios.get(
@@ -78,7 +78,7 @@ const ContentTable = () => {
         }
       );
 
-      console.log("Assigned reports response:", response.data);
+      // console.log("Assigned reports response:", response.data);
 
       // ดึงข้อมูลคำร้องจากการตอบกลับของ API
       let assignedReports = [];
@@ -91,31 +91,32 @@ const ContentTable = () => {
       }
 
       // แปลงข้อมูลให้อยู่ในรูปแบบที่เหมาะสมสำหรับตาราง
+      // แปลงข้อมูลให้อยู่ในรูปแบบที่เหมาะสมสำหรับตาราง
       const formattedData = assignedReports.map((report, index) => ({
         key: report.issueId || report._id || index,
         id: report.issueId || report._id,
         issue: report.topic || report.title || report.issue || `Issue ${index}`,
-        description: report.description || "",
+        description: report.description || null,
         date: report.date || report.createdAt,
         status: report.status || "รอดำเนินการ",
-        file: report.file || "",
+        file: report.file || null,
 
         // ข้อมูลผู้แจ้ง
         name: report.userId?.firstName
-          ? `${report.userId.firstName} ${report.userId.lastName || ""}`
+          ? `${report.userId.firstName} ${report.userId?.lastName || null}`
           : report.userId?.employeeName || "ไม่ระบุชื่อ",
         department: report.userId?.department || "ไม่ระบุแผนก",
-        position: report.userId?.position || "",
-        email: report.userId.email || "",
-        phoneNumber: report.userId.phoneNumber || "",
+        position: report.userId?.position || null,
+        email: report.userId?.email || null, // เพิ่ม optional chaining ตรงนี้
+        phoneNumber: report.userId?.phoneNumber || null,
         profilePic:
-          report.userId?.profileImage || report.userId?.profilePicture || "",
+          report.userId?.profileImage || report.userId?.profilePicture || null,
 
         // เก็บข้อมูล original เพื่อใช้ในการแสดงรายละเอียด
         originalData: report,
       }));
 
-      console.log("Formatted assigned reports:", formattedData);
+      // console.log("Formatted assigned reports:", formattedData);
 
       // กรองเอาเฉพาะรายการที่ไม่ได้ถูกปฏิเสธหรือเสร็จสิ้น
       const filteredReports = formattedData.filter(

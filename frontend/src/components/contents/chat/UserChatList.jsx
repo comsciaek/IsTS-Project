@@ -1,9 +1,6 @@
 import { useState, useEffect } from "react";
 import { List, Avatar, Badge, Spin, Empty, Input } from "antd";
-import {
-  UserOutlined,
-  PaperClipOutlined,
-} from "@ant-design/icons";
+import { UserOutlined, PaperClipOutlined } from "@ant-design/icons";
 import axios from "axios";
 import { useSocket } from "../../../context/SocketContext";
 import { useUser } from "../../../context/UserContext";
@@ -13,6 +10,14 @@ const { Search } = Input;
 
 // Import message component สำหรับการแสดงข้อความแจ้งเตือน
 import { message as antMessage } from "antd";
+
+// ฟังก์ชันสำหรับเล่นเสียงแจ้งเตือน
+const playNotificationSound = () => {
+  const audio = new Audio("/notification.mp3");
+  audio
+    .play()
+    .catch((error) => console.log("Error playing notification sound:", error));
+};
 
 const UserChatList = ({ onSelectChat, selectedChat }) => {
   const [issues, setIssues] = useState([]);
@@ -50,7 +55,7 @@ const UserChatList = ({ onSelectChat, selectedChat }) => {
           }
         );
 
-        console.log("User issues response:", response.data);
+        // console.log("User issues response:", response.data);
 
         // แปลงข้อมูลจาก API
         let userIssues = [];
@@ -139,7 +144,7 @@ const UserChatList = ({ onSelectChat, selectedChat }) => {
           };
         });
 
-        console.log("Transformed issues:", issuesList);
+        // console.log("Transformed issues:", issuesList);
         setIssues(issuesList);
         setFilteredIssues(issuesList);
       } catch (error) {
@@ -165,9 +170,11 @@ const UserChatList = ({ onSelectChat, selectedChat }) => {
     socket.off("issue_status_changed");
 
     const handleNewMessage = (messageData) => {
-      console.log("New message received:", messageData);
+      console.log("Socket new message:", messageData);
 
-      // ตรวจสอบว่าข้อความนี้มีอยู่แล้วหรือไม่
+      // ตรวจสอบว่าเป็นข้อความจากตัวเอง
+      const isOwnMessage = messageData.senderId === (user?.id || user?._id);
+
       setIssues((prev) => {
         const updatedIssues = prev.map((issue) => {
           if (issue.issueId === messageData.issueId) {
@@ -175,24 +182,35 @@ const UserChatList = ({ onSelectChat, selectedChat }) => {
               ? `📎 ${messageData.fileName || "ไฟล์แนบ"}`
               : messageData.message;
 
-            // เพิ่มการตรวจสอบถ้าเป็นข้อความล่าสุดเดิม ไม่ต้องเพิ่มจำนวนข้อความที่ยังไม่ได้อ่าน
+            // ตรวจสอบว่าเป็นข้อความซ้ำหรือไม่
             const isMessageAlreadyDisplayed =
               issue.lastMessageTime &&
               messageData.createdAt &&
               new Date(issue.lastMessageTime).getTime() ===
                 new Date(messageData.createdAt).getTime();
 
-            return {
-              ...issue,
-              lastMessage,
-              lastMessageTime:
-                messageData.createdAt || new Date().toISOString(),
-              unreadCount: isMessageAlreadyDisplayed
-                ? issue.unreadCount
-                : selectedChat?.issueId !== messageData.issueId
-                ? (issue.unreadCount || 0) + 1
-                : 0,
-            };
+            if (isOwnMessage) {
+              // ถ้าเป็นข้อความของตัวเอง ไม่อัพเดตข้อความล่าสุดและไม่เพิ่ม unreadCount
+              return {
+                ...issue,
+                // ถ้าต้องการไม่ให้แสดงข้อความของตัวเองเป็นข้อความล่าสุด ให้เอา 2 บรรทัดนี้ออก
+                // lastMessage,
+                // lastMessageTime: messageData.createdAt || new Date().toISOString(),
+              };
+            } else {
+              // ถ้าเป็นข้อความจากคู่สนทนา อัพเดตข้อความล่าสุดและเพิ่ม unreadCount (ถ้าไม่ได้ดูแชทนั้นอยู่)
+              return {
+                ...issue,
+                lastMessage,
+                lastMessageTime:
+                  messageData.createdAt || new Date().toISOString(),
+                unreadCount: isMessageAlreadyDisplayed
+                  ? issue.unreadCount // คงค่าเดิมถ้าเป็นข้อความซ้ำ
+                  : selectedChat?.issueId !== messageData.issueId
+                  ? (issue.unreadCount || 0) + 1
+                  : 0, // ถ้ากำลังดูแชทนี้อยู่ให้เป็น 0
+              };
+            }
           }
           return issue;
         });
@@ -208,30 +226,46 @@ const UserChatList = ({ onSelectChat, selectedChat }) => {
               ? `📎 ${messageData.fileName || "ไฟล์แนบ"}`
               : messageData.message;
 
-            // เพิ่มการตรวจสอบถ้าเป็นข้อความล่าสุดเดิม ไม่ต้องเพิ่มจำนวนข้อความที่ยังไม่ได้อ่าน
+            // ตรวจสอบว่าเป็นข้อความซ้ำหรือไม่
             const isMessageAlreadyDisplayed =
               issue.lastMessageTime &&
               messageData.createdAt &&
               new Date(issue.lastMessageTime).getTime() ===
                 new Date(messageData.createdAt).getTime();
 
-            return {
-              ...issue,
-              lastMessage,
-              lastMessageTime:
-                messageData.createdAt || new Date().toISOString(),
-              unreadCount: isMessageAlreadyDisplayed
-                ? issue.unreadCount
-                : selectedChat?.issueId !== messageData.issueId
-                ? (issue.unreadCount || 0) + 1
-                : 0,
-            };
+            if (isOwnMessage) {
+              // ถ้าเป็นข้อความของตัวเอง ไม่อัพเดตข้อความล่าสุดและไม่เพิ่ม unreadCount
+              return {
+                ...issue,
+                // ถ้าต้องการไม่ให้แสดงข้อความของตัวเองเป็นข้อความล่าสุด ให้เอา 2 บรรทัดนี้ออก
+                // lastMessage,
+                // lastMessageTime: messageData.createdAt || new Date().toISOString(),
+              };
+            } else {
+              // ถ้าเป็นข้อความจากคู่สนทนา อัพเดตข้อความล่าสุดและเพิ่ม unreadCount (ถ้าไม่ได้ดูแชทนั้นอยู่)
+              return {
+                ...issue,
+                lastMessage,
+                lastMessageTime:
+                  messageData.createdAt || new Date().toISOString(),
+                unreadCount: isMessageAlreadyDisplayed
+                  ? issue.unreadCount // คงค่าเดิมถ้าเป็นข้อความซ้ำ
+                  : selectedChat?.issueId !== messageData.issueId
+                  ? (issue.unreadCount || 0) + 1
+                  : 0, // ถ้ากำลังดูแชทนี้อยู่ให้เป็น 0
+              };
+            }
           }
           return issue;
         });
 
         return updatedIssues;
       });
+
+      // เล่นเสียงแจ้งเตือนเฉพาะเมื่อเป็นข้อความจากคู่สนทนา และไม่ได้กำลังดูแชทนั้นอยู่
+      if (!isOwnMessage && selectedChat?.issueId !== messageData.issueId) {
+        playNotificationSound();
+      }
     };
 
     const handleStatusChanged = (data) => {
@@ -287,7 +321,7 @@ const UserChatList = ({ onSelectChat, selectedChat }) => {
       socket.off("newMessage", handleNewMessage);
       socket.off("issue_status_changed", handleStatusChanged);
     };
-  }, [socket, selectedChat]);
+  }, [socket, selectedChat, user]);
 
   // ฟังก์ชันค้นหาคำร้อง
   const handleSearch = (value) => {

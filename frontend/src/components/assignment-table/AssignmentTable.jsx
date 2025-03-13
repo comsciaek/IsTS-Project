@@ -58,37 +58,40 @@ const AssignmentTable = () => {
   const tableRef = useRef(null);
 
   // ฟังก์ชันแปลงข้อมูลจาก API ไปเป็นรูปแบบที่เหมาะสมสำหรับตาราง
+  // ฟังก์ชันแปลงข้อมูลจาก API ไปเป็นรูปแบบที่เหมาะสมสำหรับตาราง
   const transformReportData = (report, index) => {
     return {
       key: report.issueId || report._id || index,
       issueId: report.issueId || report._id,
       topic: report.topic || report.title || report.issue || `Issue ${index}`,
-      description: report.description || "",
+      description: report.description || null,
       date: report.date || report.createdAt,
       status: report.status || "รอดำเนินการ",
-      file: report.file || "",
+      file: report.file || null,
 
       // ข้อมูลผู้แจ้งปัญหา
-      userId: report.userId || "",
-      employeeId: report.employeeId || "",
+      userId: report.userId || null,
+      employeeId: report.userId?.employeeId || null,
       employeeName:
-        report.userId.employeeName ||
-        (report.userId.firstName && report.userId.lastName
+        report.userId?.employeeName ||
+        (report.userId?.firstName && report.userId?.lastName
           ? `${report.userId.firstName} ${report.userId.lastName}`
-          : report.userId.firstName || report.userId.lastName || "ไม่ระบุชื่อ"),
-      department: report.userId.department || "ไม่ระบุแผนก",
-      position: report.userId.position || "",
-      email: report.userId.email || "",
-      phoneNumber: report.userId.phoneNumber || "",
+          : report.userId?.firstName ||
+            report.userId?.lastName ||
+            "ไม่ระบุชื่อ"),
+      department: report.userId?.department || "ไม่ระบุแผนก",
+      position: report.userId?.position || null,
+      email: report.userId?.email || null,
+      phoneNumber: report.userId?.phoneNumber || null,
       profileImage:
-        report.userId.profileImage || report.userId.profilePicture || "",
+        report.userId?.profileImage || report.userId?.profilePicture || null,
 
       // ผู้รับผิดชอบ
       assignedAdmin: report.assignedAdmin || null,
 
       // ข้อมูลเพิ่มเติม
-      response: report.response || "",
-      updatedAt: report.updatedAt || "",
+      response: report.response || null,
+      updatedAt: report.updatedAt || null,
     };
   };
 
@@ -210,6 +213,17 @@ const AssignmentTable = () => {
       const token = localStorage.getItem("token");
       const issueId = record.issueId || record._id;
 
+      // ตรวจสอบว่า status ที่ส่งตรงกับที่ API รองรับ
+      if (
+        !["pending", "approved", "rejected", "completed"].includes(newStatus)
+      ) {
+        // แปลงสถานะภาษาไทยเป็นภาษาอังกฤษ
+        if (newStatus === "รอดำเนินการ") newStatus = "pending";
+        else if (newStatus === "อนุมัติแล้ว") newStatus = "approved";
+        else if (newStatus === "ถูกปฏิเสธ") newStatus = "rejected";
+        else if (newStatus === "เสร็็จสิ้น") newStatus = "completed";
+      }
+
       // ส่งคำขอ API เพื่ออัพเดตสถานะ
       await axios.put(
         `${API_BASE_URL}/reports/edit/${issueId}`,
@@ -217,6 +231,7 @@ const AssignmentTable = () => {
         {
           headers: {
             Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
           },
         }
       );
@@ -251,11 +266,14 @@ const AssignmentTable = () => {
           })
         );
 
-        message.success(`อัพเดตสถานะเป็น ${newStatus} สำเร็จ`);
+        message.success(`อัพเดตสถานะเป็น ${getStatusText(newStatus)} สำเร็จ`);
       }
     } catch (error) {
       console.error("Error updating status:", error);
-      message.error("ไม่สามารถอัพเดตสถานะได้");
+      message.error(
+        "ไม่สามารถอัพเดตสถานะได้: " +
+          (error.response?.data?.message || "เกิดข้อผิดพลาด")
+      );
     }
   };
 
@@ -327,19 +345,17 @@ const AssignmentTable = () => {
         <Menu.Divider />
         {record.status !== "approved" && ( // แก้ไขจาก completed เป็น approved
           <Menu.Item
-            key="complete"
+            key="approve"
             onClick={() => onStatusChange(record, "approved")}>
             {" "}
             {/* แก้ไขจาก completed เป็น approved */}
             <CheckCircleOutlined /> อนุมัติ
           </Menu.Item>
         )}
-        {record.status !== "รอดำเนินการ" && (
+        {record.status !== "pending" && (
           <Menu.Item
-            key="inProgress"
-            onClick={() => onStatusChange(record, "รอดำเนินการ")}>
-            {" "}
-            {/* แก้ไขจาก in-progress เป็น pending */}
+            key="pending"
+            onClick={() => onStatusChange(record, "pending")}>
             <EditOutlined /> รอดำเนินการ
           </Menu.Item>
         )}
@@ -462,7 +478,6 @@ const AssignmentTable = () => {
       filters: [
         { text: "รอดำเนินการ", value: "pending" },
         { text: "อนุมัติแล้ว", value: "approved" },
-        { text: "เสร็จสิ้น", value: "completed" },
       ],
       onFilter: (value, record) => record.status === value,
       render: (status) => (

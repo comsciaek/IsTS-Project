@@ -85,10 +85,10 @@ const ChatWindow = ({ chat, onClose, isMobile }) => {
           text: msg.message || msg.text, // รองรับทั้ง message และ text
           senderId: msg.senderId?._id || msg.senderId?.id || msg.senderId,
           senderName: msg.senderId?.firstName
-            ? `${msg.senderId.firstName} ${msg.senderId.lastName || ""}`
+            ? `${msg.senderId.firstName} ${msg.senderId.lastName || null}`
             : msg.senderName || "ไม่ระบุชื่อ",
-          senderRole: msg.senderId?.role || "",
-          senderProfileImage: msg.senderId?.profileImage || "",
+          senderRole: msg.senderId?.role || null,
+          senderProfileImage: msg.senderId?.profileImage || null,
           createdAt: msg.createdAt || msg.timestamp || new Date().toISOString(),
           issueId: chat.issueId,
           fileUrl: msg.fileUrl || msg.file, // เพิ่มการรองรับข้อมูลไฟล์แนบ
@@ -185,11 +185,13 @@ const ChatWindow = ({ chat, onClose, isMobile }) => {
 
     if (isImage) {
       return (
-        <div className="mt-2 border rounded overflow-hidden">
+        <div
+          className="border rounded overflow-hidden"
+          style={{ maxWidth: "300px", display: "inline-block" }}>
           <Image
             src={fileUrl}
             alt={fileName || "Image"}
-            style={{ maxHeight: "200px", maxWidth: "100%" }}
+            style={{ maxHeight: "250px", maxWidth: "100%" }}
           />
         </div>
       );
@@ -249,7 +251,8 @@ const ChatWindow = ({ chat, onClose, isMobile }) => {
         message: newMessage.trim(),
         senderId: userId,
         senderName:
-          user.name || `${user.firstName || ""} ${user.lastName || ""}`.trim(),
+          user.name ||
+          `${user.firstName || null} ${user.lastName || null}`.trim(),
         senderProfileImage: user.profileImage || user.profilePicture,
         createdAt: new Date().toISOString(),
       };
@@ -298,7 +301,8 @@ const ChatWindow = ({ chat, onClose, isMobile }) => {
         text: newMessage.trim(),
         senderId: userId,
         senderName:
-          user.name || `${user.firstName || ""} ${user.lastName || ""}`.trim(),
+          user.name ||
+          `${user.firstName || null} ${user.lastName || null}`.trim(),
         senderProfileImage: user.profileImage || user.profilePicture,
         createdAt: new Date().toISOString(),
         issueId: chat.issueId,
@@ -487,6 +491,11 @@ const ChatWindow = ({ chat, onClose, isMobile }) => {
         ) : (
           messages.map((message, index) => {
             const isSelf = message.senderId === (user.id || user._id);
+            const isImage =
+              message.fileUrl &&
+              message.fileUrl.match(/\.(jpeg|jpg|gif|png)$/i) !== null;
+            const hasOnlyImage =
+              isImage && (!message.text || message.text.trim() === "");
 
             return (
               <div
@@ -503,24 +512,48 @@ const ChatWindow = ({ chat, onClose, isMobile }) => {
                   />
                 )}
                 <div>
-                  <Tooltip
-                    title={
-                      <>
-                        <div>{message.senderName}</div>
-                        <div>{formatTime(message.createdAt)}</div>
-                      </>
-                    }>
-                    <div
-                      className={`rounded-lg py-1.5 sm:py-2 px-3 sm:px-4 break-words text-sm sm:text-base ${
-                        isSelf ? "bg-blue-500 text-white" : "bg-white shadow-sm"
-                      }`}>
-                      {message.text}
-                    </div>
-                  </Tooltip>
+                  {/* แสดงกล่องข้อความเฉพาะเมื่อมีข้อความข้อความ หรือไม่ใช่รูปภาพ */}
+                  {!hasOnlyImage && (
+                    <Tooltip
+                      title={
+                        <>
+                          <div>{message.senderName}</div>
+                          <div>{formatTime(message.createdAt)}</div>
+                        </>
+                      }>
+                      <div
+                        className={`rounded-lg py-1.5 sm:py-2 px-3 sm:px-4 break-words text-sm sm:text-base ${
+                          isSelf
+                            ? "bg-blue-500 text-white"
+                            : "bg-white shadow-sm"
+                        }`}>
+                        {message.text}
+                      </div>
+                    </Tooltip>
+                  )}
+
+                  {/* แสดงไฟล์แนบ */}
                   {message.fileUrl && (
                     <div
-                      className={`mt-1 ${isSelf ? "text-right" : "text-left"}`}>
+                      className={`${hasOnlyImage ? "" : "mt-1"} ${
+                        isSelf ? "text-right" : "text-left"
+                      }`}>
                       {renderFile(message.fileUrl, message.fileName)}
+                    </div>
+                  )}
+
+                  {/* ถ้าเป็นรูปภาพเพียงอย่างเดียว ให้แสดง tooltip ที่รูปภาพแทน */}
+                  {hasOnlyImage && (
+                    <div className="mt-1">
+                      <Tooltip
+                        title={
+                          <>
+                            <div>{message.senderName}</div>
+                            <div>{formatTime(message.createdAt)}</div>
+                          </>
+                        }>
+                        <span></span>
+                      </Tooltip>
                     </div>
                   )}
                 </div>

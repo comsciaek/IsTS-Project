@@ -11,11 +11,19 @@ const { Search } = Input;
 // Import message component สำหรับการแสดงข้อความแจ้งเตือน
 import { message as antMessage } from "antd";
 
+// ฟังก์ชันสำหรับเล่นเสียงแจ้งเตือน
+const playNotificationSound = () => {
+  const audio = new Audio("/notification.mp3");
+  audio
+    .play()
+    .catch((error) => console.log("Error playing notification sound:", error));
+};
+
 const ChatList = ({ onSelectChat, selectedChat }) => {
   const [contacts, setContacts] = useState([]);
   const [filteredContacts, setFilteredContacts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchText, setSearchText] = useState("");
+  const [searchText, setSearchText] = useState(null);
   const { socket } = useSocket();
   const { user } = useUser(); // เพิ่มการใช้งาน user context
 
@@ -113,7 +121,7 @@ const ChatList = ({ onSelectChat, selectedChat }) => {
             issueId: issue._id || issue.issueId,
             userId: issue.userId?._id || issue.userId,
             name: issue.userId?.firstName
-              ? `${issue.userId.firstName} ${issue.userId.lastName || ""}`
+              ? `${issue.userId.firstName} ${issue.userId.lastName || null}`
               : issue.userId?.name || "ไม่ระบุชื่อ",
             department: issue.userId?.department || "ไม่ระบุแผนก",
             profileImage:
@@ -126,7 +134,7 @@ const ChatList = ({ onSelectChat, selectedChat }) => {
           };
         });
 
-        console.log("Transformed contacts:", contactsList);
+        // console.log("Transformed contacts:", contactsList);
         setContacts(contactsList);
         setFilteredContacts(contactsList);
       } catch (error) {
@@ -151,6 +159,10 @@ const ChatList = ({ onSelectChat, selectedChat }) => {
     socket.on("newMessage", (messageData) => {
       console.log("New message received:", messageData);
 
+      // ตรวจสอบว่าข้อความมาจากผู้ใช้ปัจจุบันหรือไม่
+      const isOwnMessage = messageData.senderId === (user?.id || user?._id);
+
+      // อัพเดต state contacts เพื่อแสดงข้อความล่าสุดและการแจ้งเตือน
       setContacts((prev) =>
         prev.map((contact) => {
           if (contact.issueId === messageData.issueId) {
@@ -159,20 +171,36 @@ const ChatList = ({ onSelectChat, selectedChat }) => {
               ? `📎 ${messageData.fileName || "ไฟล์แนบ"}`
               : messageData.message;
 
-            return {
-              ...contact,
-              lastMessage,
-              lastMessageTime:
-                messageData.createdAt || new Date().toISOString(),
-              unreadCount:
-                selectedChat?.issueId !== messageData.issueId
-                  ? (contact.unreadCount || 0) + 1
-                  : 0,
-            };
+            if (isOwnMessage) {
+              // ถ้าเป็นข้อความของเรา อัพเดตข้อความล่าสุด (ถ้าเราอยากให้แสดง) แต่ไม่เพิ่ม unreadCount
+              return {
+                ...contact,
+                // ถ้าต้องการไม่ให้แสดงข้อความของตัวเองเป็นข้อความล่าสุด ให้เอา 2 บรรทัดนี้ออก
+                // lastMessage,
+                // lastMessageTime: messageData.createdAt || new Date().toISOString(),
+              };
+            } else {
+              // ถ้าเป็นข้อความจากคนอื่น อัพเดตข้อความล่าสุดและเพิ่ม unreadCount
+              return {
+                ...contact,
+                lastMessage,
+                lastMessageTime:
+                  messageData.createdAt || new Date().toISOString(),
+                unreadCount:
+                  selectedChat?.issueId !== messageData.issueId
+                    ? (contact.unreadCount || 0) + 1
+                    : 0,
+              };
+            }
           }
           return contact;
         })
       );
+
+      // เล่นเสียงแจ้งเตือนเฉพาะเมื่อเป็นข้อความจากคู่สนทนา และไม่ได้กำลังดูแชทนั้นอยู่
+      if (!isOwnMessage && selectedChat?.issueId !== messageData.issueId) {
+        playNotificationSound();
+      }
     });
 
     // เพิ่มการติดตามเมื่อมีการเปลี่ยนแปลงสถานะคำร้อง
@@ -201,7 +229,7 @@ const ChatList = ({ onSelectChat, selectedChat }) => {
       socket.off("newMessage"); // เปลี่ยนชื่อ event ที่ unsubscribe ด้วย
       socket.off("issue_status_changed");
     };
-  }, [socket, selectedChat]);
+  }, [socket, selectedChat, user]);
 
   // ฟังก์ชันค้นหาผู้ติดต่อ
   const handleSearch = (value) => {
@@ -213,11 +241,11 @@ const ChatList = ({ onSelectChat, selectedChat }) => {
 
     const filtered = contacts.filter(
       (contact) =>
-        (contact.name?.toLowerCase() || "").includes(value.toLowerCase()) ||
-        (contact.department?.toLowerCase() || "").includes(
+        (contact.name?.toLowerCase() || null).includes(value.toLowerCase()) ||
+        (contact.department?.toLowerCase() || null).includes(
           value.toLowerCase()
         ) ||
-        (contact.topic?.toLowerCase() || "").includes(value.toLowerCase())
+        (contact.topic?.toLowerCase() || null).includes(value.toLowerCase())
     );
     setFilteredContacts(filtered);
   };
@@ -324,7 +352,7 @@ const ChatList = ({ onSelectChat, selectedChat }) => {
           renderItem={(contact) => (
             <List.Item
               className={`cursor-pointer hover:bg-gray-100 transition-colors ${
-                selectedChat?.issueId === contact.issueId ? "bg-blue-50" : ""
+                selectedChat?.issueId === contact.issueId ? "bg-blue-50" : null
               }`}
               onClick={() => handleSelectChat(contact)}>
               <List.Item.Meta

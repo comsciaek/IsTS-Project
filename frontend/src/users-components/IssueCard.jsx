@@ -23,7 +23,7 @@ import {
 import PropTypes from "prop-types";
 import dayjs from "dayjs";
 import { useUser } from "../context/UserContext";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import axios from "axios";
 
 const { Text, Paragraph } = Typography;
@@ -44,11 +44,18 @@ const statusColors = {
   approved: "green",
 };
 
-const IssueCard = ({ issue, onEdit, onDelete, readOnly = false }) => {
+const IssueCard = ({
+  issue,
+  onEdit,
+  onDelete,
+  readOnly = false,
+  onRatingChange,
+}) => {
   // ดึงข้อมูลผู้ใช้จาก UserContext
   const { user } = useUser();
   const [ratingModalVisible, setRatingModalVisible] = useState(false);
-  const [rating, setRating] = useState(issue.rating || 0);
+  const [rating, setRating] = useState(issue.rating || null);
+  const [displayRating, setDisplayRating] = useState(issue.rating || null);
   const [submitting, setSubmitting] = useState(false);
 
   // สร้างเมนูสำหรับตัวเลือกบนการ์ด - ปรับให้รองรับโหมด readOnly
@@ -65,12 +72,14 @@ const IssueCard = ({ issue, onEdit, onDelete, readOnly = false }) => {
     }
 
     // สำหรับคำร้องที่เสร็จสิ้นหรือถูกปฏิเสธ ให้แสดงตัวเลือกให้คะแนน
+    // เฉพาะเมื่อยังไม่เคยมีการให้คะแนนมาก่อน (rating เป็น 0 หรือ null)
     if (
       (issue.status === "completed" ||
         issue.status === "rejected" ||
         issue.status === "เสร็จสิ้น" ||
         issue.status === "ถูกปฏิเสธ") &&
-      readOnly
+      readOnly &&
+      (!issue.rating || issue.rating === null) // เพิ่มเงื่อนไขตรวจสอบว่ายังไม่เคยให้คะแนน
     ) {
       menuItems.push({
         key: "rate",
@@ -148,6 +157,17 @@ const IssueCard = ({ issue, onEdit, onDelete, readOnly = false }) => {
 
   const fileType = getFileTypeFromUrl(fileUrl);
 
+  useEffect(() => {
+    if (issue?.rating) {
+      setDisplayRating(issue.rating);
+      setRating(issue.rating);
+    }
+    // console.log("Rating changed:", {
+    //   issueRating: issue.rating,
+    //   displayRating,
+    // });
+  }, [issue.rating, displayRating]);
+
   // ฟังก์ชันบันทึกคะแนน
   const handleRatingSubmit = async () => {
     try {
@@ -171,8 +191,16 @@ const IssueCard = ({ issue, onEdit, onDelete, readOnly = false }) => {
       message.success("บันทึกคะแนนสำเร็จ");
       setRatingModalVisible(false);
 
+      // อัปเดตค่า rating ใน state
+      setDisplayRating(rating);
+
       // อัปเดตค่า rating ใน issue ด้วย (ถ้ามีการส่ง callback จาก parent)
       issue.rating = rating;
+
+      // แจ้ง parent component เพื่ออัปเดตข้อมูลหลัก (ถ้ามี)
+      if (typeof onRatingChange === "function") {
+        onRatingChange(issueId, rating);
+      }
     } catch (error) {
       console.error("Error submitting rating:", error);
       message.error("ไม่สามารถบันทึกคะแนนได้ กรุณาลองใหม่อีกครั้ง");
@@ -240,10 +268,18 @@ const IssueCard = ({ issue, onEdit, onDelete, readOnly = false }) => {
             {displayStatus}
           </Tag>
 
-          {/* แสดงคะแนนดาว (ถ้ามี) */}
-          {issue.rating > 0 && (
-            <div className="flex items-center">
-              <Rate disabled defaultValue={issue.rating} allowHalf />
+          {/* แสดงคะแนนดาวเฉพาะในโหมด readOnly (tab ประวัติ) และมีคะแนน */}
+          {readOnly && displayRating > 0 && (
+            <div className="flex items-center ml-2">
+              <Rate
+                disabled
+                value={displayRating}
+                allowHalf
+                style={{ fontSize: "14px" }}
+              />
+              <span className="ml-1 text-xs text-gray-500">
+                ({displayRating})
+              </span>
             </div>
           )}
 
@@ -392,6 +428,7 @@ IssueCard.propTypes = {
   onEdit: PropTypes.func,
   onDelete: PropTypes.func,
   readOnly: PropTypes.bool,
+  onRatingChange: PropTypes.func,
 };
 
 export default IssueCard;

@@ -208,11 +208,13 @@ const ChatWindowUser = ({ chat, isMobile }) => {
 
     if (isImage) {
       return (
-        <div className="mt-2 border rounded overflow-hidden">
+        <div
+          className="border rounded overflow-hidden"
+          style={{ maxWidth: "300px", display: "inline-block" }}>
           <Image
             src={fileUrl}
             alt={fileName || "Image"}
-            style={{ maxHeight: "200px", maxWidth: "100%" }}
+            style={{ maxHeight: "250px", maxWidth: "100%" }}
           />
         </div>
       );
@@ -427,40 +429,69 @@ const ChatWindowUser = ({ chat, isMobile }) => {
         ) : (
           messages.map((message, index) => {
             const isSelf = message.senderId === (user.id || user._id);
+            const isImage =
+              message.fileUrl &&
+              message.fileUrl.match(/\.(jpeg|jpg|gif|png)$/i) !== null;
+            const hasOnlyImage =
+              isImage && (!message.text || message.text.trim() === "");
 
             return (
               <div
                 key={index}
-                className={`flex mb-4 ${
+                className={`flex mb-3 ${
                   isSelf ? "justify-end" : "justify-start"
                 }`}>
                 {!isSelf && (
                   <Avatar
                     src={message.senderProfileImage}
                     icon={!message.senderProfileImage && <UserOutlined />}
-                    size="small"
+                    size={isMobile ? "small" : "default"}
                     className="mr-2 mt-1"
                   />
                 )}
                 <div>
-                  <Tooltip
-                    title={
-                      <>
-                        <div>{message.senderName}</div>
-                        <div>{formatTime(message.createdAt)}</div>
-                      </>
-                    }>
-                    <div
-                      className={`rounded-lg py-2 px-4 break-words ${
-                        isSelf ? "bg-blue-500 text-white" : "bg-white shadow-sm"
-                      }`}>
-                      {message.text}
-                    </div>
-                  </Tooltip>
+                  {/* แสดงกล่องข้อความเฉพาะเมื่อมีข้อความข้อความ หรือไม่ใช่รูปภาพ */}
+                  {!hasOnlyImage && (
+                    <Tooltip
+                      title={
+                        <>
+                          <div>{message.senderName}</div>
+                          <div>{formatTime(message.createdAt)}</div>
+                        </>
+                      }>
+                      <div
+                        className={`rounded-lg py-1.5 sm:py-2 px-3 sm:px-4 break-words text-sm sm:text-base ${
+                          isSelf
+                            ? "bg-blue-500 text-white"
+                            : "bg-white shadow-sm"
+                        }`}>
+                        {message.text}
+                      </div>
+                    </Tooltip>
+                  )}
+
+                  {/* แสดงไฟล์แนบ */}
                   {message.fileUrl && (
                     <div
-                      className={`mt-1 ${isSelf ? "text-right" : "text-left"}`}>
+                      className={`${hasOnlyImage ? "" : "mt-1"} ${
+                        isSelf ? "text-right" : "text-left"
+                      }`}>
                       {renderFile(message.fileUrl, message.fileName)}
+                    </div>
+                  )}
+
+                  {/* ถ้าเป็นรูปภาพเพียงอย่างเดียว ให้แสดง tooltip ที่รูปภาพแทน */}
+                  {hasOnlyImage && (
+                    <div className="mt-1">
+                      <Tooltip
+                        title={
+                          <>
+                            <div>{message.senderName}</div>
+                            <div>{formatTime(message.createdAt)}</div>
+                          </>
+                        }>
+                        <span></span>
+                      </Tooltip>
                     </div>
                   )}
                 </div>

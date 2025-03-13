@@ -98,13 +98,13 @@ const Reports = () => {
               department: report.userId.department || "ไม่ระบุแผนก",
               profileImage:
                 report.userId.profileImage || report.userId.profilePicture,
-              email: report.userId.email || "",
+              email: report.userId.email || null,
             }
           : {
               name: "ไม่ระบุชื่อ",
               department: "ไม่ระบุแผนก",
-              profileImage: "",
-              email: "",
+              profileImage: null,
+              email: null,
             },
         assignedAdmin: report.assignedAdmin
           ? {
@@ -118,8 +118,8 @@ const Reports = () => {
                 report.assignedAdmin.profilePicture,
             }
           : null,
-        file: report.file || "",
-        rating: report.rating || 0, // เพิ่มการดึงคะแนนรีวิว
+        file: report.file || null,
+        rating: report.rating || null, // เพิ่มการดึงคะแนนรีวิว
       }));
 
       setReports(formattedReports);
@@ -281,7 +281,7 @@ const Reports = () => {
           <span className="text-gray-400">ยังไม่มีคะแนน</span>
         ),
       responsive: ["sm", "md", "lg", "xl"],
-      sorter: (a, b) => (a.rating || 0) - (b.rating || 0),
+      sorter: (a, b) => (a.rating || null) - (b.rating || null),
     },
     {
       title: "Details",
@@ -364,37 +364,6 @@ const Reports = () => {
     );
   };
 
-  // สร้างแผนภูมิและตารางคะแนน (ถ้าต้องการ)
-  const renderRatingStats = () => {
-    // กรองรายงานที่มีคะแนน
-    const ratedReports = reports.filter((report) => report.rating > 0);
-
-    if (ratedReports.length === 0) {
-      return (
-        <div className="text-center text-gray-500 p-4">
-          ยังไม่มีคะแนนรีวิวจากพนักงาน
-        </div>
-      );
-    }
-
-    // คำนวณค่าเฉลี่ยคะแนน
-    const averageRating =
-      ratedReports.reduce((acc, report) => acc + report.rating, 0) /
-      ratedReports.length;
-
-    return (
-      <div className="flex flex-col items-center mb-4">
-        <div className="text-lg font-medium text-gray-700 mb-2">
-          คะแนนรีวิวเฉลี่ย: {averageRating.toFixed(1)}
-        </div>
-        <Rate disabled allowHalf defaultValue={averageRating} />
-        <div className="text-sm text-gray-500 mt-1">
-          จาก {ratedReports.length} คะแนน
-        </div>
-      </div>
-    );
-  };
-
   return (
     <Layout>
       <Content
@@ -464,9 +433,6 @@ const Reports = () => {
             </div>
           </div>
         </div>
-
-        {/* แสดงคะแนนรีวิวเฉลี่ย */}
-        {renderRatingStats()}
 
         <Card>
           {loading ? (
@@ -590,7 +556,7 @@ const Reports = () => {
               {/* แสดงคะแนนรีวิว */}
               <div className="mb-4">
                 <h4 className="mb-2 font-semibold">คะแนนรีวิว</h4>
-                {selectedReport.rating > 0 ? (
+                {selectedReport.rating > null ? (
                   <Rate
                     disabled
                     defaultValue={selectedReport.rating}

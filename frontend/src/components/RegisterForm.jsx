@@ -58,22 +58,22 @@ const RegisterForm = () => {
   };
 
   const departmentOptions = [
-    { label: "HR", value: "hr" },
-    { label: "Engineering", value: "engineering" },
-    { label: "Marketing", value: "marketing" },
-    { label: "Sales", value: "sales" },
-    { label: "Finance", value: "finance" },
-    { label: "IT", value: "it" },
-    { label: "Operation", value: "operation" },
-    { label: "Admin", value: "admin" },
-    { label: "Others", value: "others" },
+    { label: "HR", value: "HR" },
+    { label: "Engineering", value: "Engineering" },
+    { label: "Marketing", value: "Marketing" },
+    { label: "Sales", value: "Sales" },
+    { label: "Finance", value: "Finance" },
+    { label: "IT", value: "IT" },
+    { label: "Operation", value: "Operation" },
+    { label: "Admin", value: "Admin" },
+    { label: "Others", value: "Others" },
   ];
 
   const positionOptions = [
-    { label: "Manager", value: "manager" },
-    { label: "Team Lead", value: "team_lead" },
-    { label: "Senior Developer", value: "senior_developer" },
-    { label: "Junior Developer", value: "junior_developer" },
+    { label: "Manager", value: "Manager" },
+    { label: "Team Lead", value: "Team Lead" },
+    { label: "Senior Developer", value: "Senior Developer" },
+    { label: "Junior Developer", value: "Junior Developer" },
     { label: "Intern", value: "intern" },
     // Add more positions as needed
   ];
@@ -138,7 +138,7 @@ const RegisterForm = () => {
     try {
       const dataToSubmit = { ...formData };
 
-      console.log(" Sending data:", dataToSubmit);
+      // console.log(" Sending data:", dataToSubmit);
 
       const response = await axios.post(
         "http://172.18.43.39:5000/api/auth/register",
@@ -146,7 +146,7 @@ const RegisterForm = () => {
         { headers: { "Content-Type": "application/json" } }
       );
 
-      console.log(" Response received:", response);
+      // console.log(" Response received:", response);
 
       if (response.status === 201) {
         message.success("ลงทะเบียนสำเร็จ! กำลังนำทางไปยังหน้าล็อกอิน...");

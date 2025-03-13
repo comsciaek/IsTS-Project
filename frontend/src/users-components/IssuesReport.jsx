@@ -66,7 +66,7 @@ const IssuesReport = () => {
         },
       });
 
-      console.log("Fetched all issues:", response.data);
+      // console.log("Fetched all issues:", response.data);
 
       // ตรวจสอบรูปแบบการตอบกลับจาก API
       let reportData = [];
@@ -81,7 +81,7 @@ const IssuesReport = () => {
       // เพิ่มการแม็ปค่า rating ที่อาจจะเป็น null ให้เป็น 0
       const processedReportData = reportData.map((report) => ({
         ...report,
-        rating: report.rating || 0,
+        rating: report.rating || null,
       }));
 
       setIssues(processedReportData);
@@ -105,6 +105,20 @@ const IssuesReport = () => {
       setLoading(false);
       setRefreshing(false);
     }
+  };
+
+  const handleRatingChange = (issueId, newRating) => {
+    console.log(`Rating changed for issue ${issueId} to ${newRating}`);
+
+    // อัปเดต state เฉพาะหน้าทันที
+    setIssues((prevIssues) =>
+      prevIssues.map((issue) =>
+        issue._id === issueId || issue.issueId === issueId
+          ? { ...issue, rating: newRating }
+          : issue
+      )
+    );
+
   };
 
   // ฟังก์ชันสำหรับจัดการการคลิกปุ่มรีเฟรช
@@ -322,6 +336,7 @@ const IssuesReport = () => {
               onDelete={handleDeleteIssue}
               // กำหนด readOnly ให้เป็นจริงเฉพาะเมื่ออยู่ในแท็บ history
               readOnly={activeTabKey === "history"}
+              onRatingChange={handleRatingChange}
             />
           </Col>
         ))}

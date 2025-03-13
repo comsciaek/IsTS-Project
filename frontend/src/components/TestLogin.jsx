@@ -20,7 +20,7 @@ const TestLogin = () => {
   const clearData = () => {
     localStorage.removeItem("user");
     localStorage.removeItem("token");
-    console.log("User data and token cleared from localStorage");
+    // console.log("User data and token cleared from localStorage");
   };
 
   return (

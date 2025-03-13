@@ -82,13 +82,13 @@ const LoginForm = () => {
         values
       );
       const data = response.data;
-      console.log("Raw login response:", data);
+      // console.log("Raw login response:", data);
 
       if (data && data.success) {
         // ค้นหาข้อมูลผู้ใช้ในตำแหน่งที่เป็นไปได้
         const userData = data.user || data.userData || data.data || {};
 
-        console.log("User data extracted:", userData);
+        // console.log("User data extracted:", userData);
 
         // ตรวจสอบว่าเรามีข้อมูลผู้ใช้เพียงพอที่จะดำเนินการหรือไม่
         if (
@@ -104,10 +104,10 @@ const LoginForm = () => {
             role: data.role || "User",
           };
 
-          console.log("Using fallback user data:", fallbackUserData);
+          // console.log("Using fallback user data:", fallbackUserData);
 
           // จัดเก็บข้อมูลที่มี
-          localStorage.setItem("token", data.token || "");
+          localStorage.setItem("token", data.token || null);
           updateUser(fallbackUserData);
 
           message.success("Login successful!");
@@ -116,13 +116,13 @@ const LoginForm = () => {
           logNavigationAttempt("/user/home", fallbackUserData);
 
           // เปลี่ยนเส้นทางไปยังหน้าแรกของผู้ใช้เป็นทางออก
-          console.log("Redirecting to user home (fallback)");
+          // console.log("Redirecting to user home (fallback)");
           window.location.href = "/user/home";
           return;
         }
 
         // หากเรามาถึงที่นี่ แสดงว่าเรามีข้อมูลผู้ใช้ - จัดเก็บข้อมูล
-        localStorage.setItem("token", data.token || "");
+        localStorage.setItem("token", data.token || null);
         updateUser(userData);
 
         // กำหนดว่าจะเปลี่ยนเส้นทางไปที่ใดตามบทบาทผู้ใช้
@@ -142,20 +142,20 @@ const LoginForm = () => {
           userData
         );
 
-        console.log("User role:", userData.role);
+        // console.log("User role:", userData.role);
 
         // เปลี่ยนเส้นทางตามบทบาทพร้อมการตรวจสอบที่ปลอดภัย
         if (userData.role === "User") {
-          console.log("Redirecting to user home");
+          // console.log("Redirecting to user home");
           window.location.href = "/user/home";
         } else if (
           userData.role === "Admin" ||
           userData.role === "SuperAdmin"
         ) {
-          console.log("Redirecting to admin dashboard");
+          // console.log("Redirecting to admin dashboard");
           window.location.href = "/";
         } else {
-          console.log("Unknown role, redirecting to user home as fallback");
+          // console.log("Unknown role, redirecting to user home as fallback");
           window.location.href = "/user/home";
         }
       } else {
