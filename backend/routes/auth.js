@@ -233,6 +233,7 @@ router.post('/reset-password', async (req, res) => {
     user.password = newPassword;
     user.confirmNewPassword = newPassword;
     console.log(user.password) // ไว้ดูรหัสตอนไอนายเปลี่ยน
+    console.log(user.employeeId) // ไว้ดูรหัสตอนไอนายเปลี่ยน
     await user.save();
 
     return res.status(200).json({ message: 'Password reset successfully' });

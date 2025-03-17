@@ -4,6 +4,9 @@ import jwt from 'jsonwebtoken';
 import mongoose from 'mongoose';
 import Report from '../model/Report.js'; // Corrected import path
 import Chat from '../model/Chat.js'; // Corrected import path
+import Notification from '../model/Notification.js'; // Corrected import path
+
+
 
 const initializeSocket = (server) => {
   const io = new Server(server, {
@@ -31,40 +34,51 @@ const initializeSocket = (server) => {
 
   // Socket.IO connection handling
   io.on('connection', (socket) => {
-    console.log('A user connected:', socket.id, 'User ID:', socket.user?.id);
-
-    socket.on('joinIssueChat', async (issueId) => {
+    console.log('A user connected:', socket.id, 'User ID:', socket.user.id);
+  
+    // เข้าร่วมห้องของ userId อัตโนมัติ (จาก token)
+    socket.join(socket.user.id);
+  
+    socket.on('joinUserRoom', (roomId) => {
+      socket.join(roomId);
+      console.log(`User ${socket.user.id} joined room: ${roomId}`);
+    });
+  
+    socket.on('reportStatusUpdate', async ({ issueId, status }, callback) => {
       try {
-        if (!mongoose.Types.ObjectId.isValid(issueId)) {
-          socket.emit('error', { message: 'Invalid issue ID' });
-          return;
-        }
-
         const report = await Report.findById(issueId);
-        if (!report) {
-          socket.emit('error', { message: 'Report not found' });
-          return;
-        }
-
-        const userId = socket.user.id;
-        if (
-          report.userId?.toString() !== userId &&
-          (!report.assignedAdmin || report.assignedAdmin.toString() !== userId)
-        ) {
-          socket.emit('error', { message: 'You are not authorized to join this chat' });
-          return;
-        }
-
-        socket.join(issueId);
-        console.log(`User ${socket.id} (ID: ${userId}) joined issue chat: ${issueId}`);
-        socket.emit('joinedChat', { issueId, message: 'Successfully joined chat', status: report.status });
-
-        const chats = await Chat.find({ issueId }).sort({ createdAt: 1 }).populate('senderId', 'firstName lastName');
-        socket.emit('initialMessages', chats);
+        if (!report) return callback({ error: 'Report not found' });
+  
+        const oldStatus = report.status;
+        report.status = status;
+        await report.save();
+  
+        const userId = report.userId; // ผู้สร้าง Report
+        const adminId = socket.user.id; // Admin ที่เปลี่ยนสถานะ
+  
+        // ส่งแจ้งเตือนไปยัง User ผู้สร้าง
+        io.to(userId).emit('reportStatusUpdate', {
+          issueId,
+          oldStatus,
+          newStatus: status,
+          message: `Report ${issueId} status updated to ${status} by Admin`,
+        });
+  
+        // ส่งแจ้งเตือนไปยัง Admin (ตัวเอง)
+        io.to(adminId).emit('reportStatusUpdate', {
+          issueId,
+          oldStatus,
+          newStatus: status,
+          message: `Report ${issueId} status updated to ${status} (by you)`,
+        });
+  
+        callback({ message: 'Report status updated successfully' });
       } catch (error) {
-        socket.emit('error', { message: 'Error joining chat', error: error.message });
+        callback({ error: error.message });
       }
     });
+
+  
 
     socket.on('sendMessage', async ({ issueId, message, fileUrl }, callback) => {
       try {
@@ -108,6 +122,16 @@ const initializeSocket = (server) => {
       }
     });
 
+    socket.on('leaveIssueChat', (issueId) => {
+      socket.leave(issueId);
+      console.log(`User ${socket.id} left issue chat: ${issueId}`);
+    });
+
+    // socket.on('disconnect', () => {
+    //   console.log('User disconnected:', socket.id);
+    // });
+  
+
     socket.on('reportStatusUpdate', async ({ issueId, status }, callback) => {
       try {
         if (!mongoose.Types.ObjectId.isValid(issueId)) {
@@ -141,23 +165,56 @@ const initializeSocket = (server) => {
         report.status = status;
         await report.save();
 
-        // ส่งการแจ้งเตือนไปยังผู้ใช้ที่เกี่ยวข้อง
         const userId = report.userId?.toString();
-        const adminId = report.assignedAdmin?.toString();
+        const adminId = report.assignedAdmin?.toString() || socket.user.id;
+
+        // บันทึกการแจ้งเตือนสำหรับผู้ใช้ที่เกี่ยวข้อง
+        const notificationData = {
+          issueId,
+          oldStatus,
+          newStatus: status,
+          message: `Report ${issueId} status updated to ${status} by Admin`,
+          createdAt: new Date(),
+        };
+
+        // บันทึกการแจ้งเตือนสำหรับผู้สร้าง Report
         if (userId) {
+          const userNotification = new Notification({
+            userId,
+            ...notificationData,
+            isRead: false,
+          });
+          await userNotification.save();
+
           io.to(userId).emit('reportStatusUpdate', {
+            id: userNotification._id,
             issueId,
             oldStatus,
             newStatus: status,
-            message: `Report status updated to ${status}`,
+            message: userNotification.message,
+            isRead: userNotification.isRead,
+            createdAt: userNotification.createdAt,
           });
         }
+
+        // บันทึกการแจ้งเตือนสำหรับ Admin
         if (adminId) {
+          const adminNotification = new Notification({
+            userId: adminId,
+            ...notificationData,
+            message: `Report ${issueId} status updated to ${status} (by you)`,
+            isRead: false,
+          });
+          await adminNotification.save();
+
           io.to(adminId).emit('reportStatusUpdate', {
+            id: adminNotification._id,
             issueId,
             oldStatus,
             newStatus: status,
-            message: `Report status updated to ${status}`,
+            message: adminNotification.message,
+            isRead: adminNotification.isRead,
+            createdAt: adminNotification.createdAt,
           });
         }
 
