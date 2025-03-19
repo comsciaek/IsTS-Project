@@ -303,9 +303,12 @@ const AccountSettings = () => {
                 loading={uploadLoading}
                 style={{
                   backgroundColor: "#262362",
-                  borderColor: "#262362",
-                  marginTop: 16, // เพิ่มระยะห่างด้านบนเป็น 16px
-                }}>
+                  transition: "background-color 0.3s",
+                  border: "none",
+                  marginTop: 8,
+                }}
+                onMouseEnter={(e) => (e.target.style.backgroundColor = "#193CB8")}
+                onMouseLeave={(e) => (e.target.style.backgroundColor = "#262362")}>
                 อัพโหลดรูปภาพ
               </Button>
             )}
@@ -380,9 +383,12 @@ const AccountSettings = () => {
             loading={submitting}
             style={{
               backgroundColor: "#262362",
-              borderColor: "#262362",
-            }}>
-            Save Changes
+              transition: "background-color 0.3s",
+              border: "none",
+            }}
+            onMouseEnter={(e) => (e.target.style.backgroundColor = "#193CB8")}
+            onMouseLeave={(e) => (e.target.style.backgroundColor = "#262362")}>
+            บันทึกข้อมูล
           </Button>
         </Form.Item>
       </Form>

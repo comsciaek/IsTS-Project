@@ -20,7 +20,6 @@ import {
   UserOutlined,
   MoreOutlined,
   CheckCircleOutlined,
-  LogoutOutlined,
   PaperClipOutlined,
   FileOutlined,
   FileImageOutlined,
@@ -36,7 +35,7 @@ import PropTypes from "prop-types";
 
 const { Text } = Typography;
 
-const ChatWindow = ({ chat, onClose, isMobile }) => {
+const ChatWindow = ({ chat, isMobile }) => {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
   const [loading, setLoading] = useState(false);
@@ -348,13 +347,6 @@ const ChatWindow = ({ chat, onClose, isMobile }) => {
   // เพิ่มสถานะสำหรับ Modal ยืนยันการปิดเคส
   const [isCloseModalVisible, setIsCloseModalVisible] = useState(false);
 
-  // ฟังก์ชันสำหรับออกจากแชท
-  const handleLeaveChat = () => {
-    if (onClose) {
-      onClose();
-    }
-  };
-
   // ฟังก์ชันสำหรับแสดง Modal ยืนยันการปิดเคส
   const showCloseIssueModal = () => {
     setIsCloseModalVisible(true);
@@ -400,9 +392,6 @@ const ChatWindow = ({ chat, onClose, isMobile }) => {
 
       // ปิด Modal
       setIsCloseModalVisible(false);
-
-      // ออกจากแชท
-      handleLeaveChat();
     } catch (error) {
       console.error("Error closing issue:", error);
       message.error("ไม่สามารถปิดคำร้องได้ โปรดลองอีกครั้ง");
@@ -412,13 +401,6 @@ const ChatWindow = ({ chat, onClose, isMobile }) => {
   // เมนูสำหรับปุ่ม ... ที่มุมขวาบน
   const menu = (
     <Menu>
-      <Menu.Item
-        key="leave"
-        onClick={handleLeaveChat}
-        icon={<LogoutOutlined />}>
-        ออกจากแชท
-      </Menu.Item>
-      <Menu.Divider />
       <Menu.Item
         key="close"
         onClick={showCloseIssueModal}
@@ -438,6 +420,7 @@ const ChatWindow = ({ chat, onClose, isMobile }) => {
     );
   }
 
+  // แสดง Modal รายละเอียด
   return (
     <div className="flex flex-col h-full">
       {/* ส่วนหัวแชท (เพิ่มปุ่ม ... ที่มุมขวาบน) */}
@@ -471,7 +454,7 @@ const ChatWindow = ({ chat, onClose, isMobile }) => {
           </Dropdown>
         </div>
 
-        <div className="mt-2">
+        <div className="mt-2 break-words">
           <Text strong className="text-xs sm:text-sm">
             เรื่อง: {chat.topic}
           </Text>
@@ -479,7 +462,7 @@ const ChatWindow = ({ chat, onClose, isMobile }) => {
       </div>
 
       {/* ส่วนแสดงข้อความ */}
-      <div className="flex-1 p-4 overflow-y-auto bg-gray-50">
+      <div className="flex-1 p-2 sm:p-4 overflow-y-auto bg-gray-50">
         {loading ? (
           <div className="flex justify-center items-center h-full">
             <Spin tip="กำลังโหลดข้อความ..." />
@@ -524,7 +507,7 @@ const ChatWindow = ({ chat, onClose, isMobile }) => {
                       <div
                         className={`rounded-lg py-1.5 sm:py-2 px-3 sm:px-4 break-words text-sm sm:text-base ${
                           isSelf
-                            ? "bg-blue-500 text-white"
+                            ? "bg-[#262362] text-white"
                             : "bg-white shadow-sm"
                         }`}>
                         {message.text}
@@ -645,7 +628,7 @@ const ChatWindow = ({ chat, onClose, isMobile }) => {
         </div>
       </div>
 
-      {/* Modal ยืนยันการปิดเคส */}
+      {/* Modal ยืนยันการปิดเคส - ปรับขนาดตามหน้าจอ */}
       <Modal
         title={<span className="text-red-500">ยืนยันการปิดเคส</span>}
         open={isCloseModalVisible}
@@ -653,6 +636,7 @@ const ChatWindow = ({ chat, onClose, isMobile }) => {
         onCancel={handleCancelClose}
         okText="ยืนยันการปิดเคส"
         cancelText="ยกเลิก"
+        width={isMobile ? "90%" : 400}
         okButtonProps={{ danger: true }}>
         <p>คุณต้องการปิดเคสคำร้องนี้ใช่หรือไม่?</p>
         <p>

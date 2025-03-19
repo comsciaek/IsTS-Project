@@ -29,7 +29,7 @@ const ReportDetailModal = ({ visible, onCancel, record, onAssign }) => {
   const getStatusColor = (status) => {
     const statusColors = {
       pending: "orange",
-      approved: "green",
+      approved: "blue",
       completed: "green",
       rejected: "red",
     };

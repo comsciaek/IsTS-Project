@@ -1,7 +1,7 @@
 import {
-  SyncOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
+  CloseCircleOutlined,
 } from "@ant-design/icons";
 import { Card, Col, Row, Statistic, Spin } from "antd";
 import { useState, useEffect } from "react";
@@ -79,9 +79,9 @@ const TopCard = () => {
 
   // Define icon colors
   const iconColors = {
-    rejected: "#e08b6d", // Orange/amber color for rejected
-    completed: "#4e8b2b", // Green color for completed
-    pending: "#a35dbb", // Purple color for pending
+    rejected: "#ff4d4f",
+    completed: "#4e8b2b",
+    pending: "#e08b6d",
   };
 
   // Define card style
@@ -101,7 +101,8 @@ const TopCard = () => {
               color: "#333333",
             }}
             prefix={
-              <SyncOutlined
+              <CloseCircleOutlined
+                className="bg-red-200 p-1 rounded-xl"
                 style={{ color: iconColors.rejected, fontSize: "24px" }}
               />
             }
@@ -118,6 +119,7 @@ const TopCard = () => {
             }}
             prefix={
               <CheckCircleOutlined
+                className="bg-green-200 p-1 rounded-xl"
                 style={{ color: iconColors.completed, fontSize: "24px" }}
               />
             }
@@ -134,6 +136,7 @@ const TopCard = () => {
             }}
             prefix={
               <ClockCircleOutlined
+                className="bg-orange-200 p-1 rounded-xl"
                 style={{ color: iconColors.pending, fontSize: "24px" }}
               />
             }

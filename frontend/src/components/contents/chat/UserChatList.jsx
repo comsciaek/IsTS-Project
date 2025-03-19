@@ -55,7 +55,7 @@ const UserChatList = ({ onSelectChat, selectedChat }) => {
           }
         );
 
-        console.log("User issues response:", response.data);
+        // console.log("User issues response:", response.data);
 
         // แปลงข้อมูลจาก API
         let userIssues = [];
@@ -92,10 +92,10 @@ const UserChatList = ({ onSelectChat, selectedChat }) => {
               }
             );
 
-            console.log(
-              `Chat response for issue ${issueId}:`,
-              chatResponse.data
-            );
+            // console.log(
+            //   `Chat response for issue ${issueId}:`,
+            //   chatResponse.data
+            // );
 
             return {
               issueId,
@@ -412,7 +412,7 @@ const UserChatList = ({ onSelectChat, selectedChat }) => {
       case "completed":
         return <span className="text-green-500">เสร็จสิ้น</span>;
       case "approved":
-        return <span className="text-green-500">อนุมัติแล้ว</span>;
+        return <span className="text-blue-500">อนุมัติแล้ว</span>;
       case "rejected":
         return <span className="text-red-500">ปฏิเสธแล้ว</span>;
       default:
@@ -453,7 +453,7 @@ const UserChatList = ({ onSelectChat, selectedChat }) => {
           renderItem={(issue) => (
             <List.Item
               className={`cursor-pointer hover:bg-gray-100 transition-colors ${
-                selectedChat?.issueId === issue.issueId ? "bg-blue-50" : ""
+                selectedChat?.issueId === issue.issueId ? "bg-blue-50" : null
               }`}
               onClick={() => handleSelectChat(issue)}>
               <List.Item.Meta

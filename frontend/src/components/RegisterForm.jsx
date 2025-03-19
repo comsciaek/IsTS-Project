@@ -2,6 +2,11 @@ import { Button, Form, Input, Select, message } from "antd";
 import { useNavigate } from "react-router";
 import { useState } from "react";
 import { EyeOutlined, EyeInvisibleOutlined } from "@ant-design/icons"; // เพิ่มการ import ไอคอน
+import {
+  departmentOptions,
+  positionOptions,
+  employeeIdOptions,
+} from "../utils/optionsData";
 import axios from "axios";
 
 const formItemLayout = {
@@ -56,53 +61,6 @@ const RegisterForm = () => {
       [name]: value,
     });
   };
-
-  const departmentOptions = [
-    { label: "HR", value: "HR" },
-    { label: "Engineering", value: "Engineering" },
-    { label: "Marketing", value: "Marketing" },
-    { label: "Sales", value: "Sales" },
-    { label: "Finance", value: "Finance" },
-    { label: "IT", value: "IT" },
-    { label: "Operation", value: "Operation" },
-    { label: "Admin", value: "Admin" },
-    { label: "Others", value: "Others" },
-  ];
-
-  const positionOptions = [
-    { label: "Manager", value: "Manager" },
-    { label: "Team Lead", value: "Team Lead" },
-    { label: "Senior Developer", value: "Senior Developer" },
-    { label: "Junior Developer", value: "Junior Developer" },
-    { label: "Intern", value: "intern" },
-    // Add more positions as needed
-  ];
-
-  const employeeIdOptions = [
-    { label: "101", value: "101" },
-    { label: "102", value: "102" },
-    { label: "103", value: "103" },
-    { label: "104", value: "104" },
-    { label: "105", value: "105" },
-    { label: "106", value: "106" },
-    { label: "107", value: "107" },
-    { label: "108", value: "108" },
-    { label: "109", value: "109" },
-    { label: "110", value: "110" },
-    { label: "111", value: "111" },
-    { label: "112", value: "112" },
-    { label: "113", value: "113" },
-    { label: "114", value: "114" },
-    { label: "115", value: "115" },
-    { label: "116", value: "116" },
-    { label: "117", value: "117" },
-    { label: "118", value: "118" },
-    { label: "119", value: "119" },
-    { label: "120", value: "120" },
-    { label: "121", value: "121" },
-
-    // Add more employee IDs as needed
-  ];
 
   const checkRequiredFields = () => {
     const {

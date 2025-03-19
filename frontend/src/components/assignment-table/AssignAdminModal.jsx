@@ -129,14 +129,22 @@ const AssignAdminModal = ({
           onClick={handleSubmit}
           style={{
             backgroundColor: "#262362",
-          }}>
+            transition: "background-color 0.3s",
+            border: "none",
+          }}
+          onMouseEnter={(e) =>
+            (e.target.style.backgroundColor = "#193CB8")
+          }
+          onMouseLeave={(e) =>
+            (e.target.style.backgroundColor = "#262362")
+          }>
           มอบหมาย
         </Button>,
       ]}
       width={600}>
       {record && (
         <div>
-          <div className="mb-4 pb-4 border-b">
+          <div className="mb-4 pb-4 border-gray-300 border-b">
             <Title level={5}>รายละเอียดคำร้อง</Title>
             <Text strong>หัวข้อ:</Text> {record.topic}
             <br />
@@ -180,7 +188,7 @@ const AssignAdminModal = ({
           </Form>
 
           {selectedAdmin && (
-            <div className="mt-4 pt-4 border-t">
+            <div className="mt-4 pt-4 border-gray-300 border-t">
               <Title level={5}>ข้อมูลผู้รับผิดชอบ</Title>
               <List.Item>
                 <List.Item.Meta

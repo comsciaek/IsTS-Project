@@ -142,8 +142,8 @@ const UsersSidebar = () => {
             backgroundColor: "#262362",
             zIndex: 1000,
           }}>
-          <div className="flex ml-auto">
-            <NotiFications className="mr-5" />
+          <div className="flex mr-auto ml-5">
+            <NotiFications />
           </div>
           <div className="flex mr-5">
             <Dropdown menu={{ items: accountdropdown }}>

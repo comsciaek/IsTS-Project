@@ -373,7 +373,7 @@ const ChatWindowUser = ({ chat, isMobile }) => {
   return (
     <div className="flex flex-col h-full">
       {/* ส่วนหัวแชท */}
-      <div className="flex flex-col p-4 border-b-gray-400 shadow-md relative">
+      <div className="flex flex-col p-3 sm:p-4 border-b-gray-400 shadow-md relative">
         <div className="flex items-center justify-between">
           <div className="flex items-center">
             <Avatar
@@ -382,14 +382,16 @@ const ChatWindowUser = ({ chat, isMobile }) => {
               size={isMobile ? "default" : "large"}
             />
             <div className="ml-3">
-              <h3 className="font-medium">{chat.adminName || "ผู้ดูแลระบบ"}</h3>
+              <h3 className="font-medium text-sm sm:text-base">
+                {chat.adminName || "ผู้ดูแลระบบ"}
+              </h3>
               <div className="text-xs text-gray-500">ผู้รับผิดชอบคำร้อง</div>
             </div>
           </div>
         </div>
 
-        <div className="mt-2">
-          <Text strong className="text-sm">
+        <div className="mt-2 break-words">
+          <Text strong className="text-xs sm:text-sm">
             เรื่อง: {chat.topic}
           </Text>
           <div className="text-xs text-gray-500">
@@ -399,7 +401,7 @@ const ChatWindowUser = ({ chat, isMobile }) => {
                 chat.status === "completed"
                   ? "text-green-500"
                   : chat.status === "approved"
-                  ? "text-green-500"
+                  ? "text-blue-500"
                   : chat.status === "rejected"
                   ? "text-red-500"
                   : "text-orange-500" // pending หรือสถานะอื่นๆ
@@ -417,7 +419,7 @@ const ChatWindowUser = ({ chat, isMobile }) => {
       </div>
 
       {/* ส่วนแสดงข้อความ */}
-      <div className="flex-1 p-4 overflow-y-auto bg-gray-50">
+      <div className="flex-1 p-2 sm:p-4 overflow-y-auto bg-gray-50">
         {loading ? (
           <div className="flex justify-center items-center h-full">
             <Spin tip="กำลังโหลดข้อความ..." />
@@ -462,7 +464,7 @@ const ChatWindowUser = ({ chat, isMobile }) => {
                       <div
                         className={`rounded-lg py-1.5 sm:py-2 px-3 sm:px-4 break-words text-sm sm:text-base ${
                           isSelf
-                            ? "bg-blue-500 text-white"
+                            ? "bg-[#262362] text-white"
                             : "bg-white shadow-sm"
                         }`}>
                         {message.text}
@@ -509,9 +511,9 @@ const ChatWindowUser = ({ chat, isMobile }) => {
         }`}>
         {fileList.length > 0 && (
           <div className="mb-2 bg-gray-50 p-2 rounded border flex items-center justify-between">
-            <div className="flex items-center">
+            <div className="flex items-center max-w-[80%]">
               {getFileIconByType(fileList[0].name)}
-              <span className="ml-2 text-sm truncate max-w-xs">
+              <span className="ml-2 text-xs sm:text-sm truncate">
                 {fileList[0].name}
               </span>
             </div>
@@ -545,7 +547,6 @@ const ChatWindowUser = ({ chat, isMobile }) => {
               icon={<PaperClipOutlined />}
               className="mr-2"
               size={isMobile ? "middle" : "default"}
-              onClick={() => setFilePopoverVisible(true)}
             />
           </Popover>
 

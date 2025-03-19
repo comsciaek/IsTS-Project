@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from "react";
 import {
   Layout,
   Table,
-  Card,
   Select,
   Input,
   Button,
@@ -294,8 +293,12 @@ const Reports = () => {
           onClick={() => showReportDetail(record)}
           style={{
             backgroundColor: "#262362",
-            borderColor: "#262362",
-          }}>
+            color: "#fff",
+            transition: "background-color 0.3s",
+            border: "none",
+          }}
+          onMouseEnter={(e) => (e.target.style.backgroundColor = "#193CB8")}
+          onMouseLeave={(e) => (e.target.style.backgroundColor = "#262362")}>
           ดูรายละเอียด
         </Button>
       ),
@@ -379,10 +382,16 @@ const Reports = () => {
             onClick={fetchReports}
             loading={loading}
             style={{
+              backgroundColor: "#262362",
+              color: "#fff",
+              transition: "background-color 0.3s",
+              border: "none",
               borderRadius: "50%",
               height: "32px",
               width: "32px",
-            }}>
+            }}
+            onMouseEnter={(e) => (e.target.style.backgroundColor = "#193CB8")}
+            onMouseLeave={(e) => (e.target.style.backgroundColor = "#262362")}>
             <ReloadOutlined />
           </Button>
         </div>
@@ -434,22 +443,20 @@ const Reports = () => {
           </div>
         </div>
 
-        <Card>
-          {loading ? (
-            <div className="text-center py-10">
-              <Spin size="large" />
-              <div className="mt-2">กำลังโหลดรายงาน...</div>
-            </div>
-          ) : (
-            <Table
-              columns={columns}
-              dataSource={filteredReports}
-              pagination={{ pageSize: 10 }}
-              rowKey="id"
-              scroll={{ x: "max-content" }}
-            />
-          )}
-        </Card>
+        {loading ? (
+          <div className="text-center py-10">
+            <Spin size="large" />
+            <div className="mt-2">กำลังโหลดรายงาน...</div>
+          </div>
+        ) : (
+          <Table
+            columns={columns}
+            dataSource={filteredReports}
+            pagination={{ pageSize: 10 }}
+            rowKey="id"
+            scroll={{ x: "max-content" }}
+          />
+        )}
 
         {/* Modal แสดงรายละเอียด */}
         <Modal

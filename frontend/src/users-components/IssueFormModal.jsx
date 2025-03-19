@@ -109,6 +109,16 @@ const IssueFormModal = ({ visible, onOk, onCancel, editingRecord }) => {
       open={visible}
       onOk={handleOk}
       onCancel={onCancel}
+      okButtonProps={{
+        style: {
+          backgroundColor: "#262362",
+          transition: "background-color 0.3s",
+          border: "none",
+          borderRadius: "8px", 
+        },
+        onMouseEnter: (e) => (e.target.style.backgroundColor = "#193CB8"),
+        onMouseLeave: (e) => (e.target.style.backgroundColor = "#262362"),
+      }}
       forceRender>
       <Form form={form} layout="vertical">
         <Form.Item

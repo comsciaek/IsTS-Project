@@ -333,14 +333,14 @@ const IssuesReport = () => {
 
     return (
       <Row gutter={[16, 16]}>
-        {issuesToShow.map((issue) => (
+        {issuesToShow.map((issue, index) => (
           <Col
             xs={24}
             sm={24}
             md={12}
             lg={8}
             xl={8}
-            key={issue._id || issue.id}>
+            key={issue._id || issue.issueId || issue.id || `issue-${index}`}>
             <IssueCard
               issue={issue}
               // ส่ง onEdit เฉพาะสำหรับคำร้องที่อยู่ใน tab active เท่านั้น
@@ -364,7 +364,7 @@ const IssuesReport = () => {
         style={{
           minHeight: "75vh",
           margin: "3px 10px",
-          padding: 24,
+          padding: window.innerWidth < 768 ? 12 : 24,
           borderRadius: borderRadiusLG,
           background: colorBgContainer,
           overflowY: "auto",
@@ -377,12 +377,15 @@ const IssuesReport = () => {
                 placeholder="ค้นหาคำร้อง..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                style={{ width: "100%", maxWidth: "300px" }}
+                style={{
+                  width: "100%",
+                  maxWidth: window.innerWidth < 768 ? "100%" : "300px",
+                }}
                 prefix={<SearchOutlined />}
               />
 
               {/* กลุ่มปุ่ม - แสดงในแถวเดียวกันเสมอ */}
-              <div className="flex gap-2">
+              <div className="flex gap-2 self-end sm:self-auto">
                 {/* ปุ่มรีเฟรช */}
                 <Button
                   type="primary"
@@ -423,7 +426,7 @@ const IssuesReport = () => {
                     onMouseLeave={(e) =>
                       (e.target.style.backgroundColor = "#262362")
                     }>
-                    เพิ่มคำร้อง
+                    {window.innerWidth < 768 ? "" : "เพิ่มคำร้อง"}
                   </Button>
                 )}
               </div>
@@ -435,8 +438,9 @@ const IssuesReport = () => {
             activeKey={activeTabKey}
             items={items}
             onChange={handleTabChange}
-            style={{ marginTop: "16px" }}
+            style={{ marginTop: window.innerWidth < 768 ? "8px" : "16px" }}
             type="card"
+            size={window.innerWidth < 768 ? "small" : "default"}
           />
         </div>
 

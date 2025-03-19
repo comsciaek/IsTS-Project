@@ -1,10 +1,39 @@
-import { Form, Input, Button, message } from "antd";
-import axios from "axios"; // Import Axios
+import { Form, Input, Button, message, Modal } from "antd";
+import axios from "axios";
+import { ExclamationCircleFilled } from "@ant-design/icons";
+import { useNavigate } from "react-router";
+
+const { confirm } = Modal;
 
 const ChangePassword = () => {
   const [form] = Form.useForm();
+  const navigate = useNavigate();
 
-  const handleFinish = async (values) => {
+  const showConfirm = (values) => {
+    confirm({
+      title: "ยืนยันการเปลี่ยนรหัสผ่าน",
+      icon: <ExclamationCircleFilled />,
+      content:
+        "หลังจากเปลี่ยนรหัสผ่าน คุณจะถูกนำไปยังหน้าเข้าสู่ระบบเพื่อล็อกอินใหม่อีกครั้ง",
+      okText: "ยืนยัน",
+      okType: "primary",
+      cancelText: "ยกเลิก",
+      okButtonProps: { 
+        style: {
+          backgroundColor: "#262362",
+          transition: "background-color 0.3s",
+          border: "none",
+        },
+        onMouseEnter: (e) => (e.target.style.backgroundColor = "#193CB8"),
+        onMouseLeave: (e) => (e.target.style.backgroundColor = "#262362")
+      },
+      onOk() {
+        handleChangePassword(values);
+      },
+    });
+  };
+
+  const handleChangePassword = async (values) => {
     try {
       // Call the API to change the password
       const response = await axios.post(
@@ -16,14 +45,24 @@ const ChangePassword = () => {
         },
         {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`, // Add token to headers
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         }
       );
 
       if (response.data.message === "Password changed successfully") {
-        message.success("เปลี่ยนรหัสผ่านสำเร็จ!");
+        message.success(
+          "เปลี่ยนรหัสผ่านสำเร็จ! กรุณาเข้าสู่ระบบด้วยรหัสผ่านใหม่"
+        );
         form.resetFields();
+
+        // ลบ token และ redirect ไปหน้า login
+        localStorage.removeItem("token");
+
+        // ให้เวลาผู้ใช้อ่านข้อความก่อนเปลี่ยนหน้า
+        setTimeout(() => {
+          navigate("/login");
+        }, 2000);
       } else {
         message.error(response.data.message || "ไม่สามารถเปลี่ยนรหัสผ่านได้");
       }
@@ -37,6 +76,11 @@ const ChangePassword = () => {
         );
       }
     }
+  };
+
+  const handleFinish = (values) => {
+    // แสดง confirm dialog ก่อนทำการเปลี่ยนรหัสผ่าน
+    showConfirm(values);
   };
 
   return (

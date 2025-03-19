@@ -58,7 +58,7 @@ const Sidebar = () => {
       },
       {
         key: "5",
-        icon: <ShieldCheck size={16} strokeWidth={1.25} absoluteStrokeWidth />,
+        icon: <ShieldCheck size={17} strokeWidth={1.25} absoluteStrokeWidth />,
         label: <NavLink to="/manage-roles">Manage Roles</NavLink>,
         allowedroles: ["SuperAdmin"],
       },
@@ -172,8 +172,8 @@ const Sidebar = () => {
             backgroundColor: "#262362",
             zIndex: 1000,
           }}>
-          <div className="flex ml-auto">
-            <NotiFications className="mr-5" />
+          <div className="flex mr-auto ml-5">
+            <NotiFications />
           </div>
           <div className="flex mr-5">
             <Dropdown menu={{ items: accountdropdown }}>

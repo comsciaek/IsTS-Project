@@ -34,14 +34,13 @@ const API_BASE_URL = "http://172.18.43.39:5000/api";
 // กำหนดสีของสถานะ
 const statusColors = {
   รอดำเนินการ: "orange",
-  กำลังดำเนินการ: "blue",
   เสร็จสิ้น: "green",
   ถูกปฏิเสธ: "red",
-  อนุมัติแล้ว: "green",
+  อนุมัติแล้ว: "blue",
   pending: "orange",
   completed: "green",
   rejected: "red",
-  approved: "green",
+  approved: "blue",
 };
 
 const IssueCard = ({
@@ -229,7 +228,11 @@ const IssueCard = ({
         }`}>
         {/* ข้อมูลผู้แจ้ง */}
         <div className="flex flex-wrap items-center mb-4 gap-2">
-          <Avatar src={profileImage} size="large" className="mr-2" />
+          <Avatar
+            src={profileImage}
+            size={window.innerWidth < 768 ? "default" : "large"}
+            className="mr-2"
+          />
           <div className="min-w-0 flex-grow">
             <Text
               strong
@@ -255,8 +258,12 @@ const IssueCard = ({
         {/* คำอธิบาย */}
         <div className="mb-4">
           <Paragraph
-            ellipsis={{ rows: 3, expandable: true, symbol: "อ่านเพิ่มเติม" }}
-            className="whitespace-pre-line">
+            ellipsis={{
+              rows: window.innerWidth < 768 ? 2 : 3,
+              expandable: true,
+              symbol: "อ่านเพิ่มเติม",
+            }}
+            className="whitespace-pre-line text-sm">
             {description}
           </Paragraph>
         </div>
@@ -275,7 +282,7 @@ const IssueCard = ({
                 disabled
                 value={displayRating}
                 allowHalf
-                style={{ fontSize: "14px" }}
+                style={{ fontSize: window.innerWidth < 768 ? "12px" : "14px" }}
               />
               <span className="ml-1 text-xs text-gray-500">
                 ({displayRating})
@@ -293,7 +300,7 @@ const IssueCard = ({
               }`}
               placement="bottom">
               <div className="flex items-center">
-                <Text className="text-xs text-gray-500 mr-1">
+                <Text className="text-xs text-gray-500 mr-1 hidden xs:inline">
                   ผู้รับผิดชอบ:
                 </Text>
                 <Avatar
@@ -338,17 +345,20 @@ const IssueCard = ({
                 <FileWordOutlined style={{ color: "#2b579a" }} />
               )}
               {fileType === "other" && <FileOutlined />}
-              <span className="ml-2 truncate max-w-[180px]">{fileName}</span>
+              <span className="ml-2 truncate max-w-[140px] sm:max-w-[180px]">
+                {fileName}
+              </span>
             </a>
           </div>
         )}
       </Card>
 
-      {/* Modal สำหรับให้คะแนนดาว */}
+      {/* Modal สำหรับให้คะแนนดาว - ปรับขนาดตามหน้าจอ */}
       <Modal
         title="ให้คะแนนการแก้ไขปัญหา"
         open={ratingModalVisible}
         onCancel={() => setRatingModalVisible(false)}
+        width={window.innerWidth < 768 ? "90%" : 400}
         footer={[
           <Button key="cancel" onClick={() => setRatingModalVisible(false)}>
             ยกเลิก
@@ -376,7 +386,7 @@ const IssueCard = ({
               allowHalf
               value={rating}
               onChange={setRating}
-              style={{ fontSize: 36 }}
+              style={{ fontSize: window.innerWidth < 768 ? 28 : 36 }}
             />
           </div>
           <p className="mt-4 text-center text-sm text-gray-500">

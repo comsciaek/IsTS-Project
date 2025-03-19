@@ -15,7 +15,7 @@ import {
   Tooltip,
   Empty,
   Image,
-  Divider, // เพิ่มการนำเข้า Image component
+  Divider,
 } from "antd";
 import {
   EllipsisOutlined,
@@ -30,9 +30,9 @@ import TableSkeleton from "../skeletons/TableSkeleton";
 import axios from "axios";
 import dayjs from "dayjs";
 import { useUser } from "../../context/UserContext";
+import { useSocket } from "../../context/SocketContext"; // Add missing import
 
 const { Content } = Layout;
-
 const { Search } = Input;
 
 // API Base URL
@@ -44,6 +44,7 @@ const ContentTable = () => {
   } = theme.useToken();
 
   const { user } = useUser();
+  const { socket } = useSocket(); // Add missing socket access
 
   const [dataSource, setDataSource] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
@@ -176,11 +177,11 @@ const ContentTable = () => {
   const getStatusColor = (status) => {
     const statusColors = {
       pending: "orange",
-      approved: "green",
+      approved: "blue",
       rejected: "red",
       completed: "green",
       รอดำเนินการ: "orange",
-      อนุมัติแล้ว: "green",
+      อนุมัติแล้ว: "blue",
       ถูกปฏิเสธ: "red",
       เสร็จสิ้น: "green",
     };
@@ -191,7 +192,7 @@ const ContentTable = () => {
   const handleStatusChange = async (record, newStatus) => {
     try {
       const token = localStorage.getItem("token");
-      const issueId = record.id;
+      const issueId = record.id || record.issueId;
 
       // ส่งคำขอ API เพื่ออัพเดตสถานะ
       await axios.put(
@@ -216,6 +217,15 @@ const ContentTable = () => {
         message.success(
           `รายการถูกปรับสถานะเป็น ${statusText} และถูกย้ายไปยังรายงาน`
         );
+
+        // ใช้ updateReportStatus function แทนการใช้ socket.emit โดยตรง
+        if (socket) {
+          socket.emit("reportStatusUpdate", {
+            issueId: record.id || record.issueId,
+            status: newStatus,
+            topic: record.issue || record.topic || "คำร้อง",
+          });
+        }
       } else {
         // อัพเดตข้อมูลในตารางตามปกติ
         const newData = dataSource.map((item) => {
@@ -236,6 +246,15 @@ const ContentTable = () => {
         );
 
         message.success(`อัพเดตสถานะเป็น ${getStatusText(newStatus)} สำเร็จ`);
+
+        // ใช้ updateReportStatus function
+        if (socket) {
+          socket.emit("reportStatusUpdate", {
+            issueId: record.id || record.issueId,
+            status: newStatus,
+            topic: record.issue || record.topic || "คำร้อง",
+          });
+        }
       }
     } catch (error) {
       console.error("Error updating status:", error);

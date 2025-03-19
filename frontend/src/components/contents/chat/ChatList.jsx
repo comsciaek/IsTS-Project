@@ -55,7 +55,7 @@ const ChatList = ({ onSelectChat, selectedChat }) => {
           }
         );
 
-        console.log("Assigned issues response:", response.data);
+        // console.log("Assigned issues response:", response.data);
 
         // แปลงข้อมูลจาก API เป็นรูปแบบ contacts
         let assignedIssues = [];
@@ -83,10 +83,10 @@ const ChatList = ({ onSelectChat, selectedChat }) => {
               }
             );
 
-            console.log(
-              `Chat response for issue ${issueId}:`,
-              chatResponse.data
-            );
+            // console.log(
+            //   `Chat response for issue ${issueId}:`,
+            //   chatResponse.data
+            // );
 
             return {
               issueId,

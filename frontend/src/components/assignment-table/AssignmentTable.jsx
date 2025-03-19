@@ -29,6 +29,8 @@ import PropTypes from "prop-types"; // เพิ่มการนำเข้�
 import AssignAdminModal from "./AssignAdminModal";
 import ReportDetailModal from "./ReportDetailModal";
 import TableSkeleton from "../skeletons/TableSkeleton";
+import { useSocket } from "../../context/SocketContext";
+// import { useUser } from "../../context/UserContext"; // Add missing import
 
 const { Content } = Layout;
 const { Search } = Input;
@@ -55,6 +57,8 @@ const AssignmentTable = () => {
   const [loadingAdmins, setLoadingAdmins] = useState(false);
 
   const tableRef = useRef(null);
+  const { socket } = useSocket();
+  // const { user } = useUser(); // Add user context
 
   // ฟังก์ชันแปลงข้อมูลจาก API ไปเป็นรูปแบบที่เหมาะสมสำหรับตาราง
   // ฟังก์ชันแปลงข้อมูลจาก API ไปเป็นรูปแบบที่เหมาะสมสำหรับตาราง
@@ -106,7 +110,7 @@ const AssignmentTable = () => {
         },
       });
 
-      console.log("Fetched all reports:", response.data);
+      // console.log("Fetched all reports:", response.data);
 
       // ตรวจสอบรูปแบบการตอบกลับ
       let reportsData = [];
@@ -173,7 +177,7 @@ const AssignmentTable = () => {
         );
 
         setAdmins(filteredAdmins);
-        console.log("Filtered admins:", filteredAdmins);
+        // console.log("Filtered admins:", filteredAdmins);
       } else {
         console.warn(
           "Unexpected API response format for admins:",
@@ -246,6 +250,15 @@ const AssignmentTable = () => {
         message.success(
           `รายการถูกปรับสถานะเป็น ${statusText} และย้ายไปยังรายงาน`
         );
+
+        // ส่ง socket event เพื่อแจ้งเตือนผู้ใช้
+        if (socket) {
+          socket.emit("reportStatusUpdate", {
+            issueId: issueId,
+            status: newStatus,
+            topic: record.topic || "คำร้อง",
+          });
+        }
       } else {
         // อัพเดตข้อมูลในตารางตามปกติ
         const newData = dataSource.map((item) => {
@@ -266,6 +279,15 @@ const AssignmentTable = () => {
         );
 
         message.success(`อัพเดตสถานะเป็น ${getStatusText(newStatus)} สำเร็จ`);
+
+        // ส่ง socket event เพื่อแจ้งเตือนผู้ใช้
+        if (socket) {
+          socket.emit("reportStatusUpdate", {
+            issueId: issueId,
+            status: newStatus,
+            topic: record.topic || "คำร้อง",
+          });
+        }
       }
     } catch (error) {
       console.error("Error updating status:", error);
@@ -313,11 +335,11 @@ const AssignmentTable = () => {
   const getStatusColor = (status) => {
     const statusColors = {
       pending: "orange",
-      approved: "green", // แก้ไขจาก completed เป็น approved
+      approved: "blue", // แก้ไขจาก completed เป็น approved
       rejected: "red",
       completed: "green",
       รอดำเนินการ: "orange",
-      อนุมัติแล้ว: "green", // แก้ไขจาก เสร็จสิ้น เป็น อนุมัติแล้ว
+      อนุมัติแล้ว: "blue", // แก้ไขจาก เสร็จสิ้น เป็น อนุมัติแล้ว
       ถูกปฏิเสธ: "red",
       เสร็จสิ้น: "green",
     };
