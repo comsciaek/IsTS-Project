@@ -32,22 +32,45 @@ const initializeSocket = (server) => {
     }
   });
 
-  // Socket.IO connection handling
   io.on('connection', (socket) => {
     console.log('A user connected:', socket.id, 'User ID:', socket.userId);
-
+  
     // ผู้ใช้เข้าร่วมห้องตาม userId
     socket.join(socket.userId);
-
+  
     // รับข้อมูลผู้ใช้เมื่อเชื่อมต่อ
-    socket.on('userConnected', ({ userId, role }) => {
+    socket.on('userConnected', async ({ userId, role }) => {
       console.log(`User ${userId} (Role: ${role}) connected and joined room: ${userId}`);
       socket.userId = userId;
       socket.role = role;
       socket.join(userId);
+  
+      // ดึงการแจ้งเตือนที่ยังไม่ได้อ่าน
+      try {
+        const notifications = await Notification.find({
+          userId: userId,
+          isRead: false,
+        }).sort({ createdAt: -1 });
+  
+        if (notifications.length > 0) {
+          const notificationsResponse = notifications.map(notification => ({
+            id: notification._id,
+            userId: notification.userId,
+            issueId: notification.issueId,
+            message: notification.message,
+            oldStatus: notification.oldStatus,
+            newStatus: notification.newStatus,
+            isRead: notification.isRead,
+            createdAt: notification.createdAt,
+          }));
+          socket.emit('unreadNotifications', notificationsResponse);
+        }
+      } catch (error) {
+        console.error('Error fetching unread notifications:', error);
+        socket.emit('error', { message: 'Error fetching unread notifications', error: error.message });
+      }
     });
 
-    // เข้าร่วมห้องแชท (ตรวจสอบสิทธิ์)
     socket.on('joinUserRoom', async (roomId) => {
       try {
         const report = await Report.findById(roomId);
@@ -62,16 +85,42 @@ const initializeSocket = (server) => {
           socket.emit('error', { message: 'Unauthorized to join this room' });
           return;
         }
-
+    
         socket.join(roomId);
         console.log(`User ${socket.userId} joined room: ${roomId}`);
-
+    
         // ส่งประวัติแชทล่าสุด (เช่น 50 ข้อความ)
         const chatHistory = await Chat.find({ issueId: roomId })
-          .populate('senderId', 'firstName lastName')
+          .populate('senderId', 'firstName lastName role profileImage')
           .sort({ createdAt: -1 })
           .limit(50);
-        socket.emit('chatHistory', chatHistory.reverse()); // ส่งจากเก่าไปใหม่
+    
+        // นับข้อความที่ยังไม่ได้อ่าน
+        const unreadChats = await Chat.find({
+          issueId: roomId,
+          readBy: { $ne: socket.userId },
+        });
+    
+        const chatHistoryResponse = chatHistory.reverse().map(chat => ({
+          id: chat._id,
+          issueId: chat.issueId,
+          senderId: {
+            id: chat.senderId._id,
+            firstName: chat.senderId.firstName,
+            lastName: chat.senderId.lastName,
+            role: chat.senderId.role,
+            profileImage: chat.senderId.profileImage,
+          },
+          message: chat.message,
+          file: chat.file,
+          createdAt: chat.createdAt,
+          readBy: chat.readBy,
+        }));
+    
+        socket.emit('chatHistory', {
+          history: chatHistoryResponse,
+          unreadCount: unreadChats.length,
+        });
       } catch (error) {
         console.error('Error joining room:', error);
         socket.emit('error', { message: 'Error joining room', error: error.message });

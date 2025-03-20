@@ -10,6 +10,7 @@ import http from 'http';
 import fs from 'fs';
 import path from 'path';
 import initializeSocket from './socket/socket.js';
+import notificationRoutes from './routes/notification.js';
 
 dotenv.config();
 
@@ -35,6 +36,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // API สำหรับทดสอบ
 app.get('/api-test', (req, res) => {
