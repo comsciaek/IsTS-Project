@@ -1,18 +1,16 @@
-// filepath: c:\DEV TEST YOK\Project\IsTS-Project\backend\socket.js
 import { Server } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import mongoose from 'mongoose';
-import Report from '../model/Report.js'; // Corrected import path
-import Chat from '../model/Chat.js'; // Corrected import path
-import Notification from '../model/Notification.js'; // Corrected import path
-
-
+import Report from '../model/Report.js';
+import Chat from '../model/Chat.js';
+import Notification from '../model/Notification.js';
 
 const initializeSocket = (server) => {
   const io = new Server(server, {
     cors: {
-      origin: ['http://localhost:5000', 'http://localhost:5173'],
-      methods: ['GET', 'POST', 'PUT'],
+      origin: ['http://172.18.43.39:5000', 'http://localhost:5173', 'http://127.0.0.1:5500'],
+      methods: ['GET', 'POST', 'PUT', 'DELETE'],
+      credentials: true,
     },
   });
 
@@ -26,83 +24,106 @@ const initializeSocket = (server) => {
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       socket.user = decoded;
+      socket.userId = decoded.userId || decoded.id; // รองรับทั้ง userId และ id
       next();
     } catch (error) {
-      return next(new Error('Authentication error: Invalid token'));
+      console.error('JWT Verification Error:', error.message);
+      return next(new Error(`Authentication error: Invalid token (${error.message})`));
     }
   });
 
   // Socket.IO connection handling
   io.on('connection', (socket) => {
-    console.log('A user connected:', socket.id, 'User ID:', socket.user.id);
-  
-    // เข้าร่วมห้องของ userId อัตโนมัติ (จาก token)
-    socket.join(socket.user.id);
-  
-    socket.on('joinUserRoom', (roomId) => {
-      socket.join(roomId);
-      console.log(`User ${socket.user.id} joined room: ${roomId}`);
+    console.log('A user connected:', socket.id, 'User ID:', socket.userId);
+
+    // ผู้ใช้เข้าร่วมห้องตาม userId
+    socket.join(socket.userId);
+
+    // รับข้อมูลผู้ใช้เมื่อเชื่อมต่อ
+    socket.on('userConnected', ({ userId, role }) => {
+      console.log(`User ${userId} (Role: ${role}) connected and joined room: ${userId}`);
+      socket.userId = userId;
+      socket.role = role;
+      socket.join(userId);
     });
-  
-    socket.on('reportStatusUpdate', async ({ issueId, status }, callback) => {
+
+    // เข้าร่วมห้องแชท (ตรวจสอบสิทธิ์)
+    socket.on('joinUserRoom', async (roomId) => {
       try {
-        const report = await Report.findById(issueId);
-        if (!report) return callback({ error: 'Report not found' });
-  
-        const oldStatus = report.status;
-        report.status = status;
-        await report.save();
-  
-        const userId = report.userId; // ผู้สร้าง Report
-        const adminId = socket.user.id; // Admin ที่เปลี่ยนสถานะ
-  
-        // ส่งแจ้งเตือนไปยัง User ผู้สร้าง
-        io.to(userId).emit('reportStatusUpdate', {
-          issueId,
-          oldStatus,
-          newStatus: status,
-          message: `Report ${issueId} status updated to ${status} by Admin`,
-        });
-  
-        // ส่งแจ้งเตือนไปยัง Admin (ตัวเอง)
-        io.to(adminId).emit('reportStatusUpdate', {
-          issueId,
-          oldStatus,
-          newStatus: status,
-          message: `Report ${issueId} status updated to ${status} (by you)`,
-        });
-  
-        callback({ message: 'Report status updated successfully' });
+        const report = await Report.findById(roomId);
+        if (!report) {
+          socket.emit('error', { message: 'Room not found' });
+          return;
+        }
+        if (
+          report.userId?.toString() !== socket.userId &&
+          (!report.assignedAdmin || report.assignedAdmin?.toString() !== socket.userId)
+        ) {
+          socket.emit('error', { message: 'Unauthorized to join this room' });
+          return;
+        }
+
+        socket.join(roomId);
+        console.log(`User ${socket.userId} joined room: ${roomId}`);
+
+        // ส่งประวัติแชทล่าสุด (เช่น 50 ข้อความ)
+        const chatHistory = await Chat.find({ issueId: roomId })
+          .populate('senderId', 'firstName lastName')
+          .sort({ createdAt: -1 })
+          .limit(50);
+        socket.emit('chatHistory', chatHistory.reverse()); // ส่งจากเก่าไปใหม่
       } catch (error) {
-        callback({ error: error.message });
+        console.error('Error joining room:', error);
+        socket.emit('error', { message: 'Error joining room', error: error.message });
       }
     });
 
-  
+    // ออกจากห้องแชท
+    socket.on('leaveIssueChat', (issueId) => {
+      socket.leave(issueId);
+      console.log(`User ${socket.id} left issue chat: ${issueId}`);
+    });
 
-    socket.on('sendMessage', async ({ issueId, message, fileUrl }, callback) => {
+    // ส่งข้อความ
+    socket.on('sendMessage', async ({ issueId, message, fileUrl, receiverId }, callback) => {
+      const session = await mongoose.startSession(); // Start a new session
+      session.startTransaction(); // Begin a transaction
+    
       try {
-        const userId = socket.user.id;
-
-        const report = await Report.findById(issueId);
+        const userId = socket.userId;
+    
+        // Find the report within the transaction
+        const report = await Report.findById(issueId).session(session);
         if (
           !report ||
           (report.userId?.toString() !== userId && (!report.assignedAdmin || report.assignedAdmin?.toString() !== userId))
         ) {
-          socket.emit('error', { message: 'You are not authorized to send messages in this chat' });
-          if (typeof callback === 'function') callback({ error: 'Unauthorized' });
+          await session.abortTransaction(); // Abort the transaction
+          session.endSession(); // End the session
+          socket.emit('error', { message: 'Unauthorized' });
+          if (callback) callback({ error: 'Unauthorized' });
           return;
         }
-
-        const newMessage = await Chat.create({
-          issueId,
-          senderId: userId,
-          message: message || '',
-          file: fileUrl || '',
-        });
-
-        const populatedMessage = await Chat.findById(newMessage._id).populate('senderId', 'firstName lastName');
-        io.to(issueId).emit('newMessage', {
+    
+        // Create a new message within the transaction
+        const newMessage = await Chat.create(
+          [
+            {
+              issueId,
+              senderId: userId,
+              message: message || '',
+              file: fileUrl || '',
+            },
+          ],
+          { session }
+        );
+    
+        // Populate the message within the transaction
+        const populatedMessage = await Chat.findById(newMessage[0]._id)
+          .populate('senderId', 'firstName lastName')
+          .session(session);
+    
+        const chatData = {
           id: populatedMessage._id,
           issueId: populatedMessage.issueId,
           senderId: {
@@ -113,27 +134,65 @@ const initializeSocket = (server) => {
           message: populatedMessage.message,
           file: populatedMessage.file,
           createdAt: populatedMessage.createdAt,
+        };
+    
+        // ส่งข้อความไปยังห้อง issueId พร้อมข้อมูล fileMetadata
+        io.to(issueId).emit('messageReceived', {
+          ...chatData,
+          fileMetadata: {
+            name: fileUrl ? fileUrl.split('/').pop() : null,
+            type: fileUrl
+              ? fileUrl.endsWith('.pdf')
+                ? 'application/pdf'
+                : 'image/jpeg' // Adjust based on actual MIME type
+              : null,
+          },
         });
-
-        if (typeof callback === 'function') callback({ message: 'Message sent successfully' });
+    
+        // ถ้ามี receiverId (สำหรับแชท 1:1)
+        if (receiverId && receiverId !== userId) {
+          io.to(receiverId).emit('messageReceived', chatData);
+        }
+    
+        // สร้างการแจ้งเตือนสำหรับผู้รับที่ออฟไลน์
+        const receiverNotification = new Notification({
+          userId: report.userId?.toString() !== userId ? report.userId : report.assignedAdmin,
+          issueId,
+          message: `New message from ${populatedMessage.senderId.firstName} ${populatedMessage.senderId.lastName} in ${report.topic}`,
+          type: 'info',
+          isRead: false,
+          oldStatus: report.status, // Ensure oldStatus is included
+          newStatus: report.status, // Ensure newStatus is included
+          createdAt: new Date(),
+        });
+        await receiverNotification.save({ session });
+    
+        // ส่งการแจ้งเตือนไปยังผู้รับ
+        io.to(receiverNotification.userId).emit('newMessageNotification', {
+          id: receiverNotification._id,
+          issueId,
+          message: receiverNotification.message,
+          isRead: receiverNotification.isRead,
+          createdAt: receiverNotification.createdAt,
+        });
+    
+        await session.commitTransaction(); // Commit the transaction
+        session.endSession(); // End the session
+    
+        if (callback) callback({ message: 'Message sent successfully' });
       } catch (error) {
+        await session.abortTransaction(); // Abort the transaction in case of an error
+        session.endSession(); // End the session
+        console.error('Error sending message:', error);
         socket.emit('error', { message: 'Error sending message', error: error.message });
-        if (typeof callback === 'function') callback({ error: 'Error sending message', details: error.message });
+        if (callback) callback({ error: 'Error sending message', details: error.message });
       }
     });
 
-    socket.on('leaveIssueChat', (issueId) => {
-      socket.leave(issueId);
-      console.log(`User ${socket.id} left issue chat: ${issueId}`);
-    });
-
-    // socket.on('disconnect', () => {
-    //   console.log('User disconnected:', socket.id);
-    // });
-  
-
+    // อัปเดตสถานะคำร้อง (คงไว้เหมือนเดิม)
     socket.on('reportStatusUpdate', async ({ issueId, status }, callback) => {
       try {
+        console.log(`Updating status for issue ${issueId} to ${status}`); // Log status update
         if (!mongoose.Types.ObjectId.isValid(issueId)) {
           socket.emit('error', { message: 'Invalid issue ID' });
           if (typeof callback === 'function') callback({ error: 'Invalid issue ID' });
@@ -153,8 +212,7 @@ const initializeSocket = (server) => {
           return;
         }
 
-        // ตรวจสอบสิทธิ์ (เช่น เฉพาะ Admin หรือ SuperAdmin)
-        const userRole = socket.user.role;
+        const userRole = socket.user.role || socket.role;
         if (userRole !== 'Admin' && userRole !== 'SuperAdmin') {
           socket.emit('error', { message: 'Only Admin or SuperAdmin can update status' });
           if (typeof callback === 'function') callback({ error: 'Only Admin or SuperAdmin can update status' });
@@ -165,19 +223,37 @@ const initializeSocket = (server) => {
         report.status = status;
         await report.save();
 
-        const userId = report.userId?.toString();
-        const adminId = report.assignedAdmin?.toString() || socket.user.id;
+        console.log(`Old status: ${oldStatus}, New status: ${status}`); // Log old and new status
 
-        // บันทึกการแจ้งเตือนสำหรับผู้ใช้ที่เกี่ยวข้อง
+        const userId = report.userId?.toString();
+        const adminId = report.assignedAdmin?.toString() || socket.userId;
+
+        // สร้างข้อมูลสำหรับ event issue_status_changed
+        const topic = report.topic || `คำร้อง ${issueId}`;
+        const statusChangeData = {
+          issueId,
+          userId,
+          status,
+          topic,
+          oldStatus,
+        };
+
+        io.to(userId).emit('issue_status_changed', statusChangeData);
+        io.to(adminId).emit('issue_status_changed', {
+          ...statusChangeData,
+          message: `(by you)`,
+        });
+
         const notificationData = {
           issueId,
           oldStatus,
           newStatus: status,
-          message: `Report ${issueId} status updated to ${status} by Admin`,
+          message: `Report ${topic} status updated to ${status} by Admin`,
           createdAt: new Date(),
         };
 
-        // บันทึกการแจ้งเตือนสำหรับผู้สร้าง Report
+        console.log('Notification data:', notificationData); // Log notification data
+
         if (userId) {
           const userNotification = new Notification({
             userId,
@@ -185,40 +261,38 @@ const initializeSocket = (server) => {
             isRead: false,
           });
           await userNotification.save();
-
-          io.to(userId).emit('reportStatusUpdate', {
+          io.to(userId).emit('statusUpdate', {
             id: userNotification._id,
             issueId,
+            userId,
             oldStatus,
-            newStatus: status,
+            status,
             message: userNotification.message,
             isRead: userNotification.isRead,
             createdAt: userNotification.createdAt,
           });
         }
 
-        // บันทึกการแจ้งเตือนสำหรับ Admin
         if (adminId) {
           const adminNotification = new Notification({
             userId: adminId,
             ...notificationData,
-            message: `Report ${issueId} status updated to ${status} (by you)`,
+            message: `Report ${topic} status updated to ${status} (by you)`,
             isRead: false,
           });
           await adminNotification.save();
-
-          io.to(adminId).emit('reportStatusUpdate', {
+          io.to(adminId).emit('statusUpdate', {
             id: adminNotification._id,
             issueId,
+            userId: adminId,
             oldStatus,
-            newStatus: status,
+            status,
             message: adminNotification.message,
             isRead: adminNotification.isRead,
             createdAt: adminNotification.createdAt,
           });
         }
 
-        // ส่งการแจ้งเตือนไปยังทุกคนในห้องแชท
         io.to(issueId).emit('reportStatusUpdate', {
           issueId,
           oldStatus,
@@ -226,7 +300,7 @@ const initializeSocket = (server) => {
           message: `Report status updated to ${status}`,
         });
 
-        console.log(`Report status updated for issue ${issueId} to ${status} by User ${socket.user.id}`);
+        console.log(`Report status updated for issue ${issueId} to ${status} by User ${socket.userId}`);
         if (typeof callback === 'function') {
           callback({ message: 'Report status updated successfully' });
         }
@@ -239,9 +313,19 @@ const initializeSocket = (server) => {
       }
     });
 
-    socket.on('leaveIssueChat', (issueId) => {
-      socket.leave(issueId);
-      console.log(`User ${socket.id} left issue chat: ${issueId}`);
+    // Mark messages as read
+    socket.on('markMessageAsRead', async ({ issueId }) => {
+      try {
+        const userId = socket.userId;
+        await Chat.updateMany(
+          { issueId, readBy: { $ne: userId } }, // Find messages in the issue that haven't been read by the user
+          { $addToSet: { readBy: userId } } // Add the userId to the `readBy` array
+        );
+        io.to(issueId).emit('messageRead', { issueId, userId, message: 'Message marked as read' });
+      } catch (error) {
+        console.error('Error marking message as read:', error);
+        socket.emit('error', { message: 'Error marking message as read', error: error.message });
+      }
     });
 
     socket.on('disconnect', () => {
