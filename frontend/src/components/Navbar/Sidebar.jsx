@@ -173,7 +173,9 @@ const Sidebar = () => {
             zIndex: 1000,
           }}>
           <div className="flex mr-auto ml-5">
-            <NotiFications />
+            <div className="flex items-center justify-center p-2 rounded-full transition-all duration-300 hover:bg-blue-900 hover:bg-opacity-20 active:bg-opacity-30 transform hover:scale-105 cursor-pointer">
+              <NotiFications />
+            </div>
           </div>
           <div className="flex mr-5">
             <Dropdown menu={{ items: accountdropdown }}>

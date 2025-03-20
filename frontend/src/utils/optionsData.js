@@ -3,7 +3,6 @@ export const departmentOptions = [
   // ฝ่ายบัญชีและการเงิน
   { label: "บัญชี", value: "Accounting" },
   { label: "การเงิน", value: "Finance" },
-  { label: "ลูกหนี้", value: "Account Receivable" },
   { label: "จัดเก็บเงิน", value: "Book Keeping" },
 
   // ฝ่ายจัดซื้อและสารสนเทศ
