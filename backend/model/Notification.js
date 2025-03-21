@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+import mongoose from 'mongoose';
 
 const notificationSchema = new mongoose.Schema({
   userId: {
@@ -9,23 +9,25 @@ const notificationSchema = new mongoose.Schema({
   issueId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Report',
-    required: true,
   },
   message: {
     type: String,
     required: true,
   },
-  oldStatus: {
+  type: {
     type: String,
-    required: true,
-  },
-  newStatus: {
-    type: String,
-    required: true,
+    enum: ['info', 'warning', 'error'],
+    default: 'info',
   },
   isRead: {
     type: Boolean,
     default: false,
+  },
+  oldStatus: {
+    type: String,
+  },
+  newStatus: {
+    type: String,
   },
   createdAt: {
     type: Date,
@@ -33,5 +35,4 @@ const notificationSchema = new mongoose.Schema({
   },
 });
 
-const Notification = mongoose.model("Notification", notificationSchema);
-export default Notification;
+export default mongoose.model('Notification', notificationSchema);

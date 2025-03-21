@@ -241,43 +241,40 @@ const initializeSocket = (server) => {
     // อัปเดตสถานะคำร้อง (คงไว้เหมือนเดิม)
     socket.on('reportStatusUpdate', async ({ issueId, status }, callback) => {
       try {
-        console.log(`Updating status for issue ${issueId} to ${status}`); // Log status update
+        console.log(`Updating status for issue ${issueId} to ${status}`);
         if (!mongoose.Types.ObjectId.isValid(issueId)) {
           socket.emit('error', { message: 'Invalid issue ID' });
           if (typeof callback === 'function') callback({ error: 'Invalid issue ID' });
           return;
         }
-
+    
         if (!['pending', 'approved', 'rejected', 'completed'].includes(status)) {
           socket.emit('error', { message: 'Invalid status value' });
           if (typeof callback === 'function') callback({ error: 'Invalid status value' });
           return;
         }
-
+    
         const report = await Report.findById(issueId);
         if (!report) {
           socket.emit('error', { message: 'Report not found' });
           if (typeof callback === 'function') callback({ error: 'Report not found' });
           return;
         }
-
+    
         const userRole = socket.user.role || socket.role;
         if (userRole !== 'Admin' && userRole !== 'SuperAdmin') {
           socket.emit('error', { message: 'Only Admin or SuperAdmin can update status' });
           if (typeof callback === 'function') callback({ error: 'Only Admin or SuperAdmin can update status' });
           return;
         }
-
+    
         const oldStatus = report.status;
         report.status = status;
         await report.save();
-
-        console.log(`Old status: ${oldStatus}, New status: ${status}`); // Log old and new status
-
+    
         const userId = report.userId?.toString();
         const adminId = report.assignedAdmin?.toString() || socket.userId;
-
-        // สร้างข้อมูลสำหรับ event issue_status_changed
+    
         const topic = report.topic || `คำร้อง ${issueId}`;
         const statusChangeData = {
           issueId,
@@ -286,13 +283,13 @@ const initializeSocket = (server) => {
           topic,
           oldStatus,
         };
-
-        io.to(userId).emit('issue_status_changed', statusChangeData);
-        io.to(adminId).emit('issue_status_changed', {
-          ...statusChangeData,
-          message: `(by you)`,
-        });
-
+    
+        // io.to(userId).emit('issue_status_changed', statusChangeData);
+        // io.to(adminId).emit('issue_status_changed', {
+        //   ...statusChangeData,
+        //   message: `(by you)`,
+        // });
+    
         const notificationData = {
           issueId,
           oldStatus,
@@ -300,9 +297,7 @@ const initializeSocket = (server) => {
           message: `Report ${topic} status updated to ${status} by Admin`,
           createdAt: new Date(),
         };
-
-        console.log('Notification data:', notificationData); // Log notification data
-
+    
         if (userId) {
           const userNotification = new Notification({
             userId,
@@ -321,7 +316,7 @@ const initializeSocket = (server) => {
             createdAt: userNotification.createdAt,
           });
         }
-
+    
         if (adminId) {
           const adminNotification = new Notification({
             userId: adminId,
@@ -341,15 +336,15 @@ const initializeSocket = (server) => {
             createdAt: adminNotification.createdAt,
           });
         }
-
+    
         io.to(issueId).emit('reportStatusUpdate', {
           issueId,
           oldStatus,
           newStatus: status,
           message: `Report status updated to ${status}`,
         });
-
-        console.log(`Report status updated for issue ${issueId} to ${status} by User ${socket.userId}`);
+    
+        // console.log(`Report status updated for issue ${issueId} to ${status} by User ${socket.userId}`);
         if (typeof callback === 'function') {
           callback({ message: 'Report status updated successfully' });
         }
