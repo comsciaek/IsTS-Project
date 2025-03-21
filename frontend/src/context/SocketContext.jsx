@@ -9,12 +9,14 @@ import { io } from "socket.io-client";
 import PropTypes from "prop-types";
 import { useUser } from "./UserContext";
 import { message } from "antd";
+import axios from "axios"; // เพิ่มการนำเข้า axios สำหรับการเรียกใช้ API
 
 // สร้าง context
 export const SocketContext = createContext();
 
-// URL ของ Socket.io server
+// URL ของ Socket.io server และ API
 const SOCKET_URL = "http://172.18.43.39:5000";
+const API_BASE_URL = "http://172.18.43.39:5000/api";
 
 export const SocketProvider = ({ children }) => {
   const [socket, setSocket] = useState(null);
@@ -114,6 +116,105 @@ export const SocketProvider = ({ children }) => {
     [user]
   );
 
+  // เพิ่มฟังก์ชันเพื่อดึงการแจ้งเตือนจาก server
+  const fetchNotifications = useCallback(async () => {
+    if (!user || (!user.id && !user._id)) return;
+
+    try {
+      const token = localStorage.getItem("token");
+      const userId = user.id || user._id;
+
+      const response = await axios.get(
+        `${API_BASE_URL}/notifications/${userId}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      // console.log("Fetched notifications from server:", response.data);
+
+      if (response.data && Array.isArray(response.data.data)) {
+        const serverNotifications = response.data.data.map((notification) => ({
+          id: notification._id || notification.id,
+          issueId: notification.issueId,
+          userId: notification.userId,
+          message: notification.message,
+          type: notification.type || "info",
+          oldStatus: notification.oldStatus,
+          newStatus: notification.newStatus,
+          topic: notification.topic,
+          createdAt: notification.createdAt || new Date().toISOString(),
+          read: notification.isRead || false,
+        }));
+
+        // เพิ่มลงในรายการแจ้งเตือน (เฉพาะรายการที่ยังไม่มี)
+        setNotifications((prev) => {
+          // กรองรายการเดิมออกโดยเทียบจาก id
+          const existingIds = prev.map((item) => item.id);
+          const newNotifications = serverNotifications.filter(
+            (item) => !existingIds.includes(item.id)
+          );
+
+          return [...newNotifications, ...prev];
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching notifications:", error);
+    }
+  }, [user]);
+
+  // เพิ่มฟังก์ชันเพื่อบันทึกการแจ้งเตือนไปยัง server
+  const saveNotificationToServer = useCallback(
+    async (notification) => {
+      if (!user || (!user.id && !user._id)) return;
+
+      try {
+        // จัดเตรียมข้อมูลตามรูปแบบที่ API ต้องการ
+        const notificationData = {
+          userId: notification.userId || user.id || user._id,
+          issueId: notification.issueId,
+          message: notification.message,
+          type: notification.type || "info",
+          isRead: notification.read || false,
+          oldStatus: notification.oldStatus,
+          newStatus: notification.newStatus || notification.status,
+          createdAt: notification.createdAt || new Date(),
+        };
+
+        // ข้อมูลถูกเตรียมไว้แล้วแต่ไม่มีการส่ง API request
+        // console.log("Notification prepared for server:", notificationData);
+
+        // การบันทึกการแจ้งเตือนจะถูกดำเนินการโดย backend แทน
+        // เมื่อมีการส่ง socket events ที่เกี่ยวข้อง
+
+        return notificationData;
+      } catch (error) {
+        console.error("Error preparing notification:", error);
+        return null;
+      }
+    },
+    [user]
+  );
+
+  // เพิ่มฟังก์ชันเพื่ออัปเดตสถานะการอ่านของการแจ้งเตือน
+  const markNotificationAsReadOnServer = useCallback(async (notificationId) => {
+    try {
+      const token = localStorage.getItem("token");
+
+      const response = await axios.put(
+        `${API_BASE_URL}/notifications/read/${notificationId}`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      console.log("Notification marked as read on server:", response.data);
+      return true;
+    } catch (error) {
+      console.error("Error marking notification as read:", error);
+      return false;
+    }
+  }, []);
+
   useEffect(() => {
     // เชื่อมต่อ socket เมื่อมี user
     if (user && (user.id || user._id)) {
@@ -136,7 +237,7 @@ export const SocketProvider = ({ children }) => {
 
       // ดักจับเหตุการณ์การเชื่อมต่อ
       socketInstance.on("connect", () => {
-        console.log("Socket.io connected with ID:", socketInstance.id);
+        // console.log("Socket.io connected with ID:", socketInstance.id);
         setIsConnected(true);
 
         // แจ้ง server เกี่ยวกับข้อมูลผู้ใช้ตามรูปแบบของ backend
@@ -144,6 +245,9 @@ export const SocketProvider = ({ children }) => {
           userId: user.id || user._id,
           role: user.role,
         });
+
+        // ดึงการแจ้งเตือนที่เกิดขึ้นขณะออฟไลน์
+        fetchNotifications();
       });
 
       socketInstance.on("connect_error", (error) => {
@@ -158,7 +262,7 @@ export const SocketProvider = ({ children }) => {
 
       // รับการแจ้งเตือนแบบเดิม - statusUpdate
       socketInstance.on("statusUpdate", (data) => {
-        console.log("Status update notification received:", data);
+        // console.log("Status update notification received:", data);
 
         // แปลงรูปแบบข้อมูลให้ตรงกับโครงสร้างที่ต้องการแสดงผล
         const notification = {
@@ -177,6 +281,9 @@ export const SocketProvider = ({ children }) => {
 
         setNotifications((prev) => [notification, ...prev]);
         displayNotificationMessage(notification);
+
+        // บันทึกการแจ้งเตือนลงในฐานข้อมูล
+        saveNotificationToServer(notification);
       });
 
       // รับการแจ้งเตือนจากการเปลี่ยนสถานะคำร้อง - issue_status_changed
@@ -191,7 +298,7 @@ export const SocketProvider = ({ children }) => {
           message:
             data.message ||
             getStatusChangeMessage(
-              data.oldStatus || "pending",
+              data.oldStatus || "รอดำเนินการ",
               data.status,
               data.topic || "คำร้อง"
             ),
@@ -205,6 +312,9 @@ export const SocketProvider = ({ children }) => {
 
         setNotifications((prev) => [notification, ...prev]);
         displayNotificationMessage(notification);
+
+        // บันทึกการแจ้งเตือนลงในฐานข้อมูล
+        saveNotificationToServer(notification);
       });
 
       // รับการแจ้งเตือนจาก reportStatusUpdate (สำหรับผู้ที่อยู่ในห้องแชท)
@@ -257,6 +367,51 @@ export const SocketProvider = ({ children }) => {
 
         setNotifications((prev) => [notification, ...prev]);
         displayNotificationMessage(notification);
+
+        // บันทึกการแจ้งเตือนข้อความใหม่ลงในฐานข้อมูล
+        saveNotificationToServer(notification);
+      });
+
+      // รับการแจ้งเตือนที่ถูกบันทึกไว้ขณะผู้ใช้ออฟไลน์
+      socketInstance.on("storedNotifications", (notifications) => {
+        if (
+          notifications &&
+          Array.isArray(notifications) &&
+          notifications.length > 0
+        ) {
+          console.log("Received stored notifications:", notifications);
+
+          const formattedNotifications = notifications.map((notif) => ({
+            id: notif._id || notif.id,
+            issueId: notif.issueId,
+            userId: notif.userId,
+            message: notif.message,
+            type: notif.type || "info",
+            oldStatus: notif.oldStatus,
+            newStatus: notif.newStatus,
+            topic: notif.topic,
+            createdAt: notif.createdAt || new Date().toISOString(),
+            read: notif.isRead || false,
+          }));
+
+          // เพิ่มเข้าในรายการการแจ้งเตือน
+          setNotifications((prev) => {
+            // เพิ่มเฉพาะรายการที่ไม่ซ้ำ
+            const existingIds = prev.map((item) => item.id);
+            const newNotifications = formattedNotifications.filter(
+              (item) => !existingIds.includes(item.id)
+            );
+
+            return [...newNotifications, ...prev];
+          });
+
+          // แสดงการแจ้งเตือนรวมถ้ามีหลายรายการ
+          if (formattedNotifications.length > 0) {
+            message.info(
+              `คุณมี ${formattedNotifications.length} การแจ้งเตือนใหม่`
+            );
+          }
+        }
       });
 
       // เพิ่มการจัดการ error จาก server
@@ -276,7 +431,12 @@ export const SocketProvider = ({ children }) => {
         setIsConnected(false);
       };
     }
-  }, [user, displayNotificationMessage]);
+  }, [
+    user,
+    displayNotificationMessage,
+    fetchNotifications,
+    saveNotificationToServer,
+  ]);
 
   // ฟังก์ชันสำหรับอัปเดตสถานะคำร้องผ่าน socket
   const updateReportStatus = useCallback(
@@ -308,19 +468,70 @@ export const SocketProvider = ({ children }) => {
     [socket]
   );
 
-  // ฟังก์ชันสำหรับลบการแจ้งเตือน
-  const removeNotification = (notificationId) => {
-    setNotifications((prev) =>
-      prev.filter((notification) => notification.id !== notificationId)
-    );
-  };
+  // ปรับปรุงฟังก์ชันลบการแจ้งเตือน
+  const removeNotification = useCallback(async (notificationId) => {
+    try {
+      // อัปเดตสถานะใน UI ก่อน
+      setNotifications((prev) =>
+        prev.filter((notification) => notification.id !== notificationId)
+      );
 
-  // ฟังก์ชันสำหรับอ่านการแจ้งเตือนทั้งหมด
-  const markAllAsRead = () => {
-    setNotifications((prev) =>
-      prev.map((notification) => ({ ...notification, read: true }))
-    );
-  };
+      // ลบการแจ้งเตือนจากเซิร์ฟเวอร์
+      const token = localStorage.getItem("token");
+      await axios.delete(
+        `${API_BASE_URL}/notifications/delete/${notificationId}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      // console.log("Notification deleted from server");
+    } catch (error) {
+      console.error("Error deleting notification from server:", error);
+    }
+  }, []);
+
+  // ปรับปรุงฟังก์ชันสำหรับอ่านการแจ้งเตือนทั้งหมด
+  const markAllAsRead = useCallback(async () => {
+    if (!user || (!user.id && !user._id)) return;
+
+    try {
+      // อัปเดตสถานะใน UI ก่อน
+      setNotifications((prev) =>
+        prev.map((notification) => ({ ...notification, read: true }))
+      );
+
+      // อัปเดตในฐานข้อมูล
+      const token = localStorage.getItem("token");
+      const userId = user.id || user._id;
+
+      await axios.put(
+        `${API_BASE_URL}/notifications/readAll/${userId}`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      // console.log("All notifications marked as read on server");
+    } catch (error) {
+      console.error("Error marking all notifications as read:", error);
+    }
+  }, [user]);
+
+  // เพิ่มฟังก์ชันสำหรับทำเครื่องหมายว่าอ่านการแจ้งเตือนแล้ว
+  const markNotificationAsRead = useCallback(
+    (notificationId) => {
+      // อัปเดตใน state ก่อน
+      setNotifications((prev) =>
+        prev.map((notif) =>
+          notif.id === notificationId ? { ...notif, read: true } : notif
+        )
+      );
+
+      // อัปเดตในฐานข้อมูล
+      markNotificationAsReadOnServer(notificationId);
+    },
+    [markNotificationAsReadOnServer]
+  );
 
   // ฟังก์ชันสำหรับการเข้าร่วมห้องแชท
   const joinIssueChat = useCallback(
@@ -364,10 +575,12 @@ export const SocketProvider = ({ children }) => {
         notifications,
         removeNotification,
         markAllAsRead,
+        markNotificationAsRead,
         updateReportStatus,
         joinIssueChat,
         leaveIssueChat,
         sendMessage,
+        fetchNotifications, // เพิ่มฟังก์ชัน fetchNotifications เพื่อให้ component อื่นเรียกใช้ได้
       }}>
       {children}
     </SocketContext.Provider>

@@ -63,7 +63,7 @@ const ChatWindowUser = ({ chat, isMobile }) => {
           }
         );
 
-        console.log("User chat messages response:", response.data);
+        // console.log("User chat messages response:", response.data);
 
         // แปลงข้อมูลที่ได้จาก API เป็นรูปแบบที่ใช้งานได้
         let chatMessages = [];

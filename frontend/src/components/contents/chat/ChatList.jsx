@@ -290,7 +290,7 @@ const ChatList = ({ onSelectChat, selectedChat }) => {
         }
       );
 
-      console.log(`Marked messages as read for issue ${issueId}`);
+      // console.log(`Marked messages as read for issue ${issueId}`);
     } catch (error) {
       console.error(
         `Error marking messages as read for issue ${issueId}:`,

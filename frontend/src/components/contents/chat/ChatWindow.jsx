@@ -68,7 +68,7 @@ const ChatWindow = ({ chat, isMobile }) => {
           }
         );
 
-        console.log("Chat messages response:", response.data);
+        // console.log("Chat messages response:", response.data);
 
         // แปลงข้อมูลที่ได้จาก API เป็นรูปแบบที่ใช้งานได้
         let chatMessages = [];
