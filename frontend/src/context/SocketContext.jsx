@@ -319,7 +319,7 @@ export const SocketProvider = ({ children }) => {
 
       // รับการแจ้งเตือนจาก reportStatusUpdate (สำหรับผู้ที่อยู่ในห้องแชท)
       socketInstance.on("reportStatusUpdate", (data) => {
-        console.log("Report status update received:", data);
+        // console.log("Report status update received:", data);
 
         // รูปแบบคล้าย issue_status_changed แต่อาจใช้สำหรับปรับปรุง UI หน้าแชท
         if (data.oldStatus !== data.newStatus) {
@@ -567,6 +567,32 @@ export const SocketProvider = ({ children }) => {
     [socket]
   );
 
+  // เพิ่มฟังก์ชันสำหรับลบการแจ้งเตือนทั้งหมด
+  const clearAllNotifications = useCallback(async () => {
+    if (!user || (!user.id && !user._id)) return;
+
+    try {
+      // อัปเดตสถานะใน UI ก่อน
+      setNotifications([]);
+
+      // ลบการแจ้งเตือนทั้งหมดในฐานข้อมูล
+      const token = localStorage.getItem("token");
+      const userId = user.id || user._id;
+
+      // แก้ไข path เป็น /deleteAll/userId
+      await axios.delete(`${API_BASE_URL}/notifications/deleteAll/${userId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      message.success("ลบการแจ้งเตือนทั้งหมดแล้ว");
+    } catch (error) {
+      console.error("Error deleting all notifications:", error);
+      message.error("ไม่สามารถลบการแจ้งเตือนทั้งหมดได้");
+      // ถ้ามี error ให้ดึงข้อมูลการแจ้งเตือนใหม่เพื่อให้แน่ใจว่า UI แสดงข้อมูลที่ถูกต้อง
+      fetchNotifications();
+    }
+  }, [user, fetchNotifications]);
+
   return (
     <SocketContext.Provider
       value={{
@@ -580,7 +606,8 @@ export const SocketProvider = ({ children }) => {
         joinIssueChat,
         leaveIssueChat,
         sendMessage,
-        fetchNotifications, // เพิ่มฟังก์ชัน fetchNotifications เพื่อให้ component อื่นเรียกใช้ได้
+        fetchNotifications,
+        clearAllNotifications, // เพิ่มฟังก์ชันใหม่เข้าไปใน context
       }}>
       {children}
     </SocketContext.Provider>

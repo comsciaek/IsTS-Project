@@ -4,14 +4,30 @@ import {
   ExclamationCircleOutlined,
   InfoCircleOutlined,
   WarningOutlined,
+  DeleteOutlined,
 } from "@ant-design/icons";
-import { Badge, Dropdown, List, Avatar, Button, Empty, Tooltip } from "antd";
+import {
+  Badge,
+  Dropdown,
+  List,
+  Avatar,
+  Button,
+  Empty,
+  Tooltip,
+  Divider,
+  Popconfirm,
+} from "antd";
 import { useState, useEffect } from "react";
 import { useSocket } from "../context/SocketContext";
 import { useUser } from "../context/UserContext";
 
 const NotiFications = () => {
-  const { notifications, removeNotification, markAllAsRead } = useSocket();
+  const {
+    notifications,
+    removeNotification,
+    markAllAsRead,
+    clearAllNotifications,
+  } = useSocket();
   const { user } = useUser();
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -46,6 +62,11 @@ const NotiFications = () => {
     if (unreadCount > 0) {
       markAllAsRead();
     }
+  };
+
+  // เพิ่มฟังก์ชันสำหรับลบการแจ้งเตือนทั้งหมด
+  const handleDeleteAllNotifications = () => {
+    clearAllNotifications();
   };
 
   // ฟังก์ชันจัดรูปแบบเวลา
@@ -114,13 +135,31 @@ const NotiFications = () => {
         />
       )}
       {userNotifications && userNotifications.length > 0 && (
-        <div className="p-2 border-gray-400 border-t text-center">
-          <Button
-            type="text"
-            onClick={handleClearNotifications}
-            style={{ width: "100%", textAlign: "center" }}>
-            อ่านทั้งหมด
-          </Button>
+        <div className="p-2 border-gray-400 border-t">
+          <div className="flex justify-between">
+            <Button
+              type="text"
+              onClick={handleClearNotifications}
+              style={{ width: "48%" }}>
+              อ่านทั้งหมด
+            </Button>
+            <Divider type="vertical" style={{ height: "100%" }} />
+            <Popconfirm
+              title="ลบการแจ้งเตือนทั้งหมด"
+              description="คุณต้องการลบการแจ้งเตือนทั้งหมดหรือไม่?"
+              okText="ลบทั้งหมด"
+              cancelText="ยกเลิก"
+              onConfirm={handleDeleteAllNotifications}
+              okButtonProps={{ danger: true }}>
+              <Button
+                type="text"
+                danger
+                icon={<DeleteOutlined />}
+                style={{ width: "48%" }}>
+                ลบทั้งหมด
+              </Button>
+            </Popconfirm>
+          </div>
         </div>
       )}
     </div>
