@@ -243,26 +243,26 @@ export default (io) => {
     try {
       const issueId = req.params.issueId;
       const userId = req.user.id;
-
+  
       if (!mongoose.Types.ObjectId.isValid(issueId)) {
         return res.status(400).json({ message: 'Invalid issue ID' });
       }
-
+  
       const report = await Report.findById(issueId);
       if (!report) {
         return res.status(404).json({ message: 'Report not found' });
       }
-
+  
       if (report.userId.toString() !== userId && req.user.role !== 'SuperAdmin' && req.user.role !== 'Admin') {
         return res.status(403).json({ message: 'You are not authorized to edit this report' });
       }
-
+  
       const { topic, description, date, status, assignedAdmin } = req.body;
-
+  
       if (!topic && !description && !date && !status && !assignedAdmin && !req.file) {
         return res.status(400).json({ message: 'At least one field (topic, description, date, status, assignedAdmin, or file) is required' });
       }
-
+  
       let reportDate = report.date;
       if (date) {
         reportDate = new Date(date);
@@ -270,9 +270,9 @@ export default (io) => {
           return res.status(400).json({ message: 'Invalid date format' });
         }
       }
-
+  
       let reportStatus = report.status;
-      const oldStatus = report.status; // บันทึกสถานะเก่าเพื่อใช้ในการสร้าง Notification
+      const oldStatus = report.status;
       if (status) {
         if (req.user.role !== 'SuperAdmin' && req.user.role !== 'Admin') {
           return res.status(403).json({ message: 'Only SuperAdmin or Admin can update the status' });
@@ -282,8 +282,9 @@ export default (io) => {
         }
         reportStatus = status;
       }
-
+  
       let reportAssignedAdmin = report.assignedAdmin;
+      const oldAssignedAdmin = report.assignedAdmin?.toString();
       if (assignedAdmin) {
         if (req.user.role !== 'SuperAdmin' && req.user.role !== 'Admin') {
           return res.status(403).json({ message: 'Only SuperAdmin or Admin can assign an admin' });
@@ -297,19 +298,23 @@ export default (io) => {
         }
         reportAssignedAdmin = assignedAdmin;
       }
-
+  
       let fileUrl = report.file;
       if (req.file) {
         if (report.file) {
           const oldFileName = report.file.split('/').pop();
           const oldFilePath = path.join(reportsUploadDir, oldFileName);
-          if (fs.existsSync(oldFilePath)) {
-            fs.unlinkSync(oldFilePath);
+          try {
+            if (fs.existsSync(oldFilePath)) {
+              fs.unlinkSync(oldFilePath);
+            }
+          } catch (error) {
+            console.error('Error deleting old report file:', error.message);
           }
         }
         fileUrl = `http://172.18.43.39:5000/uploads/reports/${req.file.filename}`;
       }
-
+  
       const updatedReport = await Report.findByIdAndUpdate(
         issueId,
         {
@@ -321,14 +326,72 @@ export default (io) => {
           assignedAdmin: reportAssignedAdmin,
         },
         { new: true, runValidators: true }
-      ).populate('assignedAdmin', 'firstName lastName role profileImage');
-
-      // เพิ่มการสร้าง Notification ถ้า status เปลี่ยน
-      if (status && status !== oldStatus) {
-        const userId = updatedReport.userId?.toString();
-        const adminId = updatedReport.assignedAdmin?.toString() || req.user.id;
+      ).populate('userId assignedAdmin', 'firstName lastName role profileImage');
+  
+      const io = req.app.locals.io;
+  
+      // เพิ่มการแจ้งเตือนเมื่อ assignedAdmin เปลี่ยน
+      if (assignedAdmin && oldAssignedAdmin !== assignedAdmin) {
+        const userId = updatedReport.userId?._id?.toString();
+        const newAdminId = updatedReport.assignedAdmin?._id?.toString();
         const topic = updatedReport.topic || `คำร้อง ${issueId}`;
-
+  
+        if (userId && mongoose.Types.ObjectId.isValid(userId)) {
+          try {
+            const userNotification = new Notification({
+              userId: new mongoose.Types.ObjectId(userId),
+              issueId,
+              message: `Admin for report ${topic} has been changed`,
+              type: 'info',
+              isRead: false,
+              createdAt: new Date(),
+            });
+            await userNotification.save();
+            io.to(userId).emit('statusUpdate', {
+              id: userNotification._id,
+              issueId,
+              userId,
+              message: userNotification.message,
+              type: userNotification.type,
+              isRead: userNotification.isRead,
+              createdAt: userNotification.createdAt,
+            });
+          } catch (error) {
+            console.error('Error creating user notification for admin change:', error.message);
+          }
+        }
+  
+        if (newAdminId && mongoose.Types.ObjectId.isValid(newAdminId)) {
+          try {
+            const adminNotification = new Notification({
+              userId: new mongoose.Types.ObjectId(newAdminId),
+              issueId,
+              message: `You have been assigned to report ${topic}`,
+              type: 'info',
+              isRead: false,
+              createdAt: new Date(),
+            });
+            await adminNotification.save();
+            io.to(newAdminId).emit('statusUpdate', {
+              id: adminNotification._id,
+              issueId,
+              userId: newAdminId,
+              message: adminNotification.message,
+              type: adminNotification.type,
+              isRead: adminNotification.isRead,
+              createdAt: adminNotification.createdAt,
+            });
+          } catch (error) {
+            console.error('Error creating admin notification for admin change:', error.message);
+          }
+        }
+      }
+  
+      if (status && status !== oldStatus) {
+        const userId = updatedReport.userId?._id?.toString();
+        const adminId = updatedReport.assignedAdmin?._id?.toString() || req.user.id;
+        const topic = updatedReport.topic || `คำร้อง ${issueId}`;
+  
         const notificationData = {
           issueId,
           oldStatus,
@@ -336,12 +399,11 @@ export default (io) => {
           message: `Report ${topic} status updated to ${status} by Admin`,
           createdAt: new Date(),
         };
-
-        console.log('Creating notification for userId:', userId);
-        if (userId) {
+  
+        if (userId && mongoose.Types.ObjectId.isValid(userId)) {
           try {
             const userNotification = new Notification({
-              userId,
+              userId: new mongoose.Types.ObjectId(userId),
               ...notificationData,
               isRead: false,
             });
@@ -360,13 +422,14 @@ export default (io) => {
           } catch (error) {
             console.error('Error saving user notification:', error.message);
           }
+        } else {
+          console.warn('Invalid or missing userId for notification:', userId);
         }
-
-        console.log('Creating notification for adminId:', adminId);
-        if (adminId) {
+  
+        if (adminId && mongoose.Types.ObjectId.isValid(adminId)) {
           try {
             const adminNotification = new Notification({
-              userId: adminId,
+              userId: new mongoose.Types.ObjectId(adminId),
               ...notificationData,
               message: `Report ${topic} status updated to ${status} (by you)`,
               isRead: false,
@@ -386,8 +449,10 @@ export default (io) => {
           } catch (error) {
             console.error('Error saving admin notification:', error.message);
           }
+        } else {
+          console.warn('Invalid or missing adminId for notification:', adminId);
         }
-
+  
         if (userId) {
           io.to(userId).emit('reportStatusUpdate', {
             issueId,
@@ -405,63 +470,78 @@ export default (io) => {
           });
         }
       }
-
+  
       if (reportStatus === 'completed') {
-        const chats = await Chat.find({ issueId });
-        const deletedChats = await Chat.deleteMany({ issueId });
-        console.log(`Deleted ${deletedChats.deletedCount} chat messages for report ${issueId}`);
-
-        if (updatedReport.file) {
-          const reportFileName = updatedReport.file.split('/').pop();
-          const reportFilePath = path.join(reportsUploadDir, reportFileName);
-          if (fs.existsSync(reportFilePath)) {
-            fs.unlinkSync(reportFilePath);
-          }
-        }
-
-        for (const chat of chats) {
-          if (chat.file) {
-            const chatFileName = chat.file.split('/').pop();
-            const chatFilePath = path.join(chatUploadDir, chatFileName);
-            if (fs.existsSync(chatFilePath)) {
-              fs.unlinkSync(chatFilePath);
+        try {
+          const chats = await Chat.find({ issueId });
+          const deletedChats = await Chat.deleteMany({ issueId });
+          console.log(`Deleted ${deletedChats.deletedCount} chat messages for report ${issueId}`);
+  
+          if (updatedReport.file) {
+            const reportFileName = updatedReport.file.split('/').pop();
+            const reportFilePath = path.join(reportsUploadDir, reportFileName);
+            try {
+              if (fs.existsSync(reportFilePath)) {
+                fs.unlinkSync(reportFilePath);
+              }
+            } catch (error) {
+              console.error('Error deleting report file:', error.message);
             }
           }
+  
+          for (const chat of chats) {
+            if (chat.file) {
+              const chatFileName = chat.file.split('/').pop();
+              const chatFilePath = path.join(chatUploadDir, chatFileName);
+              try {
+                if (fs.existsSync(chatFilePath)) {
+                  fs.unlinkSync(chatFilePath);
+                }
+              } catch (error) {
+                console.error('Error deleting chat file:', error.message);
+              }
+            }
+          }
+  
+          io.to(issueId).emit('chatClosed', {
+            issueId,
+            message: 'This report chat has been closed and messages have been deleted.',
+          });
+        } catch (error) {
+          console.error('Error handling completed status:', error.message);
         }
-
-        io.to(issueId).emit('chatClosed', {
-          issueId,
-          message: 'This report chat has been closed and messages have been deleted.',
-        });
       }
-
+  
       const reportResponse = {
         issueId: updatedReport._id,
-        userId: updatedReport.userId,
+        userId: updatedReport.userId?._id,
         topic: updatedReport.topic,
         description: updatedReport.description,
         date: updatedReport.date,
         file: updatedReport.file,
         status: updatedReport.status,
-        assignedAdmin: updatedReport.assignedAdmin ? {
-          id: updatedReport.assignedAdmin._id,
-          firstName: updatedReport.assignedAdmin.firstName,
-          lastName: updatedReport.assignedAdmin.lastName,
-          role: updatedReport.assignedAdmin.role,
-          profileImage: updatedReport.assignedAdmin.profileImage,
-        } : null,
+        assignedAdmin: updatedReport.assignedAdmin
+          ? {
+              id: updatedReport.assignedAdmin._id,
+              firstName: updatedReport.assignedAdmin.firstName,
+              lastName: updatedReport.assignedAdmin.lastName,
+              role: updatedReport.assignedAdmin.role,
+              profileImage: updatedReport.assignedAdmin.profileImage,
+            }
+          : null,
         createdAt: updatedReport.createdAt,
       };
-
+  
       return res.status(200).json({
         message: 'Report updated successfully',
         data: reportResponse,
       });
     } catch (error) {
+      console.error('Error updating report:', error.message);
       return res.status(500).json({ message: 'Internal Server Error', error: error.message });
     }
   });
-
+  
   // Route สำหรับดึงประวัติแชท
   router.get('/chat/:issueId', protect, async (req, res) => {
     try {
