@@ -227,24 +227,7 @@ const ChatWindowUser = ({ chat, isMobile }) => {
   }, [messages]);
 
   // เพิ่ม debug log ในไฟล์ ChatWindow.jsx หรือ ChatWindowUser.jsx
-  useEffect(() => {
-    if (!socket) return;
-
-    // เพิ่ม log สำหรับ debug
-    const debugEventHandler =
-      (event) =>
-      (...args) => {
-        console.log(`🔍 Socket Event [${event}]:`, args[0]);
-        return args[0];
-      };
-
-    // ติดตาม events ทั้งหมด
-    socket.onAny(debugEventHandler("ANY"));
-
-    return () => {
-      socket.offAny(debugEventHandler("ANY"));
-    };
-  }, [socket]);
+  
 
   // ฟังก์ชันตรวจสอบประเภทของไฟล์
   const getFileIconByType = (fileUrl) => {
