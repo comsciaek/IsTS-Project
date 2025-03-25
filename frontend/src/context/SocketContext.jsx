@@ -22,6 +22,7 @@ export const SocketProvider = ({ children }) => {
   const [socket, setSocket] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
   const [notifications, setNotifications] = useState([]);
+  const [chatMessages, setChatMessages] = useState({}); // แยกตาม issueId
   const { user } = useUser();
 
   // แปลงสถานะเป็น notification type
@@ -420,6 +421,93 @@ export const SocketProvider = ({ children }) => {
         message.error(`Socket error: ${errorData.message}`);
       });
 
+      // รับข้อความแชทใหม่แบบ MessageReceived
+      socketInstance.on("messageReceived", (messageData) => {
+        console.log("Message received event in context:", messageData);
+
+        if (!messageData.issueId) return;
+
+        // แปลงข้อมูลให้เป็นรูปแบบที่คงที่
+        // แปลงข้อมูลรูปโปรไฟล์ - ตรวจสอบทุกแหล่งที่เป็นไปได้
+        let senderProfileImage = null;
+        if (typeof messageData.senderId === "object") {
+          senderProfileImage =
+            messageData.senderId.profileImage ||
+            messageData.senderId.profilePicture;
+        } else {
+          senderProfileImage =
+            messageData.senderProfileImage ||
+            messageData.profileImage ||
+            messageData.profilePicture;
+        }
+
+        const formattedMessage = {
+          id:
+            messageData.id ||
+            messageData._id ||
+            `msg_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+          text: messageData.message || messageData.text,
+          senderId:
+            typeof messageData.senderId === "object"
+              ? messageData.senderId.id || messageData.senderId._id
+              : messageData.senderId,
+          senderName:
+            typeof messageData.senderId === "object"
+              ? `${messageData.senderId.firstName || ""} ${
+                  messageData.senderId.lastName || ""
+                }`.trim()
+              : messageData.senderName || "ไม่ระบุชื่อ",
+          senderProfileImage: senderProfileImage,
+          createdAt: messageData.createdAt || new Date().toISOString(),
+          issueId: messageData.issueId,
+          fileUrl: messageData.fileUrl || messageData.file,
+          fileName:
+            messageData.fileName ||
+            (messageData.fileUrl && messageData.fileUrl.split("/").pop()),
+          fileType: messageData.fileType,
+          _timestamp: Date.now(), // เพิ่ม timestamp เพื่อช่วยในการระบุตัวตน
+        };
+
+        console.log("Formatted message in context:", formattedMessage);
+
+        // ตรวจสอบและป้องกันข้อความซ้ำในแต่ละห้องแชท
+        setChatMessages((prev) => {
+          const issueMessages = prev[messageData.issueId] || [];
+
+          // ตรวจสอบว่าข้อความซ้ำหรือไม่โดยใช้ ID จริง
+          const isDuplicateById = issueMessages.some(
+            (msg) => msg.id === formattedMessage.id
+          );
+
+          if (isDuplicateById) return prev;
+
+          // ตรวจสอบว่าเป็นการตอบกลับของ optimistic message หรือไม่
+          const optimisticIndex = issueMessages.findIndex(
+            (msg) =>
+              msg._isOptimistic &&
+              msg.text === formattedMessage.text &&
+              msg.fileUrl === formattedMessage.fileUrl
+          );
+
+          if (optimisticIndex !== -1) {
+            // แทนที่ optimistic message ด้วยข้อความจริง
+            const updatedMessages = [...issueMessages];
+            updatedMessages[optimisticIndex] = formattedMessage;
+
+            return {
+              ...prev,
+              [messageData.issueId]: updatedMessages,
+            };
+          }
+
+          // ถ้าไม่ซ้ำและไม่ใช่การตอบกลับของ optimistic message ให้เพิ่มใหม่
+          return {
+            ...prev,
+            [messageData.issueId]: [...issueMessages, formattedMessage],
+          };
+        });
+      });
+
       // เก็บ socket instance ใน state
       setSocket(socketInstance);
 
@@ -557,11 +645,17 @@ export const SocketProvider = ({ children }) => {
   const sendMessage = useCallback(
     (data, callback) => {
       if (socket && socket.connected) {
-        socket.emit("sendMessage", data, callback);
+        // Log ข้อมูลที่จะส่งไปเพื่อตรวจสอบ
+        console.log("Sending message through socket in context:", data);
+        socket.emit("sendMessage", data, (response) => {
+          console.log("Send message response in context:", response);
+          if (callback) callback(response);
+        });
       } else {
         message.warning(
           "ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้ โปรดรีเฟรชหน้าเว็บและลองใหม่อีกครั้ง"
         );
+        if (callback) callback({ error: "Socket not connected" });
       }
     },
     [socket]
@@ -593,12 +687,150 @@ export const SocketProvider = ({ children }) => {
     }
   }, [user, fetchNotifications]);
 
+  // เพิ่มฟังก์ชันสำหรับดึงข้อความแชทผ่าน socket
+  const fetchChatMessages = useCallback(
+    async (issueId, callback) => {
+      if (!socket || !socket.connected) {
+        // ถ้า socket ไม่ได้เชื่อมต่อให้ใช้ API แทน
+        try {
+          const token = localStorage.getItem("token");
+          const response = await axios.get(
+            `${API_BASE_URL}/reports/chat/${issueId}`,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+            }
+          );
+
+          // แปลงข้อมูลและส่งผ่าน callback
+          let chatMessages = [];
+          if (response.data?.data && Array.isArray(response.data.data)) {
+            chatMessages = response.data.data;
+          } else if (Array.isArray(response.data)) {
+            chatMessages = response.data;
+          }
+
+          if (callback && typeof callback === "function") {
+            callback({ success: true, data: chatMessages });
+          }
+          return chatMessages;
+        } catch (error) {
+          console.error("Error fetching chat messages via API:", error);
+          if (callback && typeof callback === "function") {
+            callback({
+              success: false,
+              error:
+                error.response?.data?.message || "ไม่สามารถดึงข้อความแชทได้",
+            });
+          }
+          throw error;
+        }
+      } else {
+        // ใช้ socket เพื่อดึงข้อความแชทแบบ real-time
+        return new Promise((resolve, reject) => {
+          // สร้าง unique event name เพื่อป้องกันการ listen ซ้ำ
+          const responseEventName = `fetchMessagesResponse_${Date.now()}`;
+
+          // ติดตั้ง listener ชั่วคราวที่จะถูกเรียกเพียงครั้งเดียว
+          socket.once(responseEventName, (response) => {
+            if (response.error) {
+              console.error("Error fetching chat messages:", response.error);
+              if (callback && typeof callback === "function") {
+                callback({ success: false, error: response.error });
+              }
+              reject(response.error);
+            } else {
+              const messages = response.data || response;
+              if (callback && typeof callback === "function") {
+                callback({ success: true, data: messages });
+              }
+              resolve(messages);
+            }
+          });
+
+          // ส่ง event พร้อม response event name
+          socket.emit("fetchMessages", {
+            issueId,
+            responseEvent: responseEventName,
+          });
+
+          // ตั้ง timeout เพื่อความปลอดภัย
+          setTimeout(() => {
+            socket.off(responseEventName); // ลบ listener เพื่อป้องกันการรั่วไหล
+
+            // ถ้าไม่ได้รับการตอบกลับ ให้ใช้ API แทน
+            const token = localStorage.getItem("token");
+            axios
+              .get(`${API_BASE_URL}/reports/chat/${issueId}`, {
+                headers: { Authorization: `Bearer ${token}` },
+              })
+              .then((response) => {
+                let chatMessages = [];
+                if (response.data?.data && Array.isArray(response.data.data)) {
+                  chatMessages = response.data.data;
+                } else if (Array.isArray(response.data)) {
+                  chatMessages = response.data;
+                }
+
+                if (callback && typeof callback === "function") {
+                  callback({ success: true, data: chatMessages });
+                }
+                resolve(chatMessages);
+              })
+              .catch((error) => {
+                console.error("Fallback API call failed:", error);
+                if (callback && typeof callback === "function") {
+                  callback({
+                    success: false,
+                    error: "ไม่สามารถดึงข้อความแชทได้",
+                  });
+                }
+                reject(new Error("ไม่สามารถดึงข้อความแชทได้"));
+              });
+          }, 1000);
+        });
+      }
+    },
+    [socket]
+  );
+
+  // เพิ่มฟังก์ชันเพื่อดึงข้อความแชทจาก state
+  const getChatMessages = useCallback(
+    (issueId) => {
+      return chatMessages[issueId] || [];
+    },
+    [chatMessages]
+  );
+
+  // เพิ่มฟังก์ชันเพื่อเคลียร์ข้อความแชทของห้องใดห้องหนึ่ง
+  const clearChatMessages = useCallback((issueId) => {
+    setChatMessages((prev) => {
+      const newMessages = { ...prev };
+      delete newMessages[issueId];
+      return newMessages;
+    });
+  }, []);
+
+  // เพิ่มฟังก์ชันเพื่อเพิ่มข้อความแชทใหม่ลงใน state โดยตรง (สำหรับ optimistic update)
+  const addChatMessage = useCallback((issueId, message) => {
+    setChatMessages((prev) => {
+      const issueMessages = prev[issueId] || [];
+      return {
+        ...prev,
+        [issueId]: [...issueMessages, message],
+      };
+    });
+  }, []);
+
   return (
     <SocketContext.Provider
       value={{
         socket,
         isConnected,
         notifications,
+        chatMessages,
+        getChatMessages,
+        clearChatMessages,
+        addChatMessage,
         removeNotification,
         markAllAsRead,
         markNotificationAsRead,
@@ -607,7 +839,8 @@ export const SocketProvider = ({ children }) => {
         leaveIssueChat,
         sendMessage,
         fetchNotifications,
-        clearAllNotifications, // เพิ่มฟังก์ชันใหม่เข้าไปใน context
+        clearAllNotifications,
+        fetchChatMessages,
       }}>
       {children}
     </SocketContext.Provider>

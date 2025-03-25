@@ -40,7 +40,7 @@ const ChatWindow = ({ chat, isMobile }) => {
   const [newMessage, setNewMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef(null);
-  const { socket } = useSocket();
+  const { socket, fetchChatMessages, getChatMessages } = useSocket();
   const { user } = useUser();
   const [fileList, setFileList] = useState([]);
   const [uploading, setUploading] = useState(false);
@@ -53,101 +53,174 @@ const ChatWindow = ({ chat, isMobile }) => {
 
   // ดึงข้อความเมื่อเลือกแชทใหม่
   useEffect(() => {
-    const fetchMessages = async () => {
+    const loadMessages = async () => {
       if (!chat || !chat.issueId) return;
 
       setLoading(true);
       try {
-        const token = localStorage.getItem("token");
-
-        // แก้ไข endpoint ให้ถูกต้องตาม API
-        const response = await axios.get(
-          `http://172.18.43.39:5000/api/reports/chat/${chat.issueId}`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
+        // ใช้ fetchChatMessages จาก SocketContext แทนการเรียก API โดยตรง
+        await fetchChatMessages(chat.issueId, (response) => {
+          if (!response.success) {
+            console.error("Error fetching messages:", response.error);
+            return;
           }
-        );
 
-        // console.log("Chat messages response:", response.data);
+          // แปลงรูปแบบข้อความให้เหมาะกับการแสดงผล
+          const formattedMessages = response.data.map((msg) => ({
+            id: msg.id || msg._id,
+            text: msg.message || msg.text,
+            senderId: msg.senderId?._id || msg.senderId?.id || msg.senderId,
+            senderName: msg.senderId?.firstName
+              ? `${msg.senderId.firstName} ${msg.senderId.lastName || null}`
+              : msg.senderName || "ไม่ระบุชื่อ",
+            senderRole: msg.senderId?.role || null,
+            senderProfileImage: msg.senderId?.profileImage || null,
+            createdAt:
+              msg.createdAt || msg.timestamp || new Date().toISOString(),
+            issueId: chat.issueId,
+            fileUrl: msg.fileUrl || msg.file,
+            fileName:
+              msg.fileName || (msg.fileUrl && msg.fileUrl.split("/").pop()),
+            fileType: msg.fileType,
+          }));
 
-        // แปลงข้อมูลที่ได้จาก API เป็นรูปแบบที่ใช้งานได้
-        let chatMessages = [];
-        if (response.data?.data && Array.isArray(response.data.data)) {
-          chatMessages = response.data.data;
-        } else if (Array.isArray(response.data)) {
-          chatMessages = response.data;
-        }
-
-        // แปลงรูปแบบข้อความให้เหมาะกับการแสดงผล
-        const formattedMessages = chatMessages.map((msg) => ({
-          id: msg.id || msg._id,
-          text: msg.message || msg.text, // รองรับทั้ง message และ text
-          senderId: msg.senderId?._id || msg.senderId?.id || msg.senderId,
-          senderName: msg.senderId?.firstName
-            ? `${msg.senderId.firstName} ${msg.senderId.lastName || null}`
-            : msg.senderName || "ไม่ระบุชื่อ",
-          senderRole: msg.senderId?.role || null,
-          senderProfileImage: msg.senderId?.profileImage || null,
-          createdAt: msg.createdAt || msg.timestamp || new Date().toISOString(),
-          issueId: chat.issueId,
-          fileUrl: msg.fileUrl || msg.file, // เพิ่มการรองรับข้อมูลไฟล์แนบ
-          fileName:
-            msg.fileName || (msg.fileUrl && msg.fileUrl.split("/").pop()),
-          fileType: msg.fileType,
-        }));
-
-        setMessages(formattedMessages);
+          setMessages(formattedMessages);
+          setLoading(false);
+          setTimeout(scrollToBottom, 100);
+        });
       } catch (error) {
-        console.error("Error fetching chat messages:", error);
-        // ตรวจสอบข้อความ error จาก API เพื่อแสดงให้ user รู้ว่าเกิดอะไรขึ้น
-        if (error.response?.status === 403) {
-          console.warn("User not authorized to view this chat");
-        } else if (error.response?.status === 404) {
-          console.warn("Report not found");
-        }
-      } finally {
+        console.error("Error loading messages:", error);
         setLoading(false);
-        // เลื่อนลงล่างหลังจากโหลดข้อความ
+      }
+    };
+
+    // เข้าร่วมห้องแชทเมื่อเปลี่ยนห้อง
+    if (socket && chat?.issueId) {
+      socket.emit("joinUserRoom", chat.issueId);
+      loadMessages();
+      setFileList([]);
+    }
+
+    // ออกจากห้องแชทเมื่อ unmount หรือเปลี่ยนห้องใหม่
+    return () => {
+      if (socket && chat?.issueId) {
+        socket.emit("leaveUserRoom", chat.issueId);
+      }
+    };
+  }, [chat, socket, fetchChatMessages]);
+
+  // ติดตามข้อความใหม่จาก chatMessages ในContext
+  useEffect(() => {
+    if (!chat || !chat.issueId) return;
+
+    // ดึงข้อความของ chat ปัจจุบันจาก context
+    const currentMessages = getChatMessages(chat.issueId);
+
+    if (currentMessages && currentMessages.length > 0) {
+      // อัพเดต messages state เฉพาะเมื่อมีข้อความใหม่
+      setMessages((prevMessages) => {
+        // ถ้าจำนวนข้อความไม่เท่ากันหรือข้อความล่าสุดไม่ตรงกัน แสดงว่ามีข้อความใหม่
+        if (prevMessages.length !== currentMessages.length) {
+          return currentMessages;
+        }
+
+        // ตรวจสอบข้อความล่าสุด
+        const latestContextMsg = currentMessages[currentMessages.length - 1];
+        const latestStateMsg = prevMessages[prevMessages.length - 1];
+
+        if (latestContextMsg.id !== latestStateMsg.id) {
+          return currentMessages;
+        }
+
+        return prevMessages;
+      });
+    }
+  }, [chat, getChatMessages]);
+
+  // ยังคงรักษา event listener สำหรับ newMessage ไว้เพื่อความเข้ากันได้กับระบบเดิม
+  useEffect(() => {
+    if (!socket || !chat || !chat.issueId) return;
+
+    // ลบตัวฟังก์ชันที่อาจมีอยู่ก่อนหน้า
+    socket.off("newMessage");
+    socket.off("messageReceived");
+
+    // สร้างฟังก์ชันแยกเพื่อให้สามารถถอด event listener ได้ถูกต้อง
+    const handleNewMessage = (messageData) => {
+      // ตรวจสอบว่าข้อความเป็นของแชทนี้หรือไม่
+      if (messageData.issueId === chat.issueId) {
+        console.log("Message data received:", messageData);
+
+        // เช็คว่าเป็นข้อความที่เรามีอยู่แล้วหรือไม่ เพื่อป้องกัน duplicate
+        setMessages((prevMessages) => {
+          // ถ้ามี id ตรงกับข้อความที่มีอยู่แล้ว ไม่ต้องเพิ่ม
+          if (
+            prevMessages.some(
+              (msg) => msg.id === (messageData.id || messageData._id)
+            )
+          ) {
+            return prevMessages;
+          }
+
+          // แปลงข้อมูล senderId ที่อาจเป็น Object หรือ String
+          const senderId =
+            typeof messageData.senderId === "object"
+              ? messageData.senderId.id || messageData.senderId._id
+              : messageData.senderId;
+
+          // แปลงข้อมูลชื่อผู้ส่ง
+          const senderName =
+            typeof messageData.senderId === "object"
+              ? `${messageData.senderId.firstName || ""} ${
+                  messageData.senderId.lastName || ""
+                }`.trim()
+              : messageData.senderName || "ไม่ระบุชื่อ";
+
+          // แปลงข้อมูลรูปโปรไฟล์ - ตรวจสอบทุกแหล่งที่เป็นไปได้
+          let senderProfileImage = null;
+          if (typeof messageData.senderId === "object") {
+            senderProfileImage =
+              messageData.senderId.profileImage ||
+              messageData.senderId.profilePicture;
+          } else {
+            senderProfileImage =
+              messageData.senderProfileImage ||
+              messageData.profileImage ||
+              messageData.profilePicture;
+          }
+
+          console.log("Processed profile image:", senderProfileImage);
+
+          // สร้างข้อความในรูปแบบที่ถูกต้อง
+          const formattedMessage = {
+            id: messageData.id || messageData._id,
+            text: messageData.message || messageData.text,
+            senderId,
+            senderName,
+            senderProfileImage,
+            createdAt: messageData.createdAt || new Date().toISOString(),
+            issueId: messageData.issueId,
+            fileUrl: messageData.fileUrl || messageData.file,
+            fileName:
+              messageData.fileName ||
+              (messageData.fileUrl && messageData.fileUrl.split("/").pop()),
+          };
+
+          // เพิ่มข้อความใหม่
+          return [...prevMessages, formattedMessage];
+        });
+
+        // เลื่อนลงล่างเมื่อมีข้อความใหม่
         setTimeout(scrollToBottom, 100);
       }
     };
 
-    fetchMessages();
-    setFileList([]); // รีเซ็ตรายการไฟล์เมื่อเปลี่ยนแชท
-  }, [chat]);
+    // เพิ่มตัวฟังก์ชัน event listener
+    socket.on("messageReceived", handleNewMessage);
 
-  // ติดตามข้อความใหม่จาก socket
-  useEffect(() => {
-    if (!socket || !chat || !chat.issueId) return;
-
-    // เปลี่ยนชื่อ event จาก "new_message" เป็น "newMessage" ตาม backend
-    socket.on("newMessage", (messageData) => {
-      console.log("Socket new message:", messageData);
-
-      // ตรวจสอบว่าข้อความเป็นของแชทนี้หรือไม่ (ตาม issueId)
-      if (messageData.issueId === chat.issueId) {
-        // ปรับโครงสร้างข้อมูลเพื่อให้ตรงกับวิธีแสดงผล
-        const formattedMessage = {
-          id: messageData.id || messageData._id,
-          text: messageData.message, // เปลี่ยนจาก text เป็น message ตามโครงสร้าง API
-          senderId: messageData.senderId,
-          createdAt: messageData.createdAt,
-          issueId: messageData.issueId,
-          fileUrl: messageData.fileUrl || messageData.file,
-          fileName:
-            messageData.fileName ||
-            (messageData.fileUrl && messageData.fileUrl.split("/").pop()),
-          fileType: messageData.fileType,
-        };
-
-        setMessages((prevMessages) => [...prevMessages, formattedMessage]);
-        // เลื่อนลงล่างเมื่อมีข้อความใหม่
-        setTimeout(scrollToBottom, 100);
-      }
-    });
-
+    // Clean up function
     return () => {
-      socket.off("newMessage"); // เปลี่ยนชื่อ event ที่ unsubscribe ด้วย
+      socket.off("messageReceived", handleNewMessage);
     };
   }, [socket, chat]);
 
@@ -155,6 +228,26 @@ const ChatWindow = ({ chat, isMobile }) => {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // เพิ่ม debug log ในไฟล์ ChatWindow.jsx หรือ ChatWindowUser.jsx
+  useEffect(() => {
+    if (!socket) return;
+
+    // เพิ่ม log สำหรับ debug
+    const debugEventHandler =
+      (event) =>
+      (...args) => {
+        console.log(`🔍 Socket Event [${event}]:`, args[0]);
+        return args[0];
+      };
+
+    // ติดตาม events ทั้งหมด
+    socket.onAny(debugEventHandler("ANY"));
+
+    return () => {
+      socket.offAny(debugEventHandler("ANY"));
+    };
+  }, [socket]);
 
   // ฟังก์ชันตรวจสอบประเภทของไฟล์
   const getFileIconByType = (fileUrl) => {
@@ -244,16 +337,22 @@ const ChatWindow = ({ chat, isMobile }) => {
       const token = localStorage.getItem("token");
       const userId = user.id || user._id;
 
+      // สร้าง unique ID สำหรับข้อความชั่วคราว
+      const tempId = `temp_${Date.now()}`;
+
+      // คัดลอกข้อมูลรูปโปรไฟล์จากข้อมูลผู้ใช้ให้ครบถ้วน
+      const userProfileImage = user.profileImage || user.profilePicture || "";
+
       // ข้อมูลสำหรับ socket
       const messageData = {
         issueId: chat.issueId,
         message: newMessage.trim(),
         senderId: userId,
         senderName:
-          user.name ||
-          `${user.firstName || null} ${user.lastName || null}`.trim(),
-        senderProfileImage: user.profileImage || user.profilePicture,
+          user.name || `${user.firstName || ""} ${user.lastName || ""}`.trim(),
+        senderProfileImage: userProfileImage, // เพิ่มข้อมูลรูปโปรไฟล์อย่างชัดเจน
         createdAt: new Date().toISOString(),
+        tempId: tempId, // เพิ่ม tempId เพื่อใช้สำหรับการแทนที่ optimistic update
       };
 
       // ถ้ามีไฟล์
@@ -291,18 +390,14 @@ const ChatWindow = ({ chat, isMobile }) => {
         }
       }
 
-      // ส่งข้อความผ่าน socket
-      socket.emit("sendMessage", messageData);
-
       // แสดงข้อความชั่วคราวในหน้าจอ (optimistic update)
       const optimisticMessage = {
-        id: Date.now().toString(),
+        id: tempId,
         text: newMessage.trim(),
         senderId: userId,
         senderName:
-          user.name ||
-          `${user.firstName || null} ${user.lastName || null}`.trim(),
-        senderProfileImage: user.profileImage || user.profilePicture,
+          user.name || `${user.firstName || ""} ${user.lastName || ""}`.trim(),
+        senderProfileImage: userProfileImage, // ใช้ตัวแปรเดียวกันเพื่อความคงที่
         createdAt: new Date().toISOString(),
         issueId: chat.issueId,
         fileUrl: messageData.fileUrl,
@@ -311,17 +406,29 @@ const ChatWindow = ({ chat, isMobile }) => {
       };
 
       setMessages((prevMessages) => [...prevMessages, optimisticMessage]);
+      // เลื่อนลงล่างทันทีเมื่อแสดงข้อความชั่วคราว
+      setTimeout(scrollToBottom, 50);
 
-      // ล้างฟอร์ม
+      // ล้างฟอร์มทันที
       setNewMessage("");
       setFileList([]);
+
+      // ส่งข้อความผ่าน socket และเพิ่ม console.log เพื่อตรวจสอบ
+      console.log("Sending message data:", messageData);
+      socket.emit("sendMessage", messageData, (response) => {
+        if (response.error) {
+          console.error("Error sending message:", response.error);
+          message.error("ไม่สามารถส่งข้อความได้");
+
+          // ลบข้อความที่ล้มเหลวออก
+          setMessages((prevMessages) =>
+            prevMessages.filter((msg) => msg.id !== tempId)
+          );
+        }
+      });
     } catch (error) {
       console.error("Error sending message:", error);
-      if (error.response?.data?.message) {
-        message.error(`ไม่สามารถส่งข้อความได้: ${error.response.data.message}`);
-      } else {
-        message.error("ไม่สามารถส่งข้อความได้ โปรดลองอีกครั้ง");
-      }
+      message.error("ไม่สามารถส่งข้อความได้");
     } finally {
       setUploading(false);
     }
@@ -465,7 +572,9 @@ const ChatWindow = ({ chat, isMobile }) => {
       <div className="flex-1 p-2 sm:p-4 overflow-y-auto bg-gray-50">
         {loading ? (
           <div className="flex justify-center items-center h-full">
-            <Spin tip="กำลังโหลดข้อความ..." />
+            <Spin>
+              <div className="p-5">กำลังโหลดข้อความ...</div>
+            </Spin>
           </div>
         ) : messages.length === 0 ? (
           <div className="text-center text-gray-400 mt-10">
