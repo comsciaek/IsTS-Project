@@ -110,9 +110,8 @@ router.post('/register', async (req, res) => {
 // Route สำหรับการล็อกอิน (Login) และดึงข้อมูลผู้ใช้
 router.post('/login', async (req, res) => {
   try {
-    
     const { employeeId, password } = req.body;
-    // console.log(employeeId)
+
     if (!employeeId || !password) {
       return res.status(400).json({
         message: 'Employee ID and password are required',
@@ -123,6 +122,12 @@ router.post('/login', async (req, res) => {
     if (!user) {
       return res.status(401).json({
         message: 'Invalid employeeId or password',
+      });
+    }
+
+    if (user.status === 'inactive') {
+      return res.status(403).json({
+        message: 'Access denied. User has inactive.',
       });
     }
 
@@ -270,6 +275,12 @@ router.post('/change-password', protect, async (req, res) => {
     
     if (!isMatch) {
       return res.status(401).json({ message: 'Current password is incorrect' });
+    }
+
+    // ตรวจสอบว่ารหัสผ่านใหม่เหมือนรหัสผ่านเก่าหรือไม่
+    const isOldPassword = await user.matchPassword(newPassword);
+    if (isOldPassword) {
+      return res.status(400).json({ message: 'New password cannot be the same as the old password' });
     }
     
     user.password = newPassword;

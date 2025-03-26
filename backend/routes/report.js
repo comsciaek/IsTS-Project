@@ -128,6 +128,7 @@ export default (io) => {
         date: report.date,
         file: report.file,
         status: report.status,
+        comment: report.comment,
         assignedAdmin: report.assignedAdmin ? {
           id: report.assignedAdmin._id,
           firstName: report.assignedAdmin.firstName,
@@ -239,308 +240,339 @@ export default (io) => {
   });
 
   // Route สำหรับแก้ไขรายงาน
-  router.put('/edit/:issueId', protect, upload.single('file'), async (req, res) => {
-    try {
-      const issueId = req.params.issueId;
-      const userId = req.user.id;
-  
-      if (!mongoose.Types.ObjectId.isValid(issueId)) {
-        return res.status(400).json({ message: 'Invalid issue ID' });
+router.put('/edit/:issueId', protect, upload.single('file'), async (req, res) => {
+  try {
+    const issueId = req.params.issueId;
+    const userId = req.user.id;
+
+    if (!mongoose.Types.ObjectId.isValid(issueId)) {
+      return res.status(400).json({ message: 'Invalid issue ID' });
+    }
+
+    const report = await Report.findById(issueId);
+    if (!report) {
+      return res.status(404).json({ message: 'Report not found' });
+    }
+
+    if (report.userId.toString() !== userId && req.user.role !== 'SuperAdmin' && req.user.role !== 'Admin') {
+      return res.status(403).json({ message: 'You are not authorized to edit this report' });
+    }
+
+    const { topic, description, date, status, assignedAdmin, comment } = req.body;
+
+    if (!topic && !description && !date && !status && !assignedAdmin && !req.file && !comment) {
+      return res.status(400).json({ message: 'At least one field (topic, description, date, status, assignedAdmin, comment, or file) is required' });
+    }
+
+    // ตรวจสอบและบังคับให้ส่ง comment ถ้าสถานะเป็น rejected
+    if (status === 'rejected' && (!comment || comment.trim() === '')) {
+      return res.status(400).json({ message: 'Comment is required when rejecting a report' });
+    }
+
+    let reportDate = report.date;
+    if (date) {
+      reportDate = new Date(date);
+      if (isNaN(reportDate.getTime())) {
+        return res.status(400).json({ message: 'Invalid date format' });
       }
-  
-      const report = await Report.findById(issueId);
-      if (!report) {
-        return res.status(404).json({ message: 'Report not found' });
+    }
+
+    let reportStatus = report.status;
+    const oldStatus = report.status;
+    if (status) {
+      if (req.user.role !== 'SuperAdmin' && req.user.role !== 'Admin') {
+        return res.status(403).json({ message: 'Only SuperAdmin or Admin can update the status' });
       }
-  
-      if (report.userId.toString() !== userId && req.user.role !== 'SuperAdmin' && req.user.role !== 'Admin') {
-        return res.status(403).json({ message: 'You are not authorized to edit this report' });
+      if (!['pending', 'approved', 'rejected', 'completed'].includes(status)) {
+        return res.status(400).json({ message: 'Status must be one of: pending, approved, rejected, or completed' });
       }
-  
-      const { topic, description, date, status, assignedAdmin } = req.body;
-  
-      if (!topic && !description && !date && !status && !assignedAdmin && !req.file) {
-        return res.status(400).json({ message: 'At least one field (topic, description, date, status, assignedAdmin, or file) is required' });
+      reportStatus = status;
+    }
+
+    let reportComment = report.comment || '';
+    if (status) {
+      if (status === 'rejected') {
+        reportComment = comment ? comment.trim() : '';
+      } else {
+        reportComment = ''; // รีเซ็ต comment ถ้าสถานะไม่ใช่ rejected
       }
-  
-      let reportDate = report.date;
-      if (date) {
-        reportDate = new Date(date);
-        if (isNaN(reportDate.getTime())) {
-          return res.status(400).json({ message: 'Invalid date format' });
-        }
+    }
+
+    let reportAssignedAdmin = report.assignedAdmin;
+    const oldAssignedAdmin = report.assignedAdmin?.toString();
+    if (assignedAdmin) {
+      if (req.user.role !== 'SuperAdmin' && req.user.role !== 'Admin') {
+        return res.status(403).json({ message: 'Only SuperAdmin or Admin can assign an admin' });
       }
-  
-      let reportStatus = report.status;
-      const oldStatus = report.status;
-      if (status) {
-        if (req.user.role !== 'SuperAdmin' && req.user.role !== 'Admin') {
-          return res.status(403).json({ message: 'Only SuperAdmin or Admin can update the status' });
-        }
-        if (!['pending', 'approved', 'rejected', 'completed'].includes(status)) {
-          return res.status(400).json({ message: 'Status must be one of: pending, approved, rejected, or completed' });
-        }
-        reportStatus = status;
+      if (!mongoose.Types.ObjectId.isValid(assignedAdmin)) {
+        return res.status(400).json({ message: 'Invalid admin ID' });
       }
-  
-      let reportAssignedAdmin = report.assignedAdmin;
-      const oldAssignedAdmin = report.assignedAdmin?.toString();
-      if (assignedAdmin) {
-        if (req.user.role !== 'SuperAdmin' && req.user.role !== 'Admin') {
-          return res.status(403).json({ message: 'Only SuperAdmin or Admin can assign an admin' });
-        }
-        if (!mongoose.Types.ObjectId.isValid(assignedAdmin)) {
-          return res.status(400).json({ message: 'Invalid admin ID' });
-        }
-        const admin = await User.findById(assignedAdmin);
-        if (!admin || (admin.role !== 'Admin' && admin.role !== 'SuperAdmin')) {
-          return res.status(400).json({ message: 'Assigned user must be an Admin or SuperAdmin' });
-        }
-        reportAssignedAdmin = assignedAdmin;
+      const admin = await User.findById(assignedAdmin);
+      if (!admin || (admin.role !== 'Admin' && admin.role !== 'SuperAdmin')) {
+        return res.status(400).json({ message: 'Assigned user must be an Admin or SuperAdmin' });
       }
-  
-      let fileUrl = report.file;
-      if (req.file) {
-        if (report.file) {
-          const oldFileName = report.file.split('/').pop();
-          const oldFilePath = path.join(reportsUploadDir, oldFileName);
-          try {
-            if (fs.existsSync(oldFilePath)) {
-              fs.unlinkSync(oldFilePath);
-            }
-          } catch (error) {
-            console.error('Error deleting old report file:', error.message);
+      reportAssignedAdmin = assignedAdmin;
+    }
+
+    let fileUrl = report.file;
+    if (req.file) {
+      if (report.file) {
+        const oldFileName = report.file.split('/').pop();
+        const oldFilePath = path.join(reportsUploadDir, oldFileName);
+        try {
+          if (fs.existsSync(oldFilePath)) {
+            fs.unlinkSync(oldFilePath);
           }
+        } catch (error) {
+          console.error('Error deleting old report file:', error.message);
         }
-        fileUrl = `http://172.18.43.39:5000/uploads/reports/${req.file.filename}`;
       }
-  
-      const updatedReport = await Report.findByIdAndUpdate(
+      fileUrl = `http://172.18.43.39:5000/uploads/reports/${req.file.filename}`;
+    }
+
+    const updatedReport = await Report.findByIdAndUpdate(
+      issueId,
+      {
+        topic: topic || report.topic,
+        description: description || report.description,
+        date: reportDate,
+        file: fileUrl,
+        status: reportStatus,
+        comment: reportComment, // อัปเดตฟิลด์ comment
+        assignedAdmin: reportAssignedAdmin,
+      },
+      { new: true, runValidators: true }
+    ).populate('userId assignedAdmin', 'firstName lastName role profileImage');
+
+    const io = req.app.locals.io;
+
+    if (assignedAdmin && oldAssignedAdmin !== assignedAdmin) {
+      const userId = updatedReport.userId?._id?.toString();
+      const newAdminId = updatedReport.assignedAdmin?._id?.toString();
+      const topic = updatedReport.topic || `คำร้อง ${issueId}`;
+
+      if (userId && mongoose.Types.ObjectId.isValid(userId)) {
+        try {
+          const userNotification = new Notification({
+            userId: new mongoose.Types.ObjectId(userId),
+            issueId,
+            message: `Admin for report ${topic} has been changed`,
+            type: 'info',
+            isRead: false,
+            createdAt: new Date(),
+          });
+          await userNotification.save();
+          io.to(userId).emit('statusUpdate', {
+            id: userNotification._id,
+            issueId,
+            userId,
+            message: userNotification.message,
+            type: userNotification.type,
+            isRead: userNotification.isRead,
+            createdAt: userNotification.createdAt,
+          });
+        } catch (error) {
+          console.error('Error creating user notification for admin change:', error.message);
+        }
+      }
+
+      if (newAdminId && mongoose.Types.ObjectId.isValid(newAdminId)) {
+        try {
+          const adminNotification = new Notification({
+            userId: new mongoose.Types.ObjectId(newAdminId),
+            issueId,
+            message: `You have been assigned to report ${topic}`,
+            type: 'info',
+            isRead: false,
+            createdAt: new Date(),
+          });
+          await adminNotification.save();
+          io.to(newAdminId).emit('statusUpdate', {
+            id: adminNotification._id,
+            issueId,
+            userId: newAdminId,
+            message: adminNotification.message,
+            type: adminNotification.type,
+            isRead: adminNotification.isRead,
+            createdAt: adminNotification.createdAt,
+          });
+        } catch (error) {
+          console.error('Error creating admin notification for admin change:', error.message);
+        }
+      }
+
+      io.to(`chat:${issueId}`).emit('adminChanged', {
         issueId,
-        {
-          topic: topic || report.topic,
-          description: description || report.description,
-          date: reportDate,
-          file: fileUrl,
-          status: reportStatus,
-          assignedAdmin: reportAssignedAdmin,
-        },
-        { new: true, runValidators: true }
-      ).populate('userId assignedAdmin', 'firstName lastName role profileImage');
-  
-      const io = req.app.locals.io;
-  
-      // เพิ่มการแจ้งเตือนเมื่อ assignedAdmin เปลี่ยน
-      if (assignedAdmin && oldAssignedAdmin !== assignedAdmin) {
-        const userId = updatedReport.userId?._id?.toString();
-        const newAdminId = updatedReport.assignedAdmin?._id?.toString();
-        const topic = updatedReport.topic || `คำร้อง ${issueId}`;
-  
-        if (userId && mongoose.Types.ObjectId.isValid(userId)) {
-          try {
-            const userNotification = new Notification({
-              userId: new mongoose.Types.ObjectId(userId),
-              issueId,
-              message: `Admin for report ${topic} has been changed`,
-              type: 'info',
-              isRead: false,
-              createdAt: new Date(),
-            });
-            await userNotification.save();
-            io.to(userId).emit('statusUpdate', {
-              id: userNotification._id,
-              issueId,
-              userId,
-              message: userNotification.message,
-              type: userNotification.type,
-              isRead: userNotification.isRead,
-              createdAt: userNotification.createdAt,
-            });
-          } catch (error) {
-            console.error('Error creating user notification for admin change:', error.message);
-          }
-        }
-  
-        if (newAdminId && mongoose.Types.ObjectId.isValid(newAdminId)) {
-          try {
-            const adminNotification = new Notification({
-              userId: new mongoose.Types.ObjectId(newAdminId),
-              issueId,
-              message: `You have been assigned to report ${topic}`,
-              type: 'info',
-              isRead: false,
-              createdAt: new Date(),
-            });
-            await adminNotification.save();
-            io.to(newAdminId).emit('statusUpdate', {
-              id: adminNotification._id,
-              issueId,
-              userId: newAdminId,
-              message: adminNotification.message,
-              type: adminNotification.type,
-              isRead: adminNotification.isRead,
-              createdAt: adminNotification.createdAt,
-            });
-          } catch (error) {
-            console.error('Error creating admin notification for admin change:', error.message);
-          }
+        newAdminId,
+        message: `Admin for this report has been changed`,
+      });
+    }
+
+    if (status && status !== oldStatus) {
+      const userId = updatedReport.userId?._id?.toString();
+      const adminId = updatedReport.assignedAdmin?._id?.toString() || req.user.id;
+      const topic = updatedReport.topic || `คำร้อง ${issueId}`;
+
+      const notificationData = {
+        issueId,
+        oldStatus,
+        newStatus: status,
+        message: `Report ${topic} status updated to ${status} by Admin`,
+        createdAt: new Date(),
+      };
+
+      if (status === 'rejected') {
+        notificationData.message = `Report ${topic} status updated to ${status} by Admin. Reason: ${updatedReport.comment}`;
+      }
+
+      if (userId && mongoose.Types.ObjectId.isValid(userId)) {
+        try {
+          const userNotification = new Notification({
+            userId: new mongoose.Types.ObjectId(userId),
+            ...notificationData,
+            isRead: false,
+          });
+          await userNotification.save();
+          io.to(userId).emit('statusUpdate', {
+            id: userNotification._id,
+            issueId,
+            userId,
+            oldStatus,
+            status,
+            message: userNotification.message,
+            isRead: userNotification.isRead,
+            createdAt: userNotification.createdAt,
+            ...(status === 'rejected' && { comment: updatedReport.comment }),
+          });
+        } catch (error) {
+          console.error('Error saving user notification:', error.message);
         }
       }
-  
-      if (status && status !== oldStatus) {
-        const userId = updatedReport.userId?._id?.toString();
-        const adminId = updatedReport.assignedAdmin?._id?.toString() || req.user.id;
-        const topic = updatedReport.topic || `คำร้อง ${issueId}`;
-  
-        const notificationData = {
+
+      if (adminId && mongoose.Types.ObjectId.isValid(adminId)) {
+        try {
+          const adminNotification = new Notification({
+            userId: new mongoose.Types.ObjectId(adminId),
+            ...notificationData,
+            message: `Report ${topic} status updated to ${status} (by you)${status === 'rejected' ? `. Reason: ${updatedReport.comment}` : ''}`,
+            isRead: false,
+          });
+          await adminNotification.save();
+          io.to(adminId).emit('statusUpdate', {
+            id: adminNotification._id,
+            issueId,
+            userId: adminId,
+            oldStatus,
+            status,
+            message: adminNotification.message,
+            isRead: adminNotification.isRead,
+            createdAt: adminNotification.createdAt,
+            ...(status === 'rejected' && { comment: updatedReport.comment }),
+          });
+        } catch (error) {
+          console.error('Error saving admin notification:', error.message);
+        }
+      }
+
+      if (userId) {
+        io.to(userId).emit('reportStatusUpdate', {
           issueId,
           oldStatus,
           newStatus: status,
-          message: `Report ${topic} status updated to ${status} by Admin`,
-          createdAt: new Date(),
-        };
-  
-        if (userId && mongoose.Types.ObjectId.isValid(userId)) {
-          try {
-            const userNotification = new Notification({
-              userId: new mongoose.Types.ObjectId(userId),
-              ...notificationData,
-              isRead: false,
-            });
-            await userNotification.save();
-            console.log('User notification created:', userNotification);
-            io.to(userId).emit('statusUpdate', {
-              id: userNotification._id,
-              issueId,
-              userId,
-              oldStatus,
-              status,
-              message: userNotification.message,
-              isRead: userNotification.isRead,
-              createdAt: userNotification.createdAt,
-            });
-          } catch (error) {
-            console.error('Error saving user notification:', error.message);
-          }
-        } else {
-          console.warn('Invalid or missing userId for notification:', userId);
-        }
-  
-        if (adminId && mongoose.Types.ObjectId.isValid(adminId)) {
-          try {
-            const adminNotification = new Notification({
-              userId: new mongoose.Types.ObjectId(adminId),
-              ...notificationData,
-              message: `Report ${topic} status updated to ${status} (by you)`,
-              isRead: false,
-            });
-            await adminNotification.save();
-            console.log('Admin notification created:', adminNotification);
-            io.to(adminId).emit('statusUpdate', {
-              id: adminNotification._id,
-              issueId,
-              userId: adminId,
-              oldStatus,
-              status,
-              message: adminNotification.message,
-              isRead: adminNotification.isRead,
-              createdAt: adminNotification.createdAt,
-            });
-          } catch (error) {
-            console.error('Error saving admin notification:', error.message);
-          }
-        } else {
-          console.warn('Invalid or missing adminId for notification:', adminId);
-        }
-  
-        if (userId) {
-          io.to(userId).emit('reportStatusUpdate', {
-            issueId,
-            oldStatus,
-            newStatus: status,
-            message: `Report status updated to ${status}`,
-          });
-        }
-        if (adminId) {
-          io.to(adminId).emit('reportStatusUpdate', {
-            issueId,
-            oldStatus,
-            newStatus: status,
-            message: `Report status updated to ${status}`,
-          });
-        }
+          message: `Report status updated to ${status}${status === 'rejected' ? `. Reason: ${updatedReport.comment}` : ''}`,
+          ...(status === 'rejected' && { comment: updatedReport.comment }),
+        });
       }
-  
-      if (reportStatus === 'completed') {
-        try {
-          const chats = await Chat.find({ issueId });
-          const deletedChats = await Chat.deleteMany({ issueId });
-          console.log(`Deleted ${deletedChats.deletedCount} chat messages for report ${issueId}`);
-  
-          if (updatedReport.file) {
-            const reportFileName = updatedReport.file.split('/').pop();
-            const reportFilePath = path.join(reportsUploadDir, reportFileName);
+      if (adminId) {
+        io.to(adminId).emit('reportStatusUpdate', {
+          issueId,
+          oldStatus,
+          newStatus: status,
+          message: `Report status updated to ${status}${status === 'rejected' ? `. Reason: ${updatedReport.comment}` : ''}`,
+          ...(status === 'rejected' && { comment: updatedReport.comment }),
+        });
+      }
+
+      io.to(`chat:${issueId}`).emit('statusChanged', {
+        issueId,
+        oldStatus,
+        newStatus: status,
+        message: `Report status updated to ${status}${status === 'rejected' ? `. Reason: ${updatedReport.comment}` : ''}`,
+        ...(status === 'rejected' && { comment: updatedReport.comment }),
+      });
+    }
+
+    if (reportStatus === 'completed') {
+      try {
+        const chats = await Chat.find({ issueId });
+        const deletedChats = await Chat.deleteMany({ issueId });
+        console.log(`Deleted ${deletedChats.deletedCount} chat messages for report ${issueId}`);
+
+        if (updatedReport.file) {
+          const reportFileName = updatedReport.file.split('/').pop();
+          const reportFilePath = path.join(reportsUploadDir, reportFileName);
+          try {
+            if (fs.existsSync(reportFilePath)) {
+              fs.unlinkSync(reportFilePath);
+            }
+          } catch (error) {
+            console.error('Error deleting report file:', error.message);
+          }
+        }
+
+        for (const chat of chats) {
+          if (chat.file) {
+            const chatFileName = chat.file.split('/').pop();
+            const chatFilePath = path.join(chatUploadDir, chatFileName);
             try {
-              if (fs.existsSync(reportFilePath)) {
-                fs.unlinkSync(reportFilePath);
+              if (fs.existsSync(chatFilePath)) {
+                fs.unlinkSync(chatFilePath);
               }
             } catch (error) {
-              console.error('Error deleting report file:', error.message);
+              console.error('Error deleting chat file:', error.message);
             }
           }
-  
-          for (const chat of chats) {
-            if (chat.file) {
-              const chatFileName = chat.file.split('/').pop();
-              const chatFilePath = path.join(chatUploadDir, chatFileName);
-              try {
-                if (fs.existsSync(chatFilePath)) {
-                  fs.unlinkSync(chatFilePath);
-                }
-              } catch (error) {
-                console.error('Error deleting chat file:', error.message);
-              }
-            }
-          }
-  
-          io.to(issueId).emit('chatClosed', {
-            issueId,
-            message: 'This report chat has been closed and messages have been deleted.',
-          });
-        } catch (error) {
-          console.error('Error handling completed status:', error.message);
         }
+
+        io.to(`chat:${issueId}`).emit('chatClosed', {
+          issueId,
+          message: 'This report chat has been closed and messages have been deleted.',
+        });
+      } catch (error) {
+        console.error('Error handling completed status:', error.message);
       }
-  
-      const reportResponse = {
-        issueId: updatedReport._id,
-        userId: updatedReport.userId?._id,
-        topic: updatedReport.topic,
-        description: updatedReport.description,
-        date: updatedReport.date,
-        file: updatedReport.file,
-        status: updatedReport.status,
-        assignedAdmin: updatedReport.assignedAdmin
-          ? {
-              id: updatedReport.assignedAdmin._id,
-              firstName: updatedReport.assignedAdmin.firstName,
-              lastName: updatedReport.assignedAdmin.lastName,
-              role: updatedReport.assignedAdmin.role,
-              profileImage: updatedReport.assignedAdmin.profileImage,
-            }
-          : null,
-        createdAt: updatedReport.createdAt,
-      };
-  
-      return res.status(200).json({
-        message: 'Report updated successfully',
-        data: reportResponse,
-      });
-    } catch (error) {
-      console.error('Error updating report:', error.message);
-      return res.status(500).json({ message: 'Internal Server Error', error: error.message });
     }
-  });
+
+    const reportResponse = {
+      issueId: updatedReport._id,
+      userId: updatedReport.userId?._id,
+      topic: updatedReport.topic,
+      description: updatedReport.description,
+      date: updatedReport.date,
+      file: updatedReport.file,
+      status: updatedReport.status,
+      comment: updatedReport.comment, // เพิ่ม comment ใน response
+      assignedAdmin: updatedReport.assignedAdmin
+        ? {
+            id: updatedReport.assignedAdmin._id,
+            firstName: updatedReport.assignedAdmin.firstName,
+            lastName: updatedReport.assignedAdmin.lastName,
+            role: updatedReport.assignedAdmin.role,
+            profileImage: updatedReport.assignedAdmin.profileImage,
+          }
+        : null,
+      createdAt: updatedReport.createdAt,
+    };
+
+    return res.status(200).json({
+      message: 'Report updated successfully',
+      data: reportResponse,
+    });
+  } catch (error) {
+    console.error('Error updating report:', error.message);
+    return res.status(500).json({ message: 'Internal Server Error', error: error.message });
+  }
+});
   
   // Route สำหรับดึงประวัติแชท
   router.get('/chat/:issueId', protect, async (req, res) => {

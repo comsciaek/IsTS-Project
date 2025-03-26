@@ -4,6 +4,8 @@ import { protect, authorizeAdminOrSuperAdmin } from '../auth/middleware.js';
 import multer from 'multer';
 import fs from 'fs';
 import path from 'path';
+import mongoose from 'mongoose';
+
 
 const router = express.Router();
 
@@ -332,6 +334,63 @@ router.delete('/:id', protect, authorizeAdminOrSuperAdmin, async (req, res) => {
       message: 'User deleted successfully',
     });
   } catch (error) {
+    return res.status(500).json({
+      message: 'Internal Server Error',
+      error: error.message,
+    });
+  }
+});
+
+// Route สำหรับทำเครื่องหมายผู้ใช้เป็น inactive (เฉพาะ SuperAdmin)
+router.put('/resign/:userId', protect, authorizeAdminOrSuperAdmin, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { status } = req.body;
+
+    // ตรวจสอบว่า userId ถูกต้อง
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: 'Invalid user ID' });
+    }
+
+    // ตรวจสอบว่าส่ง status มาหรือไม่ และเป็นค่าที่ถูกต้อง
+    if (!status || !['active', 'inactive'].includes(status)) {
+      return res.status(400).json({ message: 'Status must be either "active" or "inactive"' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // ตรวจสอบว่าสถานะที่ต้องการเปลี่ยนเหมือนกับสถานะปัจจุบันหรือไม่
+    if (user.status === status) {
+      return res.status(400).json({
+        message: `User is already ${status}`,
+      });
+    }
+
+    // เปลี่ยนสถานะและจัดการ inactiveAt
+    user.status = status;
+    if (status === 'inactive') {
+      user.inactiveAt = new Date();
+    } else if (status === 'active') {
+      user.inactiveAt = null; // ลบค่า inactiveAt เมื่อเปลี่ยนกลับเป็น active
+    }
+
+    await user.save();
+
+    return res.status(200).json({
+      message: `User ${user.firstName} ${user.lastName} status has been updated to ${status}`,
+      data: {
+        userId: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        status: user.status,
+        inactiveAt: user.inactiveAt,
+      },
+    });
+  } catch (error) {
+    console.error('Error updating user status:', error);
     return res.status(500).json({
       message: 'Internal Server Error',
       error: error.message,

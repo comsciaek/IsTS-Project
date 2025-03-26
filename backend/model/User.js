@@ -1,5 +1,8 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
+import Report from './Report.js'; // เพิ่มการ import Report model
+import Chat from './Chat.js'; // เพิ่มการ import Chat model
+import Notification from './Notification.js'; // เพิ่มการ import Notification model
 
 const userSchema = new mongoose.Schema({
   firstName: {
@@ -53,7 +56,6 @@ const userSchema = new mongoose.Schema({
       },
       message: 'Passwords do not match',
     },
-    // ไม่กำหนด required: true เพื่อให้ไม่บังคับใช้ในทุกกรณี
   },
   phoneNumber: {
     type: String,
@@ -62,22 +64,29 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['SuperAdmin', 'Admin', 'User'], // เปลี่ยน HeadAdmin เป็น SuperAdmin
-    default: 'User', // ผู้ใช้ใหม่จะเป็น User โดยอัตโนมัติ
-  },
-  profileImage: {
-    type: String, // เก็บ URL ของรูปภาพ (เช่น "https://example.com/image.jpg")
-    default: '', // ค่าเริ่มต้นเป็นสตริงว่างถ้าไม่มีรูปภาพ
+    enum: ['SuperAdmin', 'Admin', 'User'],
+    default: 'User',
   },
   profileImage: {
     type: String,
     default: '',
+  },
+  status: {
+    type: String,
+    enum: ['active', 'inactive'], // เพิ่มสถานะ active และ inactive
+    default: 'active', // ค่าเริ่มต้นเป็น active
+  },
+  inactiveAt: {
+    type: Date,
+    default: null, // วันที่ลาออก (จะถูกตั้งค่าเมื่อ status เปลี่ยนเป็น inactive)
   },
   createdAt: {
     type: Date,
     default: Date.now,
   },
 });
+
+// ลบ profileImage ซ้ำออก (ในโค้ดเดิมมี profileImage ซ้ำกัน 2 ครั้ง)
 
 userSchema.pre('save', async function (next) {
   if (this.isModified('password') || this.isNew) {
@@ -91,6 +100,23 @@ userSchema.pre('save', async function (next) {
 userSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
+
+// Hook สำหรับลบข้อมูลที่เกี่ยวข้องก่อนลบผู้ใช้
+userSchema.pre('deleteOne', { document: true, query: false }, async function (next) {
+  try {
+    const userId = this._id;
+
+    // ลบข้อมูลที่เกี่ยวข้อง
+    await Report.deleteMany({ userId });
+    await Notification.deleteMany({ userId });
+    await Chat.deleteMany({ senderId: userId });
+
+    next();
+  } catch (error) {
+    console.error(`Error in pre-deleteOne hook for user ${this._id}:`, error);
+    next(error);
+  }
+});
 
 const User = mongoose.model('User', userSchema);
 

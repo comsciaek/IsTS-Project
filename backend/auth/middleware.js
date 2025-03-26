@@ -1,12 +1,10 @@
 import jwt from 'jsonwebtoken';
+import User from '../model/User.js'; // เพิ่มการ import User model
 
-const protect = (req, res, next) => {
+const protect = async (req, res, next) => {
   let token;
 
-  if (
-    req.headers.authorization &&
-    req.headers.authorization.startsWith('Bearer')
-  ) {
+  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
     token = req.headers.authorization.split(' ')[1];
   } else if (req.query.token) {
     token = req.query.token;
@@ -26,7 +24,19 @@ const protect = (req, res, next) => {
     if (!decoded.id || !decoded.role) {
       throw new Error('Invalid token payload');
     }
-    req.user = decoded;
+
+    // ดึงข้อมูลผู้ใช้จากฐานข้อมูล
+    const user = await User.findById(decoded.id);
+    if (!user) {
+      return res.status(401).json({ message: 'Not authorized, user not found' });
+    }
+
+    // ตรวจสอบสถานะของผู้ใช้
+    if (user.status === 'inactive') {
+      return res.status(403).json({ message: 'User account is inactive (inactive)' });
+    }
+
+    req.user = user; // เก็บข้อมูลผู้ใช้ทั้งหมดใน req.user
     next();
   } catch (error) {
     console.error('Token verification error:', error.message);
@@ -51,7 +61,6 @@ const authorizeAdminOrSuperAdmin = (req, res, next) => {
       message: 'Only SuperAdmin or Admin is authorized to perform this action',
     });
   }
- // console.log('role', role);
   next();
 };
 

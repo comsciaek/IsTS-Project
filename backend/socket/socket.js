@@ -33,14 +33,14 @@ const initializeSocket = (server) => {
   });
 
   io.on('connection', (socket) => {
-    console.log('A user connected:', socket.id, 'User ID:', socket.userId);
+    // console.log('A user connected:', socket.id, 'User ID:', socket.userId);
   
     // ผู้ใช้เข้าร่วมห้องตาม userId
     socket.join(socket.userId);
   
     // รับข้อมูลผู้ใช้เมื่อเชื่อมต่อ
     socket.on('userConnected', async ({ userId, role }) => {
-      console.log(`User ${userId} (Role: ${role}) connected and joined room: ${userId}`);
+      // console.log(`User ${userId} (Role: ${role}) connected and joined room: ${userId}`);
       socket.userId = userId;
       socket.role = role;
       socket.join(userId);
@@ -133,115 +133,121 @@ const initializeSocket = (server) => {
       console.log(`User ${socket.id} left issue chat: ${issueId}`);
     });
 
-    // ส่งข้อความ
-    socket.on('sendMessage', async ({ issueId, message, fileUrl, receiverId }, callback) => {
-      const session = await mongoose.startSession(); // Start a new session
-      session.startTransaction(); // Begin a transaction
-    
-      try {
-        const userId = socket.userId;
-    
-        // Find the report within the transaction
-        const report = await Report.findById(issueId).session(session);
-        if (
-          !report ||
-          (report.userId?.toString() !== userId && (!report.assignedAdmin || report.assignedAdmin?.toString() !== userId))
-        ) {
-          await session.abortTransaction(); // Abort the transaction
-          session.endSession(); // End the session
-          socket.emit('error', { message: 'Unauthorized' });
-          if (callback) callback({ error: 'Unauthorized' });
-          return;
-        }
-    
-        // Create a new message within the transaction
-        const newMessage = await Chat.create(
-          [
-            {
-              issueId,
-              senderId: userId,
-              message: message || '',
-              file: fileUrl || '',
-            },
-          ],
-          { session }
-        );
-    
-        // Populate the message within the transaction
-        const populatedMessage = await Chat.findById(newMessage[0]._id)
-          .populate('senderId', 'firstName lastName')
-          .session(session);
-    
-        const chatData = {
-          id: populatedMessage._id,
-          issueId: populatedMessage.issueId,
-          senderId: {
-            id: populatedMessage.senderId._id,
-            firstName: populatedMessage.senderId.firstName,
-            lastName: populatedMessage.senderId.lastName,
-          },
-          message: populatedMessage.message,
-          file: populatedMessage.file,
-          createdAt: populatedMessage.createdAt,
-        };
-    
-        // ส่งข้อความไปยังห้อง issueId พร้อมข้อมูล fileMetadata
-        io.to(issueId).emit('messageReceived', {
-          ...chatData,
-          fileMetadata: {
-            name: fileUrl ? fileUrl.split('/').pop() : null,
-            type: fileUrl
-              ? fileUrl.endsWith('.pdf')
-                ? 'application/pdf'
-                : 'image/jpeg' // Adjust based on actual MIME type
-              : null,
-          },
-        });
-    
-        // ถ้ามี receiverId (สำหรับแชท 1:1)
-        if (receiverId && receiverId !== userId) {
-          io.to(receiverId).emit('messageReceived', chatData);
-        }
-    
-        // สร้างการแจ้งเตือนสำหรับผู้รับที่ออฟไลน์
-        const receiverNotification = new Notification({
-          userId: report.userId?.toString() !== userId ? report.userId : report.assignedAdmin,
+   // ส่งข้อความ
+socket.on('sendMessage', async ({ issueId, message, fileUrl, receiverId }, callback) => {
+  const session = await mongoose.startSession(); // Start a new session
+  session.startTransaction(); // Begin a transaction
+
+  try {
+    const userId = socket.userId;
+
+    // Find the report within the transaction
+    const report = await Report.findById(issueId).session(session);
+    if (
+      !report ||
+      (report.userId?.toString() !== userId && (!report.assignedAdmin || report.assignedAdmin?.toString() !== userId))
+    ) {
+      await session.abortTransaction(); // Abort the transaction
+      session.endSession(); // End the session
+      socket.emit('error', { message: 'Unauthorized' });
+      if (callback) callback({ error: 'Unauthorized' });
+      return;
+    }
+
+    // Create a new message within the transaction
+    const newMessage = await Chat.create(
+      [
+        {
           issueId,
-          message: `New message from ${populatedMessage.senderId.firstName} ${populatedMessage.senderId.lastName} in ${report.topic}`,
-          type: 'info',
-          isRead: false,
-          oldStatus: report.status, // Ensure oldStatus is included
-          newStatus: report.status, // Ensure newStatus is included
-          createdAt: new Date(),
-        });
-        await receiverNotification.save({ session });
-    
-        // ส่งการแจ้งเตือนไปยังผู้รับ
-        io.to(receiverNotification.userId).emit('newMessageNotification', {
-          id: receiverNotification._id,
-          issueId,
-          message: receiverNotification.message,
-          isRead: receiverNotification.isRead,
-          createdAt: receiverNotification.createdAt,
-        });
-    
-        await session.commitTransaction(); // Commit the transaction
-        session.endSession(); // End the session
-    
-        if (callback) callback({ message: 'Message sent successfully' });
-      } catch (error) {
-        await session.abortTransaction(); // Abort the transaction in case of an error
-        session.endSession(); // End the session
-        console.error('Error sending message:', error);
-        socket.emit('error', { message: 'Error sending message', error: error.message });
-        if (callback) callback({ error: 'Error sending message', details: error.message });
-      }
+          senderId: userId,
+          message: message || '',
+          file: fileUrl || '',
+        },
+      ],
+      { session }
+    );
+
+    // Populate the message within the transaction
+    const populatedMessage = await Chat.findById(newMessage[0]._id)
+      .populate('senderId', 'firstName lastName role profileImage') // เพิ่ม role และ profileImage
+      .session(session);
+
+    const chatData = {
+      id: populatedMessage._id,
+      issueId: populatedMessage.issueId,
+      senderId: {
+        id: populatedMessage.senderId._id,
+        firstName: populatedMessage.senderId.firstName,
+        lastName: populatedMessage.senderId.lastName,
+        role: populatedMessage.senderId.role, // เพิ่ม role
+        profileImage: populatedMessage.senderId.profileImage, // เพิ่ม profileImage
+      },
+      message: populatedMessage.message,
+      file: populatedMessage.file,
+      createdAt: populatedMessage.createdAt,
+    };
+
+    // ส่งข้อความไปยังห้อง issueId พร้อมข้อมูล fileMetadata
+    io.to(issueId).emit('messageReceived', {
+      ...chatData,
+      fileMetadata: {
+        name: fileUrl ? fileUrl.split('/').pop() : null,
+        type: fileUrl
+          ? fileUrl.endsWith('.pdf')
+            ? 'application/pdf'
+            : fileUrl.endsWith('.png')
+            ? 'image/png'
+            : fileUrl.endsWith('.jpg') || fileUrl.endsWith('.jpeg')
+            ? 'image/jpeg'
+            : 'application/octet-stream' // ปรับปรุงการตรวจสอบ MIME type
+          : null,
+      },
     });
+
+    // ถ้ามี receiverId (สำหรับแชท 1:1)
+    if (receiverId && receiverId !== userId) {
+      io.to(receiverId).emit('messageReceived', chatData);
+    }
+
+    // สร้างการแจ้งเตือนสำหรับผู้รับที่ออฟไลน์
+    const receiverNotification = new Notification({
+      userId: report.userId?.toString() !== userId ? report.userId : report.assignedAdmin,
+      issueId,
+      message: `New message from ${populatedMessage.senderId.firstName} ${populatedMessage.senderId.lastName} in ${report.topic}`,
+      type: 'info',
+      isRead: false,
+      oldStatus: report.status,
+      newStatus: report.status,
+      createdAt: new Date(),
+    });
+    await receiverNotification.save({ session });
+
+    // ส่งการแจ้งเตือนไปยังผู้รับ
+    io.to(receiverNotification.userId.toString()).emit('newMessageNotification', {
+      id: receiverNotification._id,
+      issueId,
+      message: receiverNotification.message,
+      isRead: receiverNotification.isRead,
+      createdAt: receiverNotification.createdAt,
+    });
+
+    await session.commitTransaction(); // Commit the transaction
+    session.endSession(); // End the session
+
+    if (callback) callback({ message: 'Message sent successfully' });
+  } catch (error) {
+    await session.abortTransaction(); // Abort the transaction in case of an error
+    session.endSession(); // End the session
+    console.error('Error sending message:', error);
+    socket.emit('error', { message: 'Error sending message', error: error.message });
+    if (callback) callback({ error: 'Error sending message', details: error.message });
+  }
+});
 
     // อัปเดตสถานะคำร้อง (คงไว้เหมือนเดิม)
     socket.on('reportStatusUpdate', async ({ issueId, status }, callback) => {
       try {
-        console.log(`Updating status for issue ${issueId} to ${status}`);
+        // console.log(`Updating status for issue ${issueId} to ${status}`);
         if (!mongoose.Types.ObjectId.isValid(issueId)) {
           socket.emit('error', { message: 'Invalid issue ID' });
           if (typeof callback === 'function') callback({ error: 'Invalid issue ID' });
@@ -373,7 +379,7 @@ const initializeSocket = (server) => {
     });
 
     socket.on('disconnect', () => {
-      console.log('User disconnected:', socket.id);
+      // console.log('User disconnected:', socket.id);
     });
   });
 

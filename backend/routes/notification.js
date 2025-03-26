@@ -157,6 +157,7 @@ router.get('/:userId', protect, async (req, res) => {
   }
 });
 
+
 router.put('/read/:notificationId', protect, async (req, res) => {
   try {
     const notificationId = req.params.notificationId;
@@ -258,6 +259,40 @@ router.delete('/delete/:notificationId', protect, async (req, res) => {
     });
   } catch (error) {
     console.error('Error deleting notification:', error);
+    res.status(500).json({ message: 'Internal Server Error', error: error.message });
+  }
+});
+
+// ลบการแจ้งเตือนทั้งหมดตาม userId
+router.delete('/deleteAll/:userId', protect, async (req, res) => {
+  try {
+    const userId = req.params.userId;
+
+    // ตรวจสอบว่า userId ถูกต้อง
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: 'Invalid user ID' });
+    }
+
+    // ตรวจสอบว่าเป็นผู้ใช้คนนั้นเองหรือไม่
+    if (userId !== req.user.id) {
+      return res.status(403).json({ message: 'Unauthorized to delete notifications' });
+    }
+
+    // ลบการแจ้งเตือนทั้งหมดของผู้ใช้
+    const result = await Notification.deleteMany({ userId });
+
+    // ส่ง event ผ่าน Socket.IO เพื่อแจ้ง Frontend
+    req.app.locals.io.to(userId).emit('allNotificationsDeleted', {
+      userId,
+      message: 'All notifications have been deleted',
+    });
+
+    res.status(200).json({
+      message: 'All notifications deleted successfully',
+      deletedCount: result.deletedCount, // จำนวนการแจ้งเตือนที่ถูกลบ
+    });
+  } catch (error) {
+    console.error('Error deleting all notifications:', error);
     res.status(500).json({ message: 'Internal Server Error', error: error.message });
   }
 });

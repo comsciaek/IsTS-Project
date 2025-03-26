@@ -45,6 +45,9 @@ const reportSchema = new mongoose.Schema({
     min: 1,
     max: 5,
     default: null, // null ถ้ายังไม่ได้ให้คะแนน
+  },comment: {
+    type: String, // เพิ่มฟิลด์ comment สำหรับเก็บเหตุผลที่ถูกปฏิเสธ
+    default: '', // ค่าเริ่มต้นเป็นสตริงว่าง
   },
 });
 

@@ -14,6 +14,9 @@ import notificationRoutes from './routes/notification.js';
 import jwt from 'jsonwebtoken';
 import Report from './model/Report.js';
 import Notification from './model/Notification.js';
+import User from './model/User.js'; // เพิ่มการ import User
+import Chat from './model/Chat.js'; // เพิ่มการ import Chat
+import cron from 'node-cron'; // เพิ่ม node-cron
 
 dotenv.config();
 
@@ -37,7 +40,7 @@ const port = process.env.PORT || 5000;
 
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
-app.use('/api/reports', reportRoutes(io)); // ส่ง io ไปยัง reportRoutes
+app.use('/api/reports', reportRoutes(io));
 app.use('/api/upload', uploadRoutes);
 app.use('/api/notifications', notificationRoutes);
 
@@ -46,6 +49,7 @@ app.get('/api-test', (req, res) => {
   res.send('Hello World2');
 });
 
+// API สำหรับอัปเดตสถานะของรายงาน
 app.put('/api/reports/:id/status', async (req, res) => {
   try {
     const { id } = req.params;
@@ -159,6 +163,79 @@ app.put('/api/reports/:id/status', async (req, res) => {
   } catch (error) {
     console.error('Error updating report status:', error.message);
     res.status(500).json({ message: 'Internal Server Error', error: error.message });
+  }
+});
+
+// Cron Job สำหรับลบผู้ใช้ที่ลาออกหลังจาก 90 วัน
+cron.schedule('0 0 * * *', async () => { // รันทุกวันตอนเที่ยงคืน
+  console.log('Running cron job to delete inactive users...');
+
+  try {
+    const ninetyDaysAgo = new Date();
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90); // คำนวณวันที่ย้อนหลัง 90 วัน
+
+    const inactiveUsers = await User.find({
+      status: 'inactive',
+      inactiveAt: { $lte: ninetyDaysAgo },
+    });
+
+    for (const user of inactiveUsers) {
+      const userId = user._id;
+
+      const session = await mongoose.startSession();
+      session.startTransaction();
+
+      try {
+        // ลบไฟล์โปรไฟล์ (ถ้ามี)
+        if (user.profileImage) {
+          const fileName = user.profileImage.split('/').pop();
+          const filePath = path.join(__dirname, 'uploads', 'profiles', fileName);
+          try {
+            if (fs.existsSync(filePath)) {
+              await fs.promises.unlink(filePath);
+            }
+          } catch (fileError) {
+            console.error(`Error deleting profile image for user ${userId}:`, fileError);
+          }
+        }
+
+        // ลบไฟล์ในแชท (ถ้ามี)
+        const chats = await Chat.find({ senderId: userId });
+        for (const chat of chats) {
+          if (chat.file) {
+            const fileName = chat.file.split('/').pop();
+            const filePath = path.join(__dirname, 'uploads', 'chat', fileName);
+            try {
+              if (fs.existsSync(filePath)) {
+                await fs.promises.unlink(filePath);
+              }
+            } catch (fileError) {
+              console.error(`Error deleting chat file for user ${userId}:`, fileError);
+            }
+          }
+        }
+
+        // ลบข้อมูลที่เกี่ยวข้อง
+        await Report.deleteMany({ userId }, { session });
+        await Notification.deleteMany({ userId }, { session });
+        await Chat.deleteMany({ senderId: userId }, { session });
+
+        // ลบผู้ใช้
+        await User.deleteOne({ _id: userId }, { session });
+
+        await session.commitTransaction();
+        console.log(`Deleted inactive user: ${user.firstName} ${user.lastName} (${userId})`);
+      } catch (error) {
+        await session.abortTransaction();
+        console.error(`Error deleting inactive user ${userId}:`, error);
+      } finally {
+        session.endSession();
+      }
+    }
+
+    console.log(`Cron job completed. Deleted ${inactiveUsers.length} inactive users.`);
+  } catch (error) {
+    console.error('Error in cron job:', error);
   }
 });
 
