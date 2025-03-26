@@ -16,7 +16,6 @@ import {
   List,
 } from "antd";
 import {
-  DeleteOutlined,
   SearchOutlined,
   UserOutlined,
   ExclamationCircleOutlined,
@@ -125,25 +124,6 @@ const ManageRoles = () => {
         ),
       });
     }
-
-    baseColumns.push({
-      title: "Action",
-      key: "action",
-      width: 60,
-      render: (_, record) => (
-        <Button
-          danger
-          icon={<DeleteOutlined />}
-          onClick={() => handleDeleteUser(record.id, record.name)}
-          size={isMobile ? "small" : "small"}
-          style={{
-            borderRadius: "50%",
-            height: isMobile ? "28px" : "30px",
-            width: isMobile ? "28px" : "30px",
-          }}
-        />
-      ),
-    });
 
     return baseColumns;
   };
@@ -265,37 +245,6 @@ const ManageRoles = () => {
     });
   };
 
-  const handleDeleteUser = (userId, userName) => {
-    confirm({
-      title: `ต้องการลบผู้ใช้ ${userName} หรือไม่?`,
-      icon: <ExclamationCircleOutlined />,
-      content: "การดำเนินการนี้ไม่สามารถเรียกคืนได้",
-      okText: "ลบ",
-      okType: "danger",
-      cancelText: "ยกเลิก",
-      onOk: async () => {
-        try {
-          const token = localStorage.getItem("token");
-
-          await axios.delete(`${API_BASE_URL}/users/${userId}`, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          });
-
-          setUsers((prevUsers) =>
-            prevUsers.filter((user) => user.id !== userId)
-          );
-
-          message.success("ลบผู้ใช้สำเร็จ");
-        } catch (error) {
-          console.error("Error deleting user:", error);
-          message.error("ไม่สามารถลบผู้ใช้ได้");
-        }
-      },
-    });
-  };
-
   const renderMobileList = () => {
     return (
       <List
@@ -312,13 +261,6 @@ const ManageRoles = () => {
                   setSelectedUser(user);
                   setDrawerVisible(true);
                 }}
-              />,
-              <Button
-                key="delete"
-                danger
-                type="text"
-                icon={<DeleteOutlined />}
-                onClick={() => handleDeleteUser(user.id, user.name)}
               />,
             ]}>
             <List.Item.Meta
@@ -410,20 +352,6 @@ const ManageRoles = () => {
                   <Tag color="red">Super Admin</Tag>
                 </Option>
               </Select>
-            </div>
-
-            <div className="pt-8">
-              <Button
-                danger
-                type="primary"
-                icon={<DeleteOutlined />}
-                onClick={() => {
-                  handleDeleteUser(selectedUser.id, selectedUser.name);
-                  setDrawerVisible(false);
-                }}
-                block>
-                ลบผู้ใช้งานนี้
-              </Button>
             </div>
           </div>
         )}

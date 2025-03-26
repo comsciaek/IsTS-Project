@@ -21,6 +21,7 @@ import { hasRequiredRole } from "./utils/authUtils";
 // แต่เนื่องจากไม่ได้ใช้งานในไฟล์นี้จึงลบออกไป
 
 import PropTypes from "prop-types";
+import UserManagement from "./pages/UserManagement";
 
 // Protected Route Component
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -111,6 +112,14 @@ const App = () => {
             element={
               <ProtectedRoute allowedRoles={["SuperAdmin"]}>
                 <ManageRoles />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="user-management"
+            element={
+              <ProtectedRoute allowedRoles={["SuperAdmin"]}>
+                <UserManagement />
               </ProtectedRoute>
             }
           />

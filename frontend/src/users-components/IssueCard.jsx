@@ -70,13 +70,10 @@ const IssueCard = ({
       });
     }
 
-    // สำหรับคำร้องที่เสร็จสิ้นหรือถูกปฏิเสธ ให้แสดงตัวเลือกให้คะแนน
+    // สำหรับคำร้องที่เสร็จสิ้นเท่านั้น ให้แสดงตัวเลือกให้คะแนน (ไม่รวมถูกปฏิเสธ)
     // เฉพาะเมื่อยังไม่เคยมีการให้คะแนนมาก่อน (rating เป็น 0 หรือ null)
     if (
-      (issue.status === "completed" ||
-        issue.status === "rejected" ||
-        issue.status === "เสร็จสิ้น" ||
-        issue.status === "ถูกปฏิเสธ") &&
+      (issue.status === "completed" || issue.status === "เสร็จสิ้น") &&
       readOnly &&
       (!issue.rating || issue.rating === null) // เพิ่มเงื่อนไขตรวจสอบว่ายังไม่เคยให้คะแนน
     ) {
@@ -275,20 +272,24 @@ const IssueCard = ({
             {displayStatus}
           </Tag>
 
-          {/* แสดงคะแนนดาวเฉพาะในโหมด readOnly (tab ประวัติ) และมีคะแนน */}
-          {readOnly && displayRating > 0 && (
-            <div className="flex items-center ml-2">
-              <Rate
-                disabled
-                value={displayRating}
-                allowHalf
-                style={{ fontSize: window.innerWidth < 768 ? "12px" : "14px" }}
-              />
-              <span className="ml-1 text-xs text-gray-500">
-                ({displayRating})
-              </span>
-            </div>
-          )}
+          {/* แสดงคะแนนดาวเฉพาะในโหมด readOnly (tab ประวัติ) และมีคะแนน และเฉพาะคำร้องที่มีสถานะเสร็จสิ้น */}
+          {readOnly &&
+            displayRating > 0 &&
+            (issue.status === "completed" || issue.status === "เสร็จสิ้น") && (
+              <div className="flex items-center ml-2">
+                <Rate
+                  disabled
+                  value={displayRating}
+                  allowHalf
+                  style={{
+                    fontSize: window.innerWidth < 768 ? "12px" : "14px",
+                  }}
+                />
+                <span className="ml-1 text-xs text-gray-500">
+                  ({displayRating})
+                </span>
+              </div>
+            )}
 
           {/* ผู้รับผิดชอบด้านขวา */}
           {hasAssignedAdmin && (

@@ -18,14 +18,14 @@ const ChangePassword = () => {
       okText: "ยืนยัน",
       okType: "primary",
       cancelText: "ยกเลิก",
-      okButtonProps: { 
+      okButtonProps: {
         style: {
           backgroundColor: "#262362",
           transition: "background-color 0.3s",
           border: "none",
         },
         onMouseEnter: (e) => (e.target.style.backgroundColor = "#193CB8"),
-        onMouseLeave: (e) => (e.target.style.backgroundColor = "#262362")
+        onMouseLeave: (e) => (e.target.style.backgroundColor = "#262362"),
       },
       onOk() {
         handleChangePassword(values);
@@ -94,7 +94,26 @@ const ChangePassword = () => {
       <Form.Item
         name="newPassword"
         label="รหัสผ่านใหม่"
-        rules={[{ required: true, message: "กรุณาใส่รหัสผ่านใหม่!" }]}>
+        dependencies={["currentPassword"]} // เพิ่มการพึ่งพารหัสผ่านปัจจุบัน
+        rules={[
+          { required: true, message: "กรุณาใส่รหัสผ่านใหม่!" },
+          ({ getFieldValue }) => ({
+            validator(_, value) {
+              if (!value || getFieldValue("currentPassword") === value) {
+                return Promise.reject(
+                  new Error("รหัสผ่านใหม่ต้องไม่ซ้ำกับรหัสผ่านปัจจุบัน!")
+                );
+              }
+              return Promise.resolve();
+            },
+          }),
+          // เพิ่มเงื่อนไขความซับซ้อนของรหัสผ่าน (ถ้าต้องการ)
+          {
+            pattern: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d]{8,}$/,
+            message:
+              "รหัสผ่านต้องมีอย่างน้อย 8 ตัว ประกอบด้วย ตัวพิมพ์เล็ก ตัวพิมพ์ใหญ่ และตัวเลข",
+          },
+        ]}>
         <Input.Password size={"large"} />
       </Form.Item>
       <Form.Item

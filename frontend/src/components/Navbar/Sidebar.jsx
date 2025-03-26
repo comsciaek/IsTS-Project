@@ -64,6 +64,12 @@ const Sidebar = () => {
       },
       {
         key: "6",
+        icon: <UserOutlined />,
+        label: <NavLink to="/user-management">User Management</NavLink>,
+        allowedroles: ["SuperAdmin"],
+      },
+      {
+        key: "7",
         icon: <SettingOutlined />,
         label: <NavLink to="/settings">Settings</NavLink>,
         allowedroles: ["Admin", "SuperAdmin", "User"],
