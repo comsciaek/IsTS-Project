@@ -52,6 +52,12 @@ const ContentTable = () => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingRecord, setEditingRecord] = useState(null);
 
+  // เพิ่ม state สำหรับ Modal เหตุผลการปฏิเสธ
+  const [rejectModalVisible, setRejectModalVisible] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
+  const [rejectingRecord, setRejectingRecord] = useState(null);
+  const [rejectingLoading, setRejectingLoading] = useState(false);
+
   // อัพเดตฟังก์ชันดึงข้อมูลคำร้องที่มอบหมายให้กับผู้ใช้ที่ล็อกอินอยู่
   const fetchAssignedReports = useCallback(async () => {
     try {
@@ -188,8 +194,16 @@ const ContentTable = () => {
     return statusColors[status] || "default";
   };
 
-  // อัพเดตสถานะคำร้อง
+  // แก้ไขฟังก์ชัน handleStatusChange เพื่อจัดการกรณีปฏิเสธคำร้อง
   const handleStatusChange = async (record, newStatus) => {
+    // กรณีปฏิเสธคำร้อง จะแสดง Modal ให้กรอกเหตุผล
+    if (newStatus === "rejected") {
+      setRejectingRecord(record);
+      setRejectReason("");
+      setRejectModalVisible(true);
+      return; // ออกจากฟังก์ชันก่อน ไม่ดำเนินการต่อจนกว่าจะกรอกเหตุผล
+    }
+
     try {
       const token = localStorage.getItem("token");
       const issueId = record.id || record.issueId;
@@ -262,15 +276,61 @@ const ContentTable = () => {
     }
   };
 
-  // แสดง Modal รายละเอียด
-  const showDetailModal = (record) => {
-    setEditingRecord(record);
-    setIsModalVisible(true);
-  };
+  // เพิ่มฟังก์ชันเพื่อจัดการการปฏิเสธคำร้องพร้อมเหตุผล
+  const handleRejectWithReason = async () => {
+    if (!rejectingRecord) return;
 
-  const handleCancel = () => {
-    setIsModalVisible(false);
-    setEditingRecord(null);
+    try {
+      setRejectingLoading(true);
+      const token = localStorage.getItem("token");
+      const issueId = rejectingRecord.id || rejectingRecord.issueId;
+
+      // ส่งคำขอ API เพื่ออัพเดตสถานะพร้อมเหตุผลการปฏิเสธ
+      await axios.put(
+        `${API_BASE_URL}/reports/edit/${issueId}`,
+        {
+          status: "rejected",
+          comment: rejectReason || "ไม่ได้ระบุเหตุผล", // ส่งเหตุผลไปด้วย
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      // ลบรายการนั้นออกจากตาราง
+      const newData = dataSource.filter(
+        (item) => item.key !== rejectingRecord.key
+      );
+      setDataSource(newData);
+      setFilteredData(
+        filteredData.filter((item) => item.key !== rejectingRecord.key)
+      );
+
+      message.success("ปฏิเสธคำร้องพร้อมระบุเหตุผลเรียบร้อยแล้ว");
+
+      // ส่ง socket event เพื่อแจ้งเตือนผู้ใช้ พร้อมเหตุผลการปฏิเสธ
+      if (socket) {
+        socket.emit("reportStatusUpdate", {
+          issueId: issueId,
+          status: "rejected",
+          topic: rejectingRecord.issue || rejectingRecord.topic || "คำร้อง",
+          comment: rejectReason || "ไม่ได้ระบุเหตุผล", // ส่งเหตุผลไปพร้อมกับการแจ้งเตือน
+        });
+      }
+
+      // ปิด Modal
+      setRejectModalVisible(false);
+      setRejectingRecord(null);
+      setRejectReason("");
+    } catch (error) {
+      console.error("Error rejecting issue with reason:", error);
+      message.error("ไม่สามารถปฏิเสธคำร้องได้");
+    } finally {
+      setRejectingLoading(false);
+    }
   };
 
   // ฟังก์ชันเพิ่มเติมสำหรับตรวจสอบประเภทไฟล์
@@ -320,6 +380,40 @@ const ContentTable = () => {
       </div>
     );
   };
+
+  // แก้ไขฟังก์ชัน showDetailModal
+  const showDetailModal = (record) => {
+    setEditingRecord(record);
+    setIsModalVisible(true);
+  };
+
+  // แก้ไขฟังก์ชัน handleCancel
+  const handleCancel = () => {
+    setIsModalVisible(false);
+    setEditingRecord(null);
+  };
+
+  // แก้ไข dropdown menu items
+  const getActionMenu = (record) => ({
+    items: [
+      {
+        key: "1",
+        label: "รอดำเนินการ",
+        onClick: () => handleStatusChange(record, "pending"),
+      },
+      {
+        key: "2",
+        label: "เสร็จสิ้น",
+        onClick: () => handleStatusChange(record, "completed"),
+      },
+      {
+        key: "3",
+        label: "ปฏิเสธคำร้อง",
+        danger: true,
+        onClick: () => handleStatusChange(record, "rejected"),
+      },
+    ],
+  });
 
   // คอลัมน์ของตาราง
   const columns = [
@@ -419,27 +513,7 @@ const ContentTable = () => {
             onClick={() => showDetailModal(record)}
             icon={<InfoOutlined />}
           />
-          <Dropdown
-            menu={{
-              items: [
-                {
-                  key: "1",
-                  label: "รอดำเนินการ",
-                  onClick: () => handleStatusChange(record, "pending"),
-                },
-                {
-                  key: "2",
-                  label: "เสร็จสิ้น",
-                  onClick: () => handleStatusChange(record, "completed"),
-                },
-                {
-                  key: "3",
-                  label: "ปฏิเสธคำร้อง",
-                  danger: true,
-                  onClick: () => handleStatusChange(record, "rejected"),
-                },
-              ],
-            }}>
+          <Dropdown menu={getActionMenu(record)}>
             <Button
               style={{ borderRadius: "50%", height: "30px", width: "30px" }}
               icon={<EllipsisOutlined />}
@@ -574,6 +648,51 @@ const ContentTable = () => {
             {editingRecord.file && renderAttachment(editingRecord.file)}
           </Modal>
         )}
+
+        {/* เพิ่ม Modal สำหรับกรอกเหตุผลการปฏิเสธ */}
+        <Modal
+          title="ระบุเหตุผลการปฏิเสธคำร้อง"
+          open={rejectModalVisible}
+          onCancel={() => {
+            if (!rejectingLoading) {
+              setRejectModalVisible(false);
+              setRejectingRecord(null);
+              setRejectReason("");
+            }
+          }}
+          footer={[
+            <Button
+              key="cancel"
+              onClick={() => {
+                if (!rejectingLoading) {
+                  setRejectModalVisible(false);
+                  setRejectingRecord(null);
+                  setRejectReason("");
+                }
+              }}
+              disabled={rejectingLoading}>
+              ยกเลิก
+            </Button>,
+            <Button
+              key="submit"
+              type="primary"
+              danger
+              onClick={handleRejectWithReason}
+              loading={rejectingLoading}>
+              ยืนยันการปฏิเสธ
+            </Button>,
+          ]}>
+          <div>
+            <p>กรุณาระบุเหตุผลในการปฏิเสธคำร้องนี้ เพื่อแจ้งให้ผู้ใช้ทราบ:</p>
+            <Input.TextArea
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              placeholder="ระบุเหตุผลการปฏิเสธคำร้องนี้..."
+              autoSize={{ minRows: 3, maxRows: 6 }}
+              style={{ marginTop: "10px" }}
+            />
+          </div>
+        </Modal>
       </Content>
     </Layout>
   );

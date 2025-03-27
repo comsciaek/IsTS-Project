@@ -41,7 +41,7 @@ export const SocketProvider = ({ children }) => {
   };
 
   // สร้างข้อความแจ้งเตือนตามสถานะที่เปลี่ยน
-  const getStatusChangeMessage = (oldStatus, newStatus, topic) => {
+  const getStatusChangeMessage = (oldStatus, newStatus, topic, comment) => {
     // ถ้ามีการอัพเดตจากสถานะ pending ไปเป็นสถานะอื่น
     if (oldStatus === "pending") {
       switch (newStatus) {
@@ -50,7 +50,10 @@ export const SocketProvider = ({ children }) => {
         case "approved":
           return `คำร้องเรื่อง "${topic}" ได้รับการอนุมัติแล้ว`;
         case "rejected":
-          return `คำร้องเรื่อง "${topic}" ถูกปฏิเสธ`;
+          // เพิ่มเหตุผลการปฏิเสธถ้ามี
+          return comment
+            ? `คำร้องเรื่อง "${topic}" ถูกปฏิเสธ เนื่องจาก: ${comment}`
+            : `คำร้องเรื่อง "${topic}" ถูกปฏิเสธ`;
         default:
           return `มีการอัปเดตสถานะคำร้องเรื่อง "${topic}"`;
       }
@@ -67,7 +70,10 @@ export const SocketProvider = ({ children }) => {
         case "approved":
           return `คำร้องเรื่อง "${topic}" ได้รับการอนุมัติแล้ว`;
         case "rejected":
-          return `คำร้องเรื่อง "${topic}" ถูกปฏิเสธ`;
+          // เพิ่มเหตุผลการปฏิเสธถ้ามี
+          return comment
+            ? `คำร้องเรื่อง "${topic}" ถูกปฏิเสธ เนื่องจาก: ${comment}`
+            : `คำร้องเรื่อง "${topic}" ถูกปฏิเสธ`;
         default:
           return `มีการอัปเดตสถานะคำร้องเรื่อง "${topic}" จาก ${oldStatus} เป็น ${newStatus}`;
       }
@@ -272,12 +278,20 @@ export const SocketProvider = ({ children }) => {
             `notif_${Date.now()}${Math.random().toString(36).substr(2, 5)}`,
           issueId: data.issueId,
           userId: data.userId,
-          message: data.message,
+          message:
+            data.message ||
+            getStatusChangeMessage(
+              data.oldStatus,
+              data.status || data.newStatus,
+              data.topic || "คำร้อง",
+              data.comment // เพิ่มพารามิเตอร์ comment
+            ),
           oldStatus: data.oldStatus,
           newStatus: data.status || data.newStatus,
           createdAt: data.createdAt || new Date().toISOString(),
           read: false,
           type: getNotificationType(data.status || data.newStatus),
+          comment: data.comment, // เก็บเหตุผลการปฏิเสธใน notification object
         };
 
         setNotifications((prev) => [notification, ...prev]);
@@ -301,7 +315,8 @@ export const SocketProvider = ({ children }) => {
             getStatusChangeMessage(
               data.oldStatus || "รอดำเนินการ",
               data.status,
-              data.topic || "คำร้อง"
+              data.topic || "คำร้อง",
+              data.comment // เพิ่มพารามิเตอร์ comment
             ),
           oldStatus: data.oldStatus,
           newStatus: data.status,
@@ -309,6 +324,7 @@ export const SocketProvider = ({ children }) => {
           createdAt: new Date().toISOString(),
           read: false,
           type: getNotificationType(data.status),
+          comment: data.comment, // เก็บเหตุผลการปฏิเสธใน notification object
         };
 
         setNotifications((prev) => [notification, ...prev]);
@@ -329,20 +345,18 @@ export const SocketProvider = ({ children }) => {
             issueId: data.issueId,
             message:
               data.message ||
-              `สถานะคำร้องถูกเปลี่ยนเป็น ${
-                data.newStatus === "completed"
-                  ? "เสร็จสิ้น"
-                  : data.newStatus === "approved"
-                  ? "อนุมัติแล้ว"
-                  : data.newStatus === "rejected"
-                  ? "ถูกปฏิเสธ"
-                  : "รอดำเนินการ"
-              }`,
+              getStatusChangeMessage(
+                data.oldStatus || "รอดำเนินการ",
+                data.newStatus || data.status,
+                data.topic || "คำร้อง",
+                data.comment // เพิ่มพารามิเตอร์ comment
+              ),
             oldStatus: data.oldStatus,
-            newStatus: data.newStatus,
+            newStatus: data.newStatus || data.status,
             createdAt: new Date().toISOString(),
             read: true, // ตั้งเป็น true เพราะผู้ใช้น่าจะเห็นการเปลี่ยนแปลงนี้ทันทีในหน้าแชท
-            type: getNotificationType(data.newStatus),
+            type: getNotificationType(data.newStatus || data.status),
+            comment: data.comment, // เก็บเหตุผลการปฏิเสธใน notification object
           };
 
           // อาจไม่จำเป็นต้องเพิ่มเข้า notifications array ถ้าผู้ใช้เห็นการเปลี่ยนแปลงแล้วในหน้าแชท
@@ -528,10 +542,14 @@ export const SocketProvider = ({ children }) => {
 
   // ฟังก์ชันสำหรับอัปเดตสถานะคำร้องผ่าน socket
   const updateReportStatus = useCallback(
-    (issueId, status, topic = null) => {
+    (issueId, status, topic = null, comment = null) => {
       if (socket && socket.connected) {
         // เตรียมข้อมูลสำหรับส่งไปยัง server
-        const data = { issueId, status };
+        const data = {
+          issueId,
+          status,
+          comment, // เพิ่ม comment ถ้ามี
+        };
 
         // เพิ่ม topic ถ้ามี
         if (topic) {

@@ -155,7 +155,7 @@ const Sidebar = () => {
         breakpoint="lg"
         collapsedWidth="50"
         className="bg-white"
-        width={170}>
+        width={187}>
         <div className="logo-container mt-6">
           <Link to="/">
             <img src={logo} alt="logo" />

@@ -88,6 +88,8 @@ const Reports = () => {
         description: report.description || "ไม่มีคำอธิบาย",
         status: report.status || "unknown",
         date: report.date || report.createdAt || new Date(),
+        // เพิ่มการดึงข้อมูลเหตุผลการปฏิเสธ
+        comment: report.comment,
         submitter: report.userId
           ? {
               name:
@@ -484,6 +486,19 @@ const Reports = () => {
                     ? "เสร็จสิ้น"
                     : "ถูกปฏิเสธ"}
                 </Tag>
+
+                {/* เพิ่มส่วนแสดงเหตุผลการปฏิเสธ */}
+                {selectedReport.status === "rejected" &&
+                  selectedReport.comment && (
+                    <div className="mt-3">
+                      <div className="text-red-500 font-medium">
+                        เหตุผลที่ถูกปฏิเสธ:
+                      </div>
+                      <div className="mt-1 text-gray-700 bg-red-50 p-3 rounded border-l-2 border-red-300">
+                        {selectedReport.comment}
+                      </div>
+                    </div>
+                  )}
               </div>
 
               <Divider style={{ margin: "16px 0" }} />

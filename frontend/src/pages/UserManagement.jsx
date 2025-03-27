@@ -6,8 +6,6 @@ import {
   message,
   Input,
   Modal,
-  Form,
-  Select,
   Avatar,
   Spin,
   Tag,
@@ -19,7 +17,6 @@ import {
   UserOutlined,
   ReloadOutlined,
   EllipsisOutlined,
-  EditOutlined,
   DeleteOutlined,
   HistoryOutlined,
   SolutionOutlined,
@@ -33,11 +30,8 @@ const UserManagement = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState("");
-  const [isModalVisible, setIsModalVisible] = useState(false);
-  const [selectedUser, setSelectedUser] = useState(null);
   const [confirmModalVisible, setConfirmModalVisible] = useState(false);
   const [selectedDeleteUser, setSelectedDeleteUser] = useState(null);
-  const [form] = Form.useForm();
   const [issuesModalVisible, setIssuesModalVisible] = useState(false);
   const [userIssues, setUserIssues] = useState([]);
   const [loadingIssues, setLoadingIssues] = useState(false);
@@ -117,51 +111,6 @@ const UserManagement = () => {
     }
   };
 
-  // Edit user
-  const handleEditUser = (user) => {
-    setSelectedUser(user);
-
-    // กำหนดค่าเริ่มต้นของฟอร์ม
-    form.setFieldsValue({
-      firstName: user.firstName || "",
-      lastName: user.lastName || "",
-      email: user.email,
-      role: user.role,
-      status: user.status || "active",
-      department: user.department || "",
-    });
-
-    setIsModalVisible(true);
-  };
-
-  // Save user changes
-  const handleSaveUser = async (values) => {
-    try {
-      const token = localStorage.getItem("token");
-      const userId = selectedUser._id || selectedUser.id;
-
-      // อัพเดตข้อมูลผู้ใช้ผ่าน API ที่มีอยู่แล้ว
-      await axios.put(`${API_BASE_URL}/users/edit/${userId}`, values, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      // อัพเดตข้อมูลในตาราง
-      setUsers(
-        users.map((user) =>
-          user._id === userId || user.id === userId
-            ? { ...user, ...values }
-            : user
-        )
-      );
-
-      message.success("อัพเดตข้อมูลผู้ใช้เรียบร้อยแล้ว");
-      setIsModalVisible(false);
-    } catch (error) {
-      console.error("Error updating user:", error);
-      message.error("ไม่สามารถอัพเดตข้อมูลผู้ใช้ได้");
-    }
-  };
-
   // เพิ่มฟังก์ชันสำหรับลบผู้ใช้
   const handleDeleteUser = async (userId) => {
     try {
@@ -199,29 +148,50 @@ const UserManagement = () => {
       setSelectedUserForIssues(user);
 
       const token = localStorage.getItem("token");
+      const userId = user._id || user.id;
 
-      // เปลี่ยนมาใช้ endpoint /reports/user/me แทน
-      const endpoint = `${API_BASE_URL}/reports/user/me`;
+      // เปลี่ยนมาใช้ endpoint /reports/admin/all แทน
+      const endpoint = `${API_BASE_URL}/reports/admin/all`;
+
+      console.log(`กำลังดึงข้อมูลคำร้องทั้งหมดจาก ${endpoint}`);
 
       const response = await axios.get(endpoint, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
       // ตรวจสอบรูปแบบการตอบกลับ
-      let issueData = [];
+      let allIssues = [];
       if (response.data && Array.isArray(response.data.data)) {
-        issueData = response.data.data;
+        allIssues = response.data.data;
       } else if (response.data && Array.isArray(response.data)) {
-        issueData = response.data;
+        allIssues = response.data;
       } else {
         console.warn("Unexpected API response format:", response.data);
-        issueData = [];
+        allIssues = [];
       }
 
-      // เพิ่ม logging เพื่อตรวจสอบข้อมูลที่ได้รับ
-      console.log(`ประวัติคำร้องของผู้ใช้:`, issueData);
+      console.log(`ดึงข้อมูลคำร้องทั้งหมดได้ ${allIssues.length} รายการ`);
 
-      setUserIssues(issueData);
+      // กรองเฉพาะคำร้องของผู้ใช้ที่เลือก
+      const userIssues = allIssues.filter((issue) => {
+        // ตรวจสอบว่ามี userId หรือไม่
+        if (!issue.userId) return false;
+
+        // กรณี userId เป็น object (มีการ populate ข้อมูล)
+        if (typeof issue.userId === "object") {
+          const issueUserId = issue.userId._id || issue.userId.id;
+          return issueUserId === userId;
+        }
+
+        // กรณี userId เป็น string
+        return issue.userId === userId;
+      });
+
+      console.log(
+        `พบคำร้องของผู้ใช้ ${userId} จำนวน ${userIssues.length} รายการ`
+      );
+
+      setUserIssues(userIssues);
       setIssuesModalVisible(true);
     } catch (error) {
       console.error("Error fetching user issues:", error);
@@ -356,15 +326,16 @@ const UserManagement = () => {
       title: "ผู้ใช้งาน",
       key: "user",
       render: (_, record) => (
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-2 sm:space-x-3">
           <Avatar
             src={record.profileImage || record.profilePicture}
             icon={
               !record.profileImage && !record.profilePicture && <UserOutlined />
             }
+            size={window.innerWidth < 576 ? "small" : "default"}
           />
           <div>
-            <div className="font-medium">
+            <div className="font-medium text-sm sm:text-base">
               {`${record.firstName || ""} ${record.lastName || ""}`.trim()}
             </div>
             <div className="text-xs text-gray-500">{record.email}</div>
@@ -376,12 +347,16 @@ const UserManagement = () => {
         const nameB = `${b.firstName || ""} ${b.lastName || ""}`.trim();
         return nameA.localeCompare(nameB);
       },
+      width: "30%",
+      ellipsis: true,
     },
     {
       title: "แผนก",
       dataIndex: "department",
       key: "department",
       render: (department) => department || "-",
+      responsive: ["sm", "md", "lg", "xl"], // ไม่แสดงบนมือถือ
+      width: "15%",
     },
     {
       title: "บทบาท",
@@ -390,7 +365,7 @@ const UserManagement = () => {
       render: (role) => (
         <Tag
           color={
-            role === "SuperAdmin" ? "red" : role === "Admin" ? "blue" : "green"
+            role === "SuperAdmin" ? "red" : role === "Admin" ? "green" : "blue"
           }>
           {role}
         </Tag>
@@ -401,6 +376,7 @@ const UserManagement = () => {
         { text: "SuperAdmin", value: "SuperAdmin" },
       ],
       onFilter: (value, record) => record.role === value,
+      width: "15%",
     },
     {
       title: "สถานะ",
@@ -416,6 +392,7 @@ const UserManagement = () => {
           }
           checkedChildren="active"
           unCheckedChildren="inactive"
+          size={window.innerWidth < 576 ? "small" : "default"}
         />
       ),
       filters: [
@@ -423,6 +400,8 @@ const UserManagement = () => {
         { text: "inactive", value: "inactive" },
       ],
       onFilter: (value, record) => (record.status || "active") === value,
+      width: "15%",
+      responsive: ["sm", "md", "lg", "xl"], // ไม่แสดงบนมือถือขนาดเล็ก
     },
     {
       title: "การจัดการ",
@@ -431,18 +410,12 @@ const UserManagement = () => {
         // สร้างรายการเมนูตามบทบาทของผู้ใช้
         const menuItems = [];
 
-        // ตัวเลือกแก้ไขสำหรับทุกคน
-        menuItems.push({
-          key: "1",
-          icon: <EditOutlined />,
-          label: "แก้ไข",
-          onClick: () => handleEditUser(record),
-        });
+        // ลบการแก้ไขผู้ใช้ออก - ไม่รวม item นี้ใน menuItems
 
         // ตัวเลือกประวัติคำร้องสำหรับ User
         if (record.role === "User") {
           menuItems.push({
-            key: "2",
+            key: "1", // เปลี่ยน key เป็น 1 เพราะไม่มีแก้ไขแล้ว
             icon: <HistoryOutlined />,
             label: "ดูประวัติคำร้อง",
             onClick: () => fetchUserIssues(record),
@@ -452,7 +425,7 @@ const UserManagement = () => {
         // ตัวเลือกคำร้องที่ได้รับมอบหมายสำหรับ Admin และ SuperAdmin
         if (record.role === "Admin" || record.role === "SuperAdmin") {
           menuItems.push({
-            key: "2",
+            key: "1", // เปลี่ยน key เป็น 1 เพราะไม่มีแก้ไขแล้ว
             icon: <SolutionOutlined />,
             label: "รายการคำร้องที่ได้รับมอบหมาย",
             onClick: () => fetchAssignedIssues(record),
@@ -461,7 +434,7 @@ const UserManagement = () => {
 
         // ตัวเลือกลบสำหรับทุกคน
         menuItems.push({
-          key: "3",
+          key: "2", // เปลี่ยน key เป็น 2 เพราะไม่มีแก้ไขแล้ว
           icon: <DeleteOutlined />,
           label: "ลบ",
           danger: true,
@@ -486,32 +459,40 @@ const UserManagement = () => {
           </Dropdown>
         );
       },
+      width: "10%",
     },
   ];
 
   return (
-    <div className="p-6">
-      <div className="mb-4 flex justify-between items-center">
-        <h1 className="text-xl font-bold">จัดการผู้ใช้งาน</h1>
-        <div className="flex space-x-2">
-          <Input.Search
-            placeholder="ค้นหาผู้ใช้งาน..."
-            onChange={(e) => setSearchText(e.target.value)}
-            style={{ width: 300 }}
-          />
-          <Button
-            onClick={fetchUsers}
-            type="primary"
-            style={{
-              backgroundColor: "#262362",
-              transition: "background-color 0.3s",
-              border: "none",
-            }}
-            onMouseEnter={(e) => (e.target.style.backgroundColor = "#193CB8")}
-            onMouseLeave={(e) => (e.target.style.backgroundColor = "#262362")}
-            icon={<ReloadOutlined />}>
-            รีเฟรช
-          </Button>
+    <div className="p-3 sm:p-6 bg-white rounded-lg shadow-md">
+      <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+        <h1 className="text-lg sm:text-xl font-bold">จัดการผู้ใช้งาน</h1>
+        <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto items-start sm:items-center">
+          <div className="w-full max-w-md relative flex justify-center items-center gap-2">
+            <Input.Search
+              placeholder="ค้นหาผู้ใช้งาน..."
+              onChange={(e) => setSearchText(e.target.value)}
+              style={{ width: "100%", maxWidth: "300px" }}
+              size={window.innerWidth < 576 ? "middle" : "middle"}
+            />
+            <Button
+              type="primary"
+              onClick={fetchUsers}
+              style={{
+                backgroundColor: "#262362",
+                transition: "background-color 0.3s",
+                border: "none",
+                borderRadius: "50%",
+                height: "32px",
+                width: "32px",
+              }}
+              onMouseEnter={(e) => (e.target.style.backgroundColor = "#193CB8")}
+              onMouseLeave={(e) =>
+                (e.target.style.backgroundColor = "#262362")
+              }>
+              <ReloadOutlined />
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -520,91 +501,22 @@ const UserManagement = () => {
           <Spin size="large" />
         </div>
       ) : (
-        <Table
-          columns={columns}
-          dataSource={filteredUsers}
-          rowKey={(record) => record._id || record.id}
-          pagination={{ pageSize: 10 }}
-          locale={{ emptyText: "ไม่พบข้อมูลผู้ใช้งาน" }}
-        />
+        <div className="overflow-x-auto">
+          <Table
+            columns={columns}
+            dataSource={filteredUsers}
+            rowKey={(record) => record._id || record.id}
+            pagination={{
+              pageSize: window.innerWidth < 576 ? 5 : 10,
+              responsive: true,
+              size: window.innerWidth < 576 ? "small" : "default",
+            }}
+            locale={{ emptyText: "ไม่พบข้อมูลผู้ใช้งาน" }}
+            size={window.innerWidth < 576 ? "small" : "middle"}
+            scroll={{ x: "max-content" }}
+          />
+        </div>
       )}
-
-      <Modal
-        title="แก้ไขข้อมูลผู้ใช้"
-        open={isModalVisible}
-        onCancel={() => setIsModalVisible(false)}
-        footer={null}>
-        <Form form={form} layout="vertical" onFinish={handleSaveUser}>
-          <Form.Item
-            name="firstName"
-            label="ชื่อ"
-            rules={[{ required: true, message: "กรุณาระบุชื่อ" }]}>
-            <Input />
-          </Form.Item>
-
-          <Form.Item
-            name="lastName"
-            label="นามสกุล"
-            rules={[{ required: true, message: "กรุณาระบุนามสกุล" }]}>
-            <Input />
-          </Form.Item>
-
-          <Form.Item
-            name="email"
-            label="อีเมล"
-            rules={[
-              { required: true, message: "กรุณาระบุอีเมล" },
-              { type: "email", message: "รูปแบบอีเมลไม่ถูกต้อง" },
-            ]}>
-            <Input readOnly />
-          </Form.Item>
-
-          <Form.Item name="department" label="แผนก">
-            <Input />
-          </Form.Item>
-
-          <Form.Item name="role" label="บทบาท">
-            <Select>
-              <Select.Option value="User">User</Select.Option>
-              <Select.Option value="Admin">Admin</Select.Option>
-              <Select.Option value="SuperAdmin">SuperAdmin</Select.Option>
-            </Select>
-          </Form.Item>
-
-          <Form.Item name="status" label="สถานะ">
-            <Select>
-              <Select.Option value="active">active</Select.Option>
-              <Select.Option value="inactive">inactive</Select.Option>
-            </Select>
-          </Form.Item>
-
-          <Form.Item>
-            <div className="flex justify-end">
-              <Button
-                onClick={() => setIsModalVisible(false)}
-                style={{ marginRight: 8 }}>
-                ยกเลิก
-              </Button>
-              <Button
-                type="primary"
-                htmlType="submit"
-                style={{
-                  backgroundColor: "#262362",
-                  transition: "background-color 0.3s",
-                  border: "none",
-                }}
-                onMouseEnter={(e) =>
-                  (e.target.style.backgroundColor = "#193CB8")
-                }
-                onMouseLeave={(e) =>
-                  (e.target.style.backgroundColor = "#262362")
-                }>
-                บันทึกการเปลี่ยนแปลง
-              </Button>
-            </div>
-          </Form.Item>
-        </Form>
-      </Modal>
 
       {/* เพิ่ม Modal ยืนยันการลบผู้ใช้ */}
       <Modal
@@ -680,10 +592,20 @@ const UserManagement = () => {
                           ? `${item.description.substring(0, 100)}...`
                           : item.description || "ไม่มีคำอธิบาย"}
                       </div>
-                      <div className="flex justify-between text-xs">
-                        <span>
-                          รหัสคำร้อง: {item._id || item.issueId || "ไม่ระบุ"}
-                        </span>
+                      {/* เพิ่มการแสดงเหตุผลการปฏิเสธ */}
+                      {(item.status === "rejected" ||
+                        item.status === "ถูกปฏิเสธ") &&
+                        item.comment && (
+                          <div className="mt-1">
+                            <div className="text-red-500 text-xs font-medium">
+                              เหตุผลที่ถูกปฏิเสธ:
+                            </div>
+                            <div className="text-xs bg-red-50 p-2 border-l-2 border-red-300 mt-1">
+                              {item.comment}
+                            </div>
+                          </div>
+                        )}
+                      <div className="flex justify-between text-xs mt-2">
                         <span>
                           วันที่:{" "}
                           {dayjs(item.createdAt || item.date).format(
@@ -691,6 +613,19 @@ const UserManagement = () => {
                           )}
                         </span>
                       </div>
+                      {/* เพิ่มข้อมูลผู้รับผิดชอบ */}
+                      {item.assignedAdmin && (
+                        <div className="text-xs text-gray-500 mt-1">
+                          <span>
+                            ผู้รับผิดชอบ:{" "}
+                            {item.assignedAdmin.firstName
+                              ? `${item.assignedAdmin.firstName} ${
+                                  item.assignedAdmin.lastName || ""
+                                }`
+                              : item.assignedAdmin.name || "ไม่ระบุชื่อ"}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   }
                 />
@@ -753,10 +688,20 @@ const UserManagement = () => {
                           ? `${item.description.substring(0, 100)}...`
                           : item.description || "ไม่มีคำอธิบาย"}
                       </div>
-                      <div className="flex justify-between text-xs">
-                        <span>
-                          รหัสคำร้อง: {item._id || item.issueId || "ไม่ระบุ"}
-                        </span>
+                      {/* เพิ่มการแสดงเหตุผลการปฏิเสธ */}
+                      {(item.status === "rejected" ||
+                        item.status === "ถูกปฏิเสธ") &&
+                        item.comment && (
+                          <div className="mt-1">
+                            <div className="text-red-500 text-xs font-medium">
+                              เหตุผลที่ถูกปฏิเสธ:
+                            </div>
+                            <div className="text-xs bg-red-50 p-2 border-l-2 border-red-300 mt-1">
+                              {item.comment}
+                            </div>
+                          </div>
+                        )}
+                      <div className="flex justify-between text-xs mt-2">
                         <span>
                           วันที่:{" "}
                           {dayjs(item.createdAt || item.date).format(
@@ -773,18 +718,6 @@ const UserManagement = () => {
                                   item.userId.lastName || ""
                                 }`
                               : item.userId.name || "ไม่ระบุชื่อ"}
-                          </span>
-                        </div>
-                      )}
-                      {item.assignedAdmin && (
-                        <div className="text-xs text-gray-500 mt-1">
-                          <span>
-                            ผู้รับผิดชอบ:{" "}
-                            {item.assignedAdmin.firstName
-                              ? `${item.assignedAdmin.firstName} ${
-                                  item.assignedAdmin.lastName || ""
-                                }`
-                              : item.assignedAdmin.name || "ไม่ระบุชื่อ"}
                           </span>
                         </div>
                       )}

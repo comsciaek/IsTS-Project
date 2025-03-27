@@ -106,6 +106,8 @@ const IssueCard = ({
   const description = issue.description || "";
   const date = issue.date || issue.createdAt || issue.updatedAt;
   const status = issue.status || "รอดำเนินการ";
+  // เพิ่มการดึงข้อมูล comment ที่อาจเป็นเหตุผลการปฏิเสธ
+  const rejectReason = issue.comment || null;
 
   // ข้อมูลผู้ใช้จะเก็บแยกอยู่แล้ว ไม่มีในคำร้อง
   const employeeName =
@@ -325,6 +327,22 @@ const IssueCard = ({
           )}
         </div>
 
+        {/* เพิ่มส่วนแสดงเหตุผลการปฏิเสธ */}
+        {readOnly &&
+          (issue.status === "rejected" || issue.status === "ถูกปฏิเสธ") &&
+          rejectReason && (
+            <div className="mt-3 pt-2 border-t border-gray-200">
+              <div className="flex items-start">
+                <div className="text-red-500 font-medium text-sm">
+                  เหตุผลที่ถูกปฏิเสธ:
+                </div>
+              </div>
+              <div className="mt-1 text-sm text-gray-700 bg-red-50 p-2 rounded border-l-2 border-red-300">
+                {rejectReason}
+              </div>
+            </div>
+          )}
+
         {/* แสดงไฟล์แนบ */}
         {fileUrl && (
           <div className="mt-4 pt-3 border-t border-gray-400">
@@ -425,6 +443,7 @@ IssueCard.propTypes = {
     createdAt: PropTypes.string,
     updatedAt: PropTypes.string,
     rating: PropTypes.number,
+    comment: PropTypes.string, // เพิ่ม comment สำหรับเหตุผลการปฏิเสธ
     assignedAdmin: PropTypes.shape({
       _id: PropTypes.string,
       id: PropTypes.string,
