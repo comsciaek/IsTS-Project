@@ -17,6 +17,8 @@ import Notification from './model/Notification.js';
 import User from './model/User.js'; // เพิ่มการ import User
 import Chat from './model/Chat.js'; // เพิ่มการ import Chat
 import cron from 'node-cron'; // เพิ่ม node-cron
+import axios from 'axios';
+import { createHmac } from 'crypto';
 
 dotenv.config();
 
@@ -43,6 +45,142 @@ app.use('/api/users', userRoutes);
 app.use('/api/reports', reportRoutes(io));
 app.use('/api/upload', uploadRoutes);
 app.use('/api/notifications', notificationRoutes);
+
+// Channel Secret และ Access Token จาก LINE Developers Console
+const CHANNEL_SECRET = process.env.CHANNEL_SECRET;
+const CHANNEL_ACCESS_TOKEN = process.env.CHANNEL_ACCESS_TOKEN;
+
+console.log('CHANNEL_SECRET:', CHANNEL_SECRET);
+console.log('CHANNEL_ACCESS_TOKEN:', CHANNEL_ACCESS_TOKEN);
+
+// Schema สำหรับเก็บการเชื่อมโยงระหว่าง lineUserId และ employeeId
+const UserLinkSchema = new mongoose.Schema({
+  lineUserId: { type: String, required: true, unique: true },
+  employeeId: { type: String, required: true, unique: true },
+  linkedAt: { type: Date, default: Date.now },
+});
+const UserLink = mongoose.model('UserLink', UserLinkSchema);
+
+// Schema สำหรับข้อมูลพนักงาน
+const EmployeeSchema = new mongoose.Schema({
+  employeeId: { type: String, required: true, unique: true },
+  firstName: String,
+  lastName: String,
+});
+const Employee = mongoose.model('Employee', EmployeeSchema);
+
+// ฟังก์ชันส่งข้อความผ่าน LINE Messaging API
+const sendMessage = async (lineUserId, message) => {
+  try {
+    await axios.post(
+      'https://api.line.me/v2/bot/message/push',
+      {
+        to: lineUserId,
+        messages: [{ type: 'text', text: message }],
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${CHANNEL_ACCESS_TOKEN}`,
+        },
+      }
+    );
+    console.log('Message sent successfully to:', lineUserId);
+  } catch (error) {
+    console.error('Error sending message:', error.response?.data || error.message);
+  }
+};
+
+// Webhook เพื่อรับข้อความจาก LINE
+app.post('/webhook', async (req, res) => {
+  console.log('Webhook received:', JSON.stringify(req.body, null, 2)); // ล็อก request ที่ได้รับ
+  console.log('Headers:', req.headers); // ล็อก headers เพื่อดู x-line-signature
+
+  // ตรวจสอบความถูกต้องของ request ด้วย signature
+  const signature = req.headers['x-line-signature'];
+  if (!signature) {
+    console.error('Missing X-Line-Signature header');
+    return res.status(200).json({ message: 'Webhook processed' });
+  }
+
+  const body = JSON.stringify(req.body);
+  const hash = createHmac('SHA256', CHANNEL_SECRET).update(body).digest('base64');
+  if (signature !== hash) {
+    console.error('Invalid signature');
+    return res.status(200).json({ message: 'Webhook processed' });
+  }
+
+  const events = req.body.events;
+  for (const event of events) {
+    if (event.type === 'message' && event.message.type === 'text') {
+      const lineUserId = event.source.userId;
+      const messageText = event.message.text.trim();
+
+      console.log(`Message from ${lineUserId}: ${messageText}`); // ล็อกข้อความที่ได้รับ
+
+      // ตรวจสอบว่าผู้ใช้ลงทะเบียนแล้วหรือยัง
+      const userLink = await UserLink.findOne({ lineUserId });
+
+      if (messageText.toLowerCase() === 'ลงทะเบียน') {
+        if (userLink) {
+          await sendMessage(lineUserId, `คุณลงทะเบียนแล้วด้วยรหัสพนักงาน: ${userLink.employeeId}`);
+        } else {
+          await sendMessage(lineUserId, 'กรุณากรอกรหัสพนักงานของคุณ (เช่น EMP001) เพื่อลงทะเบียน');
+        }
+      } else if (!userLink) {
+        // ถ้ายังไม่ได้ลงทะเบียน ให้ถือว่าข้อความที่ส่งมาเป็นรหัสพนักงาน
+        const employeeId = messageText.trim(); // ตัดช่องว่าง
+
+        console.log('Searching for employeeId in User table:', employeeId);
+
+        // ตรวจสอบว่ารหัสพนักงานถูกต้องในคอลเลกชัน User
+        const user = await User.findOne({ employeeId: { $regex: new RegExp(`^${employeeId}$`, 'i') } });
+        if (!user) {
+          console.log('Employee ID not found in User table');
+          await sendMessage(lineUserId, 'รหัสพนักงานไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง');
+          return;
+        }
+
+        console.log('Employee ID found in User table:', user);
+
+        // ตรวจสอบว่ารหัสพนักงานนี้ถูกใช้ไปแล้วหรือไม่
+        const existingLink = await UserLink.findOne({ employeeId });
+        if (existingLink) {
+          await sendMessage(lineUserId, 'รหัสพนักงานนี้ถูกใช้ลงทะเบียนแล้ว กรุณาติดต่อผู้ดูแลระบบ');
+          return;
+        }
+
+        // บันทึกการเชื่อมโยง
+        await UserLink.create({ lineUserId, employeeId });
+        await sendMessage(
+          lineUserId,
+          `ลงทะเบียนสำเร็จ! รหัสพนักงานของคุณคือ ${employeeId} คุณจะได้รับการแจ้งเตือนผ่าน LINE`
+        );
+      } else {
+        await sendMessage(lineUserId, 'คุณลงทะเบียนแล้ว หากต้องการความช่วยเหลือเพิ่มเติม กรุณาติดต่อผู้ดูแลระบบ');
+      }
+    }
+  }
+
+  res.status(200).json({ message: 'Webhook processed' });
+});
+
+// API สำหรับส่งข้อความแจ้งเตือน
+app.post('/notify-employee', async (req, res) => {
+  const { employeeId, message } = req.body;
+
+  if (!employeeId || !message) {
+    return res.status(400).json({ message: 'Employee ID and message are required' });
+  }
+
+  const userLink = await UserLink.findOne({ employeeId });
+  if (!userLink) {
+    return res.status(404).json({ message: 'Employee not linked with LINE' });
+  }
+
+  await sendMessage(userLink.lineUserId, message);
+  res.status(200).json({ message: 'Notification sent successfully' });
+});
 
 // API สำหรับทดสอบ
 app.get('/api-test', (req, res) => {
@@ -248,5 +386,5 @@ mongoose.connect(process.env.MONGO_URI)
 server.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
-
+ 
 export { io };

@@ -171,6 +171,7 @@ export default (io) => {
         date: report.date,
         file: report.file,
         status: report.status,
+        comment: report.comment, 
         assignedAdmin: report.assignedAdmin ? {
           id: report.assignedAdmin._id,
           firstName: report.assignedAdmin.firstName,
