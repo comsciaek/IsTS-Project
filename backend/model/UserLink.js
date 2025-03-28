@@ -1,3 +1,4 @@
+// filepath: c:\DEV TEST YOK\Project\IsTS-Project\backend\model\UserLink.js
 import mongoose from 'mongoose';
 
 const UserLinkSchema = new mongoose.Schema({
@@ -6,4 +7,6 @@ const UserLinkSchema = new mongoose.Schema({
   linkedAt: { type: Date, default: Date.now },
 });
 
-export default mongoose.model('UserLink', UserLinkSchema);
+const UserLink = mongoose.models.UserLink || mongoose.model('UserLink', UserLinkSchema);
+
+export default UserLink;

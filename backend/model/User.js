@@ -84,6 +84,11 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+  lineUserId: { // เพิ่มฟิลด์ lineUserId
+    type: String,
+    unique: true,
+    sparse: true, // อนุญาตให้ค่า null ได้
+  },
 });
 
 // ลบ profileImage ซ้ำออก (ในโค้ดเดิมมี profileImage ซ้ำกัน 2 ครั้ง)

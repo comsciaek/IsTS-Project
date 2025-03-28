@@ -1,9 +1,41 @@
 import { Server } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import mongoose from 'mongoose';
-import Report from '../model/Report.js';
-import Chat from '../model/Chat.js';
-import Notification from '../model/Notification.js';
+import models from '../model/index.js'; // ใช้ models/index.js เพื่อรวม models
+import axios from 'axios';
+
+const { User, Report, Chat, Notification } = models; // ลบ UserLink ออก
+
+const CHANNEL_ACCESS_TOKEN = process.env.CHANNEL_ACCESS_TOKEN;
+if (!CHANNEL_ACCESS_TOKEN) {
+  throw new Error('CHANNEL_ACCESS_TOKEN is not defined in the environment variables');
+}
+
+// ฟังก์ชันส่งข้อความผ่าน LINE Messaging API
+const sendMessage = async (lineUserId, message, type = 'text', flexMessage = null) => {
+  try {
+    const payload = {
+      to: lineUserId,
+      messages: type === 'flex' ? [{ type: 'flex', altText: message, contents: flexMessage }] : [{ type: 'text', text: message }],
+    };
+
+    const response = await axios.post(
+      'https://api.line.me/v2/bot/message/push',
+      payload,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${CHANNEL_ACCESS_TOKEN}`,
+        },
+      }
+    );
+    console.log('Message sent successfully to:', lineUserId);
+    return response;
+  } catch (error) {
+    console.error('Error sending message to', lineUserId, ':', error.response?.data || error.message);
+    throw error;
+  }
+};
 
 const initializeSocket = (server) => {
   const io = new Server(server, {
@@ -14,7 +46,6 @@ const initializeSocket = (server) => {
     },
   });
 
-  // Authentication middleware for Socket.IO
   io.use((socket, next) => {
     const token = socket.handshake.auth.token;
     if (!token) {
@@ -24,7 +55,7 @@ const initializeSocket = (server) => {
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       socket.user = decoded;
-      socket.userId = decoded.userId || decoded.id; // รองรับทั้ง userId และ id
+      socket.userId = decoded.userId || decoded.id;
       next();
     } catch (error) {
       console.error('JWT Verification Error:', error.message);
@@ -33,25 +64,19 @@ const initializeSocket = (server) => {
   });
 
   io.on('connection', (socket) => {
-    // console.log('A user connected:', socket.id, 'User ID:', socket.userId);
-  
-    // ผู้ใช้เข้าร่วมห้องตาม userId
     socket.join(socket.userId);
-  
-    // รับข้อมูลผู้ใช้เมื่อเชื่อมต่อ
+
     socket.on('userConnected', async ({ userId, role }) => {
-      // console.log(`User ${userId} (Role: ${role}) connected and joined room: ${userId}`);
       socket.userId = userId;
       socket.role = role;
       socket.join(userId);
-  
-      // ดึงการแจ้งเตือนที่ยังไม่ได้อ่าน
+
       try {
         const notifications = await Notification.find({
           userId: userId,
           isRead: false,
         }).sort({ createdAt: -1 });
-  
+
         if (notifications.length > 0) {
           const notificationsResponse = notifications.map(notification => ({
             id: notification._id,
@@ -85,22 +110,20 @@ const initializeSocket = (server) => {
           socket.emit('error', { message: 'Unauthorized to join this room' });
           return;
         }
-    
+
         socket.join(roomId);
         console.log(`User ${socket.userId} joined room: ${roomId}`);
-    
-        // ส่งประวัติแชทล่าสุด (เช่น 50 ข้อความ)
+
         const chatHistory = await Chat.find({ issueId: roomId })
           .populate('senderId', 'firstName lastName role profileImage')
           .sort({ createdAt: -1 })
           .limit(50);
-    
-        // นับข้อความที่ยังไม่ได้อ่าน
+
         const unreadChats = await Chat.find({
           issueId: roomId,
           readBy: { $ne: socket.userId },
         });
-    
+
         const chatHistoryResponse = chatHistory.reverse().map(chat => ({
           id: chat._id,
           issueId: chat.issueId,
@@ -116,7 +139,7 @@ const initializeSocket = (server) => {
           createdAt: chat.createdAt,
           readBy: chat.readBy,
         }));
-    
+
         socket.emit('chatHistory', {
           history: chatHistoryResponse,
           unreadCount: unreadChats.length,
@@ -127,134 +150,127 @@ const initializeSocket = (server) => {
       }
     });
 
-    // ออกจากห้องแชท
     socket.on('leaveIssueChat', (issueId) => {
       socket.leave(issueId);
       console.log(`User ${socket.id} left issue chat: ${issueId}`);
     });
 
-   // ส่งข้อความ
-socket.on('sendMessage', async ({ issueId, message, fileUrl, receiverId }, callback) => {
-  const session = await mongoose.startSession(); // Start a new session
-  session.startTransaction(); // Begin a transaction
+    socket.on('sendMessage', async ({ issueId, message, fileUrl, receiverId }, callback) => {
+      const session = await mongoose.startSession();
+      session.startTransaction();
 
-  try {
-    const userId = socket.userId;
+      try {
+        const userId = socket.userId;
 
-    // Find the report within the transaction
-    const report = await Report.findById(issueId).session(session);
-    if (
-      !report ||
-      (report.userId?.toString() !== userId && (!report.assignedAdmin || report.assignedAdmin?.toString() !== userId))
-    ) {
-      await session.abortTransaction(); // Abort the transaction
-      session.endSession(); // End the session
-      socket.emit('error', { message: 'Unauthorized' });
-      if (callback) callback({ error: 'Unauthorized' });
-      return;
-    }
+        const report = await Report.findById(issueId).session(session);
+        if (
+          !report ||
+          (report.userId?.toString() !== userId && (!report.assignedAdmin || report.assignedAdmin?.toString() !== userId))
+        ) {
+          await session.abortTransaction();
+          session.endSession();
+          socket.emit('error', { message: 'Unauthorized' });
+          if (callback) callback({ error: 'Unauthorized' });
+          return;
+        }
 
-    // Create a new message within the transaction
-    const newMessage = await Chat.create(
-      [
-        {
+        const newMessage = await Chat.create(
+          [
+            {
+              issueId,
+              senderId: userId,
+              message: message || '',
+              file: fileUrl || '',
+            },
+          ],
+          { session }
+        );
+
+        const populatedMessage = await Chat.findById(newMessage[0]._id)
+          .populate('senderId', 'firstName lastName role profileImage')
+          .session(session);
+
+        const chatData = {
+          id: populatedMessage._id,
+          issueId: populatedMessage.issueId,
+          senderId: {
+            id: populatedMessage.senderId._id,
+            firstName: populatedMessage.senderId.firstName,
+            lastName: populatedMessage.senderId.lastName,
+            role: populatedMessage.senderId.role,
+            profileImage: populatedMessage.senderId.profileImage,
+          },
+          message: populatedMessage.message,
+          file: populatedMessage.file,
+          createdAt: populatedMessage.createdAt,
+        };
+
+        io.to(issueId).emit('messageReceived', {
+          ...chatData,
+          fileMetadata: {
+            name: fileUrl ? fileUrl.split('/').pop() : null,
+            type: fileUrl
+              ? fileUrl.endsWith('.pdf')
+                ? 'application/pdf'
+                : fileUrl.endsWith('.png')
+                ? 'image/png'
+                : fileUrl.endsWith('.jpg') || fileUrl.endsWith('.jpeg')
+                ? 'image/jpeg'
+                : 'application/octet-stream'
+              : null,
+          },
+        });
+
+        if (receiverId && receiverId !== userId) {
+          io.to(receiverId).emit('messageReceived', chatData);
+        }
+
+        const receiverNotification = new Notification({
+          userId: report.userId?.toString() !== userId ? report.userId : report.assignedAdmin,
           issueId,
-          senderId: userId,
-          message: message || '',
-          file: fileUrl || '',
-        },
-      ],
-      { session }
-    );
+          message: `New message from ${populatedMessage.senderId.firstName} ${populatedMessage.senderId.lastName} in ${report.topic}`,
+          type: 'info',
+          isRead: false,
+          oldStatus: report.status,
+          newStatus: report.status,
+          createdAt: new Date(),
+        });
+        await receiverNotification.save({ session });
 
-    // Populate the message within the transaction
-    const populatedMessage = await Chat.findById(newMessage[0]._id)
-      .populate('senderId', 'firstName lastName role profileImage') // เพิ่ม role และ profileImage
-      .session(session);
+        io.to(receiverNotification.userId.toString()).emit('newMessageNotification', {
+          id: receiverNotification._id,
+          issueId,
+          message: receiverNotification.message,
+          isRead: receiverNotification.isRead,
+          createdAt: receiverNotification.createdAt,
+        });
 
-    const chatData = {
-      id: populatedMessage._id,
-      issueId: populatedMessage.issueId,
-      senderId: {
-        id: populatedMessage.senderId._id,
-        firstName: populatedMessage.senderId.firstName,
-        lastName: populatedMessage.senderId.lastName,
-        role: populatedMessage.senderId.role, // เพิ่ม role
-        profileImage: populatedMessage.senderId.profileImage, // เพิ่ม profileImage
-      },
-      message: populatedMessage.message,
-      file: populatedMessage.file,
-      createdAt: populatedMessage.createdAt,
-    };
+        await session.commitTransaction();
+        session.endSession();
 
-    // ส่งข้อความไปยังห้อง issueId พร้อมข้อมูล fileMetadata
-    io.to(issueId).emit('messageReceived', {
-      ...chatData,
-      fileMetadata: {
-        name: fileUrl ? fileUrl.split('/').pop() : null,
-        type: fileUrl
-          ? fileUrl.endsWith('.pdf')
-            ? 'application/pdf'
-            : fileUrl.endsWith('.png')
-            ? 'image/png'
-            : fileUrl.endsWith('.jpg') || fileUrl.endsWith('.jpeg')
-            ? 'image/jpeg'
-            : 'application/octet-stream' // ปรับปรุงการตรวจสอบ MIME type
-          : null,
-      },
+        if (callback) callback({ message: 'Message sent successfully' });
+      } catch (error) {
+        await session.abortTransaction();
+        session.endSession();
+        console.error('Error sending message:', error);
+        socket.emit('error', { message: 'Error sending message', error: error.message });
+        if (callback) callback({ error: 'Error sending message', details: error.message });
+      }
     });
 
-    // ถ้ามี receiverId (สำหรับแชท 1:1)
-    if (receiverId && receiverId !== userId) {
-      io.to(receiverId).emit('messageReceived', chatData);
-    }
-
-    // สร้างการแจ้งเตือนสำหรับผู้รับที่ออฟไลน์
-    const receiverNotification = new Notification({
-      userId: report.userId?.toString() !== userId ? report.userId : report.assignedAdmin,
-      issueId,
-      message: `New message from ${populatedMessage.senderId.firstName} ${populatedMessage.senderId.lastName} in ${report.topic}`,
-      type: 'info',
-      isRead: false,
-      oldStatus: report.status,
-      newStatus: report.status,
-      createdAt: new Date(),
-    });
-    await receiverNotification.save({ session });
-
-    // ส่งการแจ้งเตือนไปยังผู้รับ
-    io.to(receiverNotification.userId.toString()).emit('newMessageNotification', {
-      id: receiverNotification._id,
-      issueId,
-      message: receiverNotification.message,
-      isRead: receiverNotification.isRead,
-      createdAt: receiverNotification.createdAt,
-    });
-
-    await session.commitTransaction(); // Commit the transaction
-    session.endSession(); // End the session
-
-    if (callback) callback({ message: 'Message sent successfully' });
-  } catch (error) {
-    await session.abortTransaction(); // Abort the transaction in case of an error
-    session.endSession(); // End the session
-    console.error('Error sending message:', error);
-    socket.emit('error', { message: 'Error sending message', error: error.message });
-    if (callback) callback({ error: 'Error sending message', details: error.message });
-  }
-});
-
-    // อัปเดตสถานะคำร้อง (คงไว้เหมือนเดิม)
     socket.on('reportStatusUpdate', async ({ issueId, status }, callback) => {
       try {
-        // console.log(`Updating status for issue ${issueId} to ${status}`);
+        console.log(`Received request to update status for issueId: ${issueId} to status: ${status}`);
+    
         if (!mongoose.Types.ObjectId.isValid(issueId)) {
+          console.log(`Invalid issue ID: ${issueId}`);
           socket.emit('error', { message: 'Invalid issue ID' });
           if (typeof callback === 'function') callback({ error: 'Invalid issue ID' });
           return;
         }
     
         if (!['pending', 'approved', 'rejected', 'completed'].includes(status)) {
+          console.log(`Invalid status value: ${status}`);
           socket.emit('error', { message: 'Invalid status value' });
           if (typeof callback === 'function') callback({ error: 'Invalid status value' });
           return;
@@ -262,13 +278,16 @@ socket.on('sendMessage', async ({ issueId, message, fileUrl, receiverId }, callb
     
         const report = await Report.findById(issueId);
         if (!report) {
+          console.log(`Report not found for issueId: ${issueId}`);
           socket.emit('error', { message: 'Report not found' });
           if (typeof callback === 'function') callback({ error: 'Report not found' });
           return;
         }
     
         const userRole = socket.user.role || socket.role;
+        console.log(`User role: ${userRole}`);
         if (userRole !== 'Admin' && userRole !== 'SuperAdmin') {
+          console.log(`Unauthorized role: ${userRole}`);
           socket.emit('error', { message: 'Only Admin or SuperAdmin can update status' });
           if (typeof callback === 'function') callback({ error: 'Only Admin or SuperAdmin can update status' });
           return;
@@ -277,70 +296,252 @@ socket.on('sendMessage', async ({ issueId, message, fileUrl, receiverId }, callb
         const oldStatus = report.status;
         report.status = status;
         await report.save();
+        console.log(`Status updated for issueId: ${issueId} from ${oldStatus} to ${status}`);
     
-        const userId = report.userId?.toString();
-        const adminId = report.assignedAdmin?.toString() || socket.userId;
+        const employeeId = report.userId?.toString();
+        const assignedAdminId = report.assignedAdmin?.toString();
+        const userId = socket.userId;
     
         const topic = report.topic || `คำร้อง ${issueId}`;
-        const statusChangeData = {
-          issueId,
-          userId,
-          status,
-          topic,
-          oldStatus,
-        };
+        console.log(`Topic: ${topic}, EmployeeId: ${employeeId}, AssignedAdminId: ${assignedAdminId}, UserId: ${userId}`);
     
-        // io.to(userId).emit('issue_status_changed', statusChangeData);
-        // io.to(adminId).emit('issue_status_changed', {
-        //   ...statusChangeData,
-        //   message: `(by you)`,
-        // });
+        const user = employeeId ? await User.findOne({ _id: employeeId }) : null;
+        const admin = userId ? await User.findOne({ _id: userId }) : null;
+        const assignedAdmin = assignedAdminId ? await User.findOne({ _id: assignedAdminId }) : null;
+    
+        const userFullName = user ? `${user.firstName} ${user.lastName}` : 'ผู้ใช้';
+        const adminFullName = admin ? `${admin.firstName} ${admin.lastName}` : 'ผู้ดูแล';
+        const assignedAdminFullName = assignedAdmin ? `${assignedAdmin.firstName} ${assignedAdmin.lastName}` : 'ผู้ดูแลที่รับผิดชอบ';
+    
+        console.log(`User: ${userFullName}, Admin: ${adminFullName}, AssignedAdmin: ${assignedAdminFullName}`);
     
         const notificationData = {
           issueId,
           oldStatus,
           newStatus: status,
-          message: `Report ${topic} status updated to ${status} by Admin`,
           createdAt: new Date(),
         };
     
-        if (userId) {
+        // ส่งการแจ้งเตือนไปยัง User
+        if (employeeId) {
+          console.log(`Sending notification to employeeId: ${employeeId}`);
+          const userMessage = `สวัสดี ${userFullName}, รายงาน ${topic} ได้รับการเปลี่ยนสถานะเป็น ${status} โดย ${adminFullName}`;
           const userNotification = new Notification({
-            userId,
+            userId: employeeId,
             ...notificationData,
+            message: userMessage,
             isRead: false,
           });
           await userNotification.save();
-          io.to(userId).emit('statusUpdate', {
+          console.log(`Notification saved for employeeId: ${employeeId}`);
+    
+          io.to(employeeId).emit('statusUpdate', {
             id: userNotification._id,
             issueId,
-            userId,
+            userId: employeeId,
             oldStatus,
             status,
             message: userNotification.message,
             isRead: userNotification.isRead,
             createdAt: userNotification.createdAt,
           });
+    
+          try {
+            if (user && user.lineUserId) {
+              console.log(`Sending LINE notification to lineUserId: ${user.lineUserId}`);
+              const flexMessage = {
+                type: 'bubble',
+                body: {
+                  type: 'box',
+                  layout: 'vertical',
+                  contents: [
+                    {
+                      type: 'text',
+                      text: 'การแจ้งเตือนสถานะรายงาน',
+                      weight: 'bold',
+                      size: 'lg',
+                      color: '#1DB446',
+                    },
+                    {
+                      type: 'text',
+                      text: `รายงาน: ${topic}`,
+                      size: 'md',
+                      margin: 'md',
+                    },
+                    {
+                      type: 'text',
+                      text: `สถานะ: ${status}`,
+                      size: 'md',
+                      color: status === 'approved' ? '#00C853' : '#FF6D00',
+                    },
+                    {
+                      type: 'text',
+                      text: `โดย: ${adminFullName}`,
+                      size: 'sm',
+                      color: '#666666',
+                      margin: 'sm',
+                    },
+                  ],
+                },
+              };
+    
+              const truncatedUserMessage = userMessage.length > 400 ? userMessage.substring(0, 397) + '...' : userMessage;
+              await sendMessage(user.lineUserId, truncatedUserMessage, 'flex', flexMessage);
+              console.log(`LINE notification sent to employeeId: ${employeeId}`);
+            } else {
+              console.log(`No LINE user link found for employeeId: ${employeeId}`);
+            }
+          } catch (error) {
+            console.error(`Failed to send LINE notification to employeeId: ${employeeId}`, error.message);
+          }
         }
     
-        if (adminId) {
+        // ส่งการแจ้งเตือนไปยัง Admin ที่เปลี่ยนสถานะ
+        if (userId) {
+          console.log(`Sending notification to userId: ${userId}`);
+          const adminMessage = `สวัสดี ${adminFullName}, คุณได้เปลี่ยนสถานะรายงาน ${topic} เป็น ${status}`;
           const adminNotification = new Notification({
-            userId: adminId,
+            userId,
             ...notificationData,
-            message: `Report ${topic} status updated to ${status} (by you)`,
+            message: adminMessage,
             isRead: false,
           });
           await adminNotification.save();
-          io.to(adminId).emit('statusUpdate', {
+          console.log(`Notification saved for userId: ${userId}`);
+    
+          io.to(userId).emit('statusUpdate', {
             id: adminNotification._id,
             issueId,
-            userId: adminId,
+            userId,
             oldStatus,
             status,
             message: adminNotification.message,
             isRead: adminNotification.isRead,
             createdAt: adminNotification.createdAt,
           });
+    
+          try {
+            if (admin && admin.lineUserId) {
+              console.log(`Sending LINE notification to lineUserId: ${admin.lineUserId}`);
+              const flexMessage = {
+                type: 'bubble',
+                body: {
+                  type: 'box',
+                  layout: 'vertical',
+                  contents: [
+                    {
+                      type: 'text',
+                      text: 'การแจ้งเตือนสถานะรายงาน',
+                      weight: 'bold',
+                      size: 'lg',
+                      color: '#1DB446',
+                    },
+                    {
+                      type: 'text',
+                      text: `รายงาน: ${topic}`,
+                      size: 'md',
+                      margin: 'md',
+                    },
+                    {
+                      type: 'text',
+                      text: `สถานะ: ${status}`,
+                      size: 'md',
+                      color: status === 'approved' ? '#00C853' : '#FF6D00',
+                    },
+                    {
+                      type: 'text',
+                      text: 'โดย: คุณ',
+                      size: 'sm',
+                      color: '#666666',
+                      margin: 'sm',
+                    },
+                  ],
+                },
+              };
+    
+              const truncatedAdminMessage = adminMessage.length > 400 ? adminMessage.substring(0, 397) + '...' : adminMessage;
+              await sendMessage(admin.lineUserId, truncatedAdminMessage, 'flex', flexMessage);
+              console.log(`LINE notification sent to userId: ${userId}`);
+            } else {
+              console.log(`No LINE user link found for userId: ${userId}`);
+            }
+          } catch (error) {
+            console.error(`Failed to send LINE notification to userId: ${userId}`, error.message);
+          }
+        }
+    
+        // ส่งการแจ้งเตือนไปยัง Admin ผู้รับผิดชอบ
+        if (assignedAdminId && assignedAdminId !== userId) {
+          console.log(`Sending notification to assignedAdminId: ${assignedAdminId}`);
+          const assignedAdminMessage = `สวัสดี ${assignedAdminFullName}, รายงาน ${topic} ที่คุณรับผิดชอบได้รับการเปลี่ยนสถานะเป็น ${status} โดย ${adminFullName}`;
+          const assignedAdminNotification = new Notification({
+            userId: assignedAdminId,
+            ...notificationData,
+            message: assignedAdminMessage,
+            isRead: false,
+          });
+          await assignedAdminNotification.save();
+          console.log(`Notification saved for assignedAdminId: ${assignedAdminId}`);
+    
+          io.to(assignedAdminId).emit('statusUpdate', {
+            id: assignedAdminNotification._id,
+            issueId,
+            userId: assignedAdminId,
+            oldStatus,
+            status,
+            message: assignedAdminNotification.message,
+            isRead: assignedAdminNotification.isRead,
+            createdAt: assignedAdminNotification.createdAt,
+          });
+    
+          try {
+            if (assignedAdmin && assignedAdmin.lineUserId) {
+              console.log(`Sending LINE notification to lineUserId: ${assignedAdmin.lineUserId}`);
+              const flexMessage = {
+                type: 'bubble',
+                body: {
+                  type: 'box',
+                  layout: 'vertical',
+                  contents: [
+                    {
+                      type: 'text',
+                      text: 'การแจ้งเตือนสถานะรายงาน',
+                      weight: 'bold',
+                      size: 'lg',
+                      color: '#1DB446',
+                    },
+                    {
+                      type: 'text',
+                      text: `รายงาน: ${topic}`,
+                      size: 'md',
+                      margin: 'md',
+                    },
+                    {
+                      type: 'text',
+                      text: `สถานะ: ${status}`,
+                      size: 'md',
+                      color: status === 'approved' ? '#00C853' : '#FF6D00',
+                    },
+                    {
+                      type: 'text',
+                      text: `โดย: ${adminFullName}`,
+                      size: 'sm',
+                      color: '#666666',
+                      margin: 'sm',
+                    },
+                  ],
+                },
+              };
+    
+              const truncatedAssignedAdminMessage = assignedAdminMessage.length > 400 ? assignedAdminMessage.substring(0, 397) + '...' : assignedAdminMessage;
+              await sendMessage(assignedAdmin.lineUserId, truncatedAssignedAdminMessage, 'flex', flexMessage);
+              console.log(`LINE notification sent to assignedAdminId: ${assignedAdminId}`);
+            } else {
+              console.log(`No LINE user link found for assignedAdminId: ${assignedAdminId}`);
+            }
+          } catch (error) {
+            console.error(`Failed to send LINE notification to assignedAdminId: ${assignedAdminId}`, error.message);
+          }
         }
     
         io.to(issueId).emit('reportStatusUpdate', {
@@ -350,7 +551,6 @@ socket.on('sendMessage', async ({ issueId, message, fileUrl, receiverId }, callb
           message: `Report status updated to ${status}`,
         });
     
-        // console.log(`Report status updated for issue ${issueId} to ${status} by User ${socket.userId}`);
         if (typeof callback === 'function') {
           callback({ message: 'Report status updated successfully' });
         }
@@ -363,13 +563,12 @@ socket.on('sendMessage', async ({ issueId, message, fileUrl, receiverId }, callb
       }
     });
 
-    // Mark messages as read
     socket.on('markMessageAsRead', async ({ issueId }) => {
       try {
         const userId = socket.userId;
         await Chat.updateMany(
-          { issueId, readBy: { $ne: userId } }, // Find messages in the issue that haven't been read by the user
-          { $addToSet: { readBy: userId } } // Add the userId to the `readBy` array
+          { issueId, readBy: { $ne: userId } },
+          { $addToSet: { readBy: userId } }
         );
         io.to(issueId).emit('messageRead', { issueId, userId, message: 'Message marked as read' });
       } catch (error) {
@@ -379,7 +578,7 @@ socket.on('sendMessage', async ({ issueId, message, fileUrl, receiverId }, callb
     });
 
     socket.on('disconnect', () => {
-      // console.log('User disconnected:', socket.id);
+      console.log('User disconnected:', socket.id);
     });
   });
 

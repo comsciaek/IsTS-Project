@@ -14,9 +14,9 @@ import notificationRoutes from './routes/notification.js';
 import jwt from 'jsonwebtoken';
 import Report from './model/Report.js';
 import Notification from './model/Notification.js';
-import User from './model/User.js'; // เพิ่มการ import User
-import Chat from './model/Chat.js'; // เพิ่มการ import Chat
-import cron from 'node-cron'; // เพิ่ม node-cron
+import User from './model/User.js';
+import Chat from './model/Chat.js';
+import cron from 'node-cron';
 import axios from 'axios';
 import { createHmac } from 'crypto';
 
@@ -53,22 +53,6 @@ const CHANNEL_ACCESS_TOKEN = process.env.CHANNEL_ACCESS_TOKEN;
 console.log('CHANNEL_SECRET:', CHANNEL_SECRET);
 console.log('CHANNEL_ACCESS_TOKEN:', CHANNEL_ACCESS_TOKEN);
 
-// Schema สำหรับเก็บการเชื่อมโยงระหว่าง lineUserId และ employeeId
-const UserLinkSchema = new mongoose.Schema({
-  lineUserId: { type: String, required: true, unique: true },
-  employeeId: { type: String, required: true, unique: true },
-  linkedAt: { type: Date, default: Date.now },
-});
-const UserLink = mongoose.model('UserLink', UserLinkSchema);
-
-// Schema สำหรับข้อมูลพนักงาน
-const EmployeeSchema = new mongoose.Schema({
-  employeeId: { type: String, required: true, unique: true },
-  firstName: String,
-  lastName: String,
-});
-const Employee = mongoose.model('Employee', EmployeeSchema);
-
 // ฟังก์ชันส่งข้อความผ่าน LINE Messaging API
 const sendMessage = async (lineUserId, message) => {
   try {
@@ -93,8 +77,8 @@ const sendMessage = async (lineUserId, message) => {
 
 // Webhook เพื่อรับข้อความจาก LINE
 app.post('/webhook', async (req, res) => {
-  console.log('Webhook received:', JSON.stringify(req.body, null, 2)); // ล็อก request ที่ได้รับ
-  console.log('Headers:', req.headers); // ล็อก headers เพื่อดู x-line-signature
+  console.log('Webhook received:', JSON.stringify(req.body, null, 2));
+  console.log('Headers:', req.headers);
 
   // ตรวจสอบความถูกต้องของ request ด้วย signature
   const signature = req.headers['x-line-signature'];
@@ -116,42 +100,45 @@ app.post('/webhook', async (req, res) => {
       const lineUserId = event.source.userId;
       const messageText = event.message.text.trim();
 
-      console.log(`Message from ${lineUserId}: ${messageText}`); // ล็อกข้อความที่ได้รับ
+      console.log(`Message from ${lineUserId}: ${messageText}`);
 
       // ตรวจสอบว่าผู้ใช้ลงทะเบียนแล้วหรือยัง
-      const userLink = await UserLink.findOne({ lineUserId });
+      const user = await User.findOne({ lineUserId });
 
       if (messageText.toLowerCase() === 'ลงทะเบียน') {
-        if (userLink) {
-          await sendMessage(lineUserId, `คุณลงทะเบียนแล้วด้วยรหัสพนักงาน: ${userLink.employeeId}`);
+        if (user) {
+          await sendMessage(lineUserId, `คุณลงทะเบียนแล้วด้วยรหัสพนักงาน: ${user.employeeId}`);
         } else {
           await sendMessage(lineUserId, 'กรุณากรอกรหัสพนักงานของคุณ (เช่น EMP001) เพื่อลงทะเบียน');
         }
-      } else if (!userLink) {
+      } else if (!user) {
         // ถ้ายังไม่ได้ลงทะเบียน ให้ถือว่าข้อความที่ส่งมาเป็นรหัสพนักงาน
-        const employeeId = messageText.trim(); // ตัดช่องว่าง
+        const employeeId = messageText.trim();
 
         console.log('Searching for employeeId in User table:', employeeId);
 
         // ตรวจสอบว่ารหัสพนักงานถูกต้องในคอลเลกชัน User
-        const user = await User.findOne({ employeeId: { $regex: new RegExp(`^${employeeId}$`, 'i') } });
-        if (!user) {
+        const existingUser = await User.findOne({ employeeId: { $regex: new RegExp(`^${employeeId}$`, 'i') } });
+        if (!existingUser) {
           console.log('Employee ID not found in User table');
           await sendMessage(lineUserId, 'รหัสพนักงานไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง');
           return;
         }
 
-        console.log('Employee ID found in User table:', user);
+        console.log('Employee ID found in User table:', existingUser);
 
-        // ตรวจสอบว่ารหัสพนักงานนี้ถูกใช้ไปแล้วหรือไม่
-        const existingLink = await UserLink.findOne({ employeeId });
+        // ตรวจสอบว่ารหัสพนักงานนี้ถูกใช้ลงทะเบียน LINE แล้วหรือไม่
+        const existingLink = await User.findOne({ employeeId, lineUserId: { $ne: null } });
         if (existingLink) {
           await sendMessage(lineUserId, 'รหัสพนักงานนี้ถูกใช้ลงทะเบียนแล้ว กรุณาติดต่อผู้ดูแลระบบ');
           return;
         }
 
-        // บันทึกการเชื่อมโยง
-        await UserLink.create({ lineUserId, employeeId });
+        // อัปเดต lineUserId ใน User
+        await User.updateOne(
+          { employeeId },
+          { $set: { lineUserId } }
+        );
         await sendMessage(
           lineUserId,
           `ลงทะเบียนสำเร็จ! รหัสพนักงานของคุณคือ ${employeeId} คุณจะได้รับการแจ้งเตือนผ่าน LINE`
@@ -173,12 +160,12 @@ app.post('/notify-employee', async (req, res) => {
     return res.status(400).json({ message: 'Employee ID and message are required' });
   }
 
-  const userLink = await UserLink.findOne({ employeeId });
-  if (!userLink) {
+  const user = await User.findOne({ employeeId });
+  if (!user || !user.lineUserId) {
     return res.status(404).json({ message: 'Employee not linked with LINE' });
   }
 
-  await sendMessage(userLink.lineUserId, message);
+  await sendMessage(user.lineUserId, message);
   res.status(200).json({ message: 'Notification sent successfully' });
 });
 
@@ -305,12 +292,12 @@ app.put('/api/reports/:id/status', async (req, res) => {
 });
 
 // Cron Job สำหรับลบผู้ใช้ที่ลาออกหลังจาก 90 วัน
-cron.schedule('0 0 * * *', async () => { // รันทุกวันตอนเที่ยงคืน
+cron.schedule('0 0 * * *', async () => {
   console.log('Running cron job to delete inactive users...');
 
   try {
     const ninetyDaysAgo = new Date();
-    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90); // คำนวณวันที่ย้อนหลัง 90 วัน
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
 
     const inactiveUsers = await User.find({
       status: 'inactive',
@@ -386,5 +373,5 @@ mongoose.connect(process.env.MONGO_URI)
 server.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
- 
+
 export { io };
