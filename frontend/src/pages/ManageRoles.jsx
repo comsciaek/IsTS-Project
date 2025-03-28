@@ -22,7 +22,7 @@ import {
   ReloadOutlined,
   FilterOutlined,
   LoadingOutlined,
-  EyeOutlined,
+  InfoOutlined,
 } from "@ant-design/icons";
 import axios from "axios";
 import { useMediaQuery } from "react-responsive";
@@ -113,8 +113,9 @@ const ManageRoles = () => {
         width: 50,
         render: (_, record) => (
           <Button
+            style={{ borderRadius: "50%", height: "30px", width: "30px" }}
             type="text"
-            icon={<EyeOutlined />}
+            icon={<InfoOutlined />}
             onClick={() => {
               setSelectedUser(record);
               setDrawerVisible(true);
@@ -254,9 +255,10 @@ const ManageRoles = () => {
           <List.Item
             actions={[
               <Button
+                style={{ borderRadius: "50%", height: "30px", width: "30px" }}
                 key="edit"
                 type="text"
-                icon={<EyeOutlined />}
+                icon={<InfoOutlined />}
                 onClick={() => {
                   setSelectedUser(user);
                   setDrawerVisible(true);

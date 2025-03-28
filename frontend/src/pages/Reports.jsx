@@ -43,19 +43,15 @@ const Reports = () => {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("all");
   const [searchText, setSearchText] = useState("");
-  // เพิ่ม state สำหรับตัวกรองตามช่วงเวลา
   const [dateFilter, setDateFilter] = useState("all");
-  // เพิ่ม state สำหรับ Modal รายละเอียด
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [selectedReport, setSelectedReport] = useState(null);
 
-  // ดึงข้อมูลรายงานทั้งหมด
   const fetchReports = useCallback(async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem("token");
 
-      // เรียกใช้ API เพื่อดึงรายงานทั้งหมด (สำหรับ SuperAdmin)
       const response = await axios.get(`${API_BASE_URL}/reports/admin/all`, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -64,7 +60,6 @@ const Reports = () => {
 
       console.log("All reports response:", response.data);
 
-      // ดึงข้อมูลรายงานจากการตอบกลับของ API
       let reportsData = [];
       if (response.data && Array.isArray(response.data.data)) {
         reportsData = response.data.data;
@@ -74,13 +69,11 @@ const Reports = () => {
         console.warn("Unexpected API response format:", response.data);
       }
 
-      // กรองเฉพาะรายการที่มีสถานะเป็น "completed" หรือ "rejected"
       const completedReports = reportsData.filter(
         (report) =>
           report.status === "completed" || report.status === "rejected"
       );
 
-      // แปลงข้อมูลให้อยู่ในรูปแบบที่เหมาะสมสำหรับตาราง
       const formattedReports = completedReports.map((report, index) => ({
         key: report._id || report.issueId || index,
         id: report._id || report.issueId,
@@ -88,7 +81,6 @@ const Reports = () => {
         description: report.description || "ไม่มีคำอธิบาย",
         status: report.status || "unknown",
         date: report.date || report.createdAt || new Date(),
-        // เพิ่มการดึงข้อมูลเหตุผลการปฏิเสธ
         comment: report.comment,
         submitter: report.userId
           ? {
@@ -120,7 +112,7 @@ const Reports = () => {
             }
           : null,
         file: report.file || null,
-        rating: report.rating || null, // เพิ่มการดึงคะแนนรีวิว
+        rating: report.rating || null,
       }));
 
       setReports(formattedReports);
@@ -134,31 +126,24 @@ const Reports = () => {
     }
   }, []);
 
-  // ฟิลเตอร์รายงานตามสถานะ ช่วงเวลา และข้อความค้นหา
   useEffect(() => {
     let result = [...reports];
 
-    // Filter by status
     if (statusFilter !== "all") {
       result = result.filter((report) => report.status === statusFilter);
     }
 
-    // Filter by date range
     if (dateFilter !== "all") {
       const today = dayjs();
       let startDate;
 
       if (dateFilter === "daily") {
-        // รายวัน - วันนี้
         startDate = today.startOf("day");
       } else if (dateFilter === "weekly") {
-        // รายสัปดาห์ - 7 วันล่าสุด
         startDate = today.subtract(7, "day");
       } else if (dateFilter === "monthly") {
-        // รายเดือน - 30 วันล่าสุด
         startDate = today.subtract(30, "day");
       } else if (dateFilter === "yearly") {
-        // รายเดือน - 30 วันล่าสุด
         startDate = today.subtract(365, "day");
       }
 
@@ -172,7 +157,6 @@ const Reports = () => {
       }
     }
 
-    // Filter by search text
     if (searchText) {
       const lowerCaseSearch = searchText.toLowerCase();
       result = result.filter(
@@ -189,12 +173,10 @@ const Reports = () => {
     setFilteredReports(result);
   }, [reports, statusFilter, searchText, dateFilter]);
 
-  // โหลดข้อมูลเมื่อ component mount
   useEffect(() => {
     fetchReports();
-  }, [fetchReports]); // เพิ่ม fetchReports เป็น dependency
+  }, [fetchReports]);
 
-  // คอลัมน์ของตาราง
   const columns = [
     {
       title: "Issue",
@@ -254,6 +236,12 @@ const Reports = () => {
       key: "date",
       render: (date) => dayjs(date).format("DD/MM/YYYY"),
       responsive: ["sm"],
+      sorter: (a, b) => {
+        const dateA = new Date(a.date);
+        const dateB = new Date(b.date);
+        return dateA - dateB;
+      },
+      sortDirections: ["ascend", "descend"],
     },
     {
       title: "Status",
@@ -310,13 +298,11 @@ const Reports = () => {
     },
   ];
 
-  // แสดงรายละเอียดรายงาน
   const showReportDetail = (report) => {
     setSelectedReport(report);
     setDetailModalVisible(true);
   };
 
-  // ฟังก์ชันเพิ่มเติมสำหรับตรวจสอบประเภทไฟล์
   const getFileType = (fileUrl) => {
     if (!fileUrl) return null;
 
@@ -333,7 +319,6 @@ const Reports = () => {
     return "other";
   };
 
-  // ฟังก์ชันเพิ่มเติมสำหรับแสดงไฟล์แนบ
   const renderAttachment = (fileUrl) => {
     if (!fileUrl) return null;
 
@@ -401,7 +386,6 @@ const Reports = () => {
           </Button>
         </div>
 
-        {/* ปรับปรุงส่วนนี้ให้เป็น responsive มากขึ้น */}
         <div className="mb-4 flex flex-col sm:flex-row gap-4">
           <Input
             placeholder="ค้นหารายงาน..."
@@ -411,7 +395,6 @@ const Reports = () => {
             style={{ maxWidth: 300 }}
           />
 
-          {/* จัดกลุ่มตัวกรองเป็นแนวตั้งในมุมมองมือถือ */}
           <div className="flex flex-col sm:flex-row gap-2">
             <div className="flex items-center gap-2">
               <span className="whitespace-nowrap text-gray-400">
@@ -428,7 +411,6 @@ const Reports = () => {
               </Select>
             </div>
 
-            {/* ตัวเลือกกรองตามช่วงเวลา - จะอยู่ด้านล่างในมุมมองมือถือ */}
             <div className="flex items-center gap-2">
               <span className="whitespace-nowrap text-gray-400">
                 เลือกช่วงเวลา :
@@ -464,7 +446,6 @@ const Reports = () => {
           />
         )}
 
-        {/* Modal แสดงรายละเอียด */}
         <Modal
           title={<span className="font-semibold">{selectedReport?.title}</span>}
           open={detailModalVisible}
@@ -479,7 +460,6 @@ const Reports = () => {
             <>
               <Divider style={{ margin: "16px 0" }} />
 
-              {/* แสดงสถานะ */}
               <div className="mb-4">
                 <h4 className="mb-2 font-semibold">สถานะ</h4>
                 <Tag
@@ -491,7 +471,6 @@ const Reports = () => {
                     : "ถูกปฏิเสธ"}
                 </Tag>
 
-                {/* เพิ่มส่วนแสดงเหตุผลการปฏิเสธ */}
                 {selectedReport.status === "rejected" &&
                   selectedReport.comment && (
                     <div className="mt-3">
@@ -507,7 +486,6 @@ const Reports = () => {
 
               <Divider style={{ margin: "16px 0" }} />
 
-              {/* แสดงรายละเอียด */}
               <div className="mb-4">
                 <h4 className="mb-2 font-semibold">รายละเอียด</h4>
                 <p>{selectedReport.description}</p>
@@ -515,7 +493,6 @@ const Reports = () => {
 
               <Divider style={{ margin: "16px 0" }} />
 
-              {/* แสดงข้อมูลผู้แจ้ง */}
               <div className="mb-4">
                 <h4 className="mb-2 font-semibold">ผู้แจ้ง</h4>
                 <Space align="start">
@@ -542,7 +519,6 @@ const Reports = () => {
                 </Space>
               </div>
 
-              {/* แสดงข้อมูลผู้รับผิดชอบ ถ้ามี */}
               {selectedReport.assignedAdmin && (
                 <>
                   <Divider style={{ margin: "16px 0" }} />
@@ -573,13 +549,13 @@ const Reports = () => {
 
               <Divider style={{ margin: "16px 0" }} />
 
-              {/* แสดงวันที่ */}
               <div className="mb-4">
                 <h4 className="mb-2 font-semibold">วันที่แจ้งปัญหา</h4>
                 <p>{dayjs(selectedReport.date).format("DD/MM/YYYY")}</p>
               </div>
+
               <Divider style={{ margin: "16px 0" }} />
-              {/* แสดงคะแนนรีวิว */}
+
               <div className="mb-4">
                 <h4 className="mb-2 font-semibold">คะแนนรีวิว</h4>
                 {selectedReport.rating > null ? (
@@ -593,7 +569,6 @@ const Reports = () => {
                 )}
               </div>
 
-              {/* แสดงไฟล์แนบ ถ้ามี */}
               {selectedReport.file && (
                 <>
                   <Divider style={{ margin: "16px 0" }} />

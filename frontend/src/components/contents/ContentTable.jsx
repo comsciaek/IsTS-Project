@@ -459,6 +459,12 @@ const ContentTable = () => {
       width: "12%",
       render: (date) => dayjs(date).format("DD/MM/YYYY"),
       responsive: ["sm", "md", "lg", "xl"],
+      sorter: (a, b) => {
+        const dateA = new Date(a.date);
+        const dateB = new Date(b.date);
+        return dateA - dateB;
+      },
+      sortDirections: ["ascend", "descend"],
     },
     {
       title: "Submitter",
@@ -509,7 +515,7 @@ const ContentTable = () => {
       render: (_, record) => (
         <Space>
           <Button
-            style={{ borderRadius: "50%", height: "30px", width: "30px" }}
+            style={{ borderRadius: "50%", height: "30px", width: "30px"}}
             onClick={() => showDetailModal(record)}
             icon={<InfoOutlined />}
           />
@@ -612,21 +618,30 @@ const ContentTable = () => {
             </div>
             <Divider style={{ margin: "16px 0" }} />
             <div className="mb-4 ">
-              <h4 className="mb-4 font-semibold">ผู้แจ้ง</h4>
-              <Space className="flex flex-col space-x-30 ml-2 ">
-                <Avatar src={editingRecord.profilePic} />
+              <h4 className="mb-4 font-semibold">ข้อมูลผู้แจ้ง</h4>
+              <Space className="flex flex-col sm:flex-row items-center">
+                <Avatar
+                  className="flex-shrink-0"
+                  src={editingRecord.profilePic}
+                  size={64}
+                  icon={
+                    !editingRecord.profilePic && (
+                      <UserOutlined style={{ fontSize: "28px" }} />
+                    )
+                  }
+                />
                 <div className="flex flex-col space-y-1 ml-2">
                   <div className="font-medium text-base">
-                    {editingRecord.name}
+                    ชื่อ : {editingRecord.name}
                   </div>
                   <div className="text-sm text-gray-600">
-                    {editingRecord.department}
+                    แผนก : {editingRecord.department}
                   </div>
                   <div className="text-xs text-gray-500">
-                    {editingRecord.email}
+                    email : {editingRecord.email}
                   </div>
                   <div className="text-xs text-gray-500">
-                    {editingRecord.phoneNumber}
+                    เบอร์โทรศัพท์ : {editingRecord.phoneNumber}
                   </div>
                 </div>
               </Space>

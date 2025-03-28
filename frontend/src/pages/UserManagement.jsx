@@ -84,30 +84,63 @@ const UserManagement = () => {
     try {
       const token = localStorage.getItem("token");
 
-      // อัพเดตสถานะผู้ใช้ผ่าน API ที่มีอยู่แล้ว
-      await axios.put(
+      // ตรวจสอบค่า status ให้ตรงกับที่ API กำหนด
+      if (!newStatus || !["active", "inactive"].includes(newStatus)) {
+        message.error("สถานะต้องเป็น active หรือ inactive เท่านั้น");
+        return;
+      }
+
+      // อัพเดตสถานะผู้ใช้ผ่าน API
+      const response = await axios.put(
         `${API_BASE_URL}/users/resign/${userId}`,
         { status: newStatus },
-        { headers: { Authorization: `Bearer ${token}` } }
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
       );
 
-      // อัพเดตข้อมูลในตาราง
-      setUsers(
-        users.map((user) =>
-          user._id === userId || user.id === userId
-            ? { ...user, status: newStatus }
-            : user
-        )
-      );
+      // ถ้าสำเร็จ อัพเดตข้อมูลในตาราง
+      if (response.data) {
+        // อัพเดตข้อมูลในตารางโดยใช้ข้อมูลจาก API response
+        setUsers(
+          users.map((user) =>
+            user._id === userId || user.id === userId
+              ? {
+                  ...user,
+                  status: newStatus,
+                  inactiveAt: newStatus === "inactive" ? new Date() : null,
+                }
+              : user
+          )
+        );
 
-      message.success(
-        `อัพเดตสถานะผู้ใช้เป็น ${
-          newStatus === "active" ? "active" : "inactive"
-        } เรียบร้อยแล้ว`
-      );
+        message.success(
+          response.data.message ||
+            `อัพเดตสถานะผู้ใช้เป็น ${newStatus} เรียบร้อยแล้ว`
+        );
+      }
     } catch (error) {
       console.error("Error updating user status:", error);
-      message.error("ไม่สามารถอัพเดตสถานะผู้ใช้ได้");
+
+      // จัดการข้อผิดพลาดตามรหัส HTTP ที่ได้รับ
+      if (error.response) {
+        switch (error.response.status) {
+          case 400:
+            // กรณีข้อมูลไม่ถูกต้องหรือสถานะซ้ำ
+            message.error(error.response.data.message || "ข้อมูลไม่ถูกต้อง");
+            break;
+          case 404:
+            message.error("ไม่พบข้อมูลผู้ใช้");
+            break;
+          case 403:
+            message.error("คุณไม่มีสิทธิ์ในการเปลี่ยนสถานะผู้ใช้");
+            break;
+          default:
+            message.error("ไม่สามารถอัพเดตสถานะผู้ใช้ได้");
+        }
+      } else {
+        message.error("ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้");
+      }
     }
   };
 
@@ -323,7 +356,7 @@ const UserManagement = () => {
   // Table columns
   const columns = [
     {
-      title: "ผู้ใช้งาน",
+      title: "Employee",
       key: "user",
       render: (_, record) => (
         <div className="flex items-center space-x-2 sm:space-x-3">
@@ -351,7 +384,7 @@ const UserManagement = () => {
       ellipsis: true,
     },
     {
-      title: "แผนก",
+      title: "Department",
       dataIndex: "department",
       key: "department",
       render: (department) => department || "-",
@@ -359,7 +392,7 @@ const UserManagement = () => {
       width: "15%",
     },
     {
-      title: "บทบาท",
+      title: "Roles",
       dataIndex: "role",
       key: "role",
       render: (role) => (
@@ -379,7 +412,7 @@ const UserManagement = () => {
       width: "15%",
     },
     {
-      title: "สถานะ",
+      title: "Status",
       key: "status",
       render: (_, record) => (
         <Switch
@@ -401,10 +434,10 @@ const UserManagement = () => {
       ],
       onFilter: (value, record) => (record.status || "active") === value,
       width: "15%",
-      responsive: ["sm", "md", "lg", "xl"], // ไม่แสดงบนมือถือขนาดเล็ก
+      responsive: ["xs", "sm", "md", "lg", "xl"], // เปลี่ยนจาก ["sm", "md", "lg", "xl"] เป็น ["xs", "sm", "md", "lg", "xl"] เพื่อให้แสดงในทุกขนาดหน้าจอรวมถึงมือถือ
     },
     {
-      title: "การจัดการ",
+      title: "Actions",
       key: "actions",
       render: (_, record) => {
         // สร้างรายการเมนูตามบทบาทของผู้ใช้

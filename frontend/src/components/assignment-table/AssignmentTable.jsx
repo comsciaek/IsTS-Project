@@ -550,6 +550,12 @@ const AssignmentTable = () => {
       width: "10%",
       render: (date) => dayjs(date).format("DD/MM/YYYY"),
       responsive: ["sm", "md", "lg", "xl"], // ไม่แสดงในขนาด xs (มือถือ)
+      sorter: (a, b) => {
+        const dateA = new Date(a.date);
+        const dateB = new Date(b.date);
+        return dateA - dateB;
+      },
+      sortDirections: ["ascend", "descend"],
     },
     {
       title: "Submitter",
