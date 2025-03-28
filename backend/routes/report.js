@@ -8,6 +8,8 @@ import multer from 'multer';
 import fs from 'fs';
 import path from 'path';
 import mongoose from 'mongoose';
+import { sendMessage } from '../utils/lineNotification.js'; // เพิ่ม import ฟังก์ชันส่ง LINE
+import ExcelJS from 'exceljs'; // เพิ่ม import ExcelJS
 
 const router = express.Router();
 
@@ -149,48 +151,140 @@ export default (io) => {
     }
   });
 
-  // Route สำหรับดึงรายงานทั้งหมด (เฉพาะ SuperAdmin และ Admin)
   router.get('/admin/all', protect, authorizeAdminOrSuperAdmin, async (req, res) => {
     try {
-      const reports = await Report.find().sort({ createdAt: -1 }).populate('userId', 'firstName lastName department profileImage').populate('assignedAdmin', 'firstName lastName role profileImage');
+      const { exportToExcel, locale = 'th-TH' } = req.query;
+      console.log('Export to Excel:', exportToExcel);
+  
+      const reports = await Report.find()
+        .sort({ createdAt: -1 })
+        .populate('userId', 'firstName lastName department profileImage')
+        .populate('assignedAdmin', 'firstName lastName role profileImage');
+  
+      console.log('Reports found:', reports.length);
+  
       if (!reports.length) {
         return res.status(404).json({ message: 'No reports found' });
       }
-
+  
       const reportsResponse = reports.map(report => ({
         issueId: report._id,
-        userId: report.userId ? {
-          id: report.userId._id,
-          firstName: report.userId.firstName,
-          lastName: report.userId.lastName,
-          department: report.userId.department,
-          profileImage: report.userId.profileImage,
-        } : null,
+        userId: report.userId
+          ? {
+              id: report.userId._id,
+              firstName: report.userId.firstName,
+              lastName: report.userId.lastName,
+              department: report.userId.department,
+              profileImage: report.userId.profileImage,
+            }
+          : null,
         topic: report.topic,
         description: report.description,
         date: report.date,
         file: report.file,
         status: report.status,
-        comment: report.comment, 
-        assignedAdmin: report.assignedAdmin ? {
-          id: report.assignedAdmin._id,
-          firstName: report.assignedAdmin.firstName,
-          lastName: report.assignedAdmin.lastName,
-          role: report.assignedAdmin.role,
-          profileImage: report.assignedAdmin.profileImage,
-        } : null,
+        comment: report.comment,
+        assignedAdmin: report.assignedAdmin
+          ? {
+              id: report.assignedAdmin._id,
+              firstName: report.assignedAdmin.firstName,
+              lastName: report.assignedAdmin.lastName,
+              role: report.assignedAdmin.role,
+              profileImage: report.assignedAdmin.profileImage,
+            }
+          : null,
         rating: report.rating,
         createdAt: report.createdAt,
       }));
-
+  
+      console.log('Reports Response:', reportsResponse);
+  
+      if (exportToExcel === 'true') {
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('Reports');
+  
+        worksheet.columns = [
+          { header: 'Issue ID', key: 'issueId', width: 25 },
+          { header: 'User Name', key: 'userName', width: 20 },
+          { header: 'Department', key: 'department', width: 20 },
+          { header: 'Topic', key: 'topic', width: 30 },
+          { header: 'Description', key: 'description', width: 40 },
+          { header: 'Date', key: 'date', width: 15 },
+          { header: 'File', key: 'file', width: 30 },
+          { header: 'Status', key: 'status', width: 15 },
+          { header: 'Comment', key: 'comment', width: 30 },
+          { header: 'Assigned Admin', key: 'assignedAdmin', width: 20 },
+          { header: 'Admin Role', key: 'adminRole', width: 15 },
+          { header: 'Rating', key: 'rating', width: 10 },
+          { header: 'Created At', key: 'createdAt', width: 20 },
+        ];
+  
+        reportsResponse.forEach(report => {
+          worksheet.addRow({
+            issueId: report.issueId?.toString() || 'N/A',
+            userName: report.userId ? `${report.userId.firstName || ''} ${report.userId.lastName || ''}`.trim() : 'N/A',
+            department: report.userId?.department || 'N/A',
+            topic: report.topic || 'N/A',
+            description: report.description || 'N/A',
+            date: report.date ? new Date(report.date).toLocaleDateString(locale, { timeZone: 'Asia/Bangkok' }) : 'N/A',
+            file: report.file || 'N/A',
+            status: report.status || 'N/A',
+            comment: report.comment || 'N/A',
+            assignedAdmin: report.assignedAdmin
+              ? `${report.assignedAdmin.firstName || ''} ${report.assignedAdmin.lastName || ''}`.trim()
+              : 'N/A',
+            adminRole: report.assignedAdmin?.role || 'N/A',
+            rating: report.rating != null ? report.rating : 'N/A',
+            createdAt: report.createdAt ? new Date(report.createdAt).toLocaleString(locale, { timeZone: 'Asia/Bangkok' }) : 'N/A',
+          });
+        });
+  
+        // เพิ่มสไตล์ให้ header
+        worksheet.getRow(1).font = { bold: true };
+        worksheet.getRow(1).fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFCCCCCC' },
+        };
+  
+        // เพิ่ม auto-filter
+        worksheet.autoFilter = {
+          from: 'A1',
+          to: { row: 1, column: worksheet.columns.length },
+        };
+  
+        // ปรับความกว้างคอลัมน์อัตโนมัติ
+        worksheet.columns.forEach(column => {
+          let maxLength = 0;
+          column.eachCell({ includeEmpty: true }, cell => {
+            const columnLength = cell.value ? cell.value.toString().length : 0;
+            if (columnLength > maxLength) {
+              maxLength = columnLength;
+            }
+          });
+          column.width = maxLength < 10 ? 10 : maxLength + 2;
+        });
+  
+        res.setHeader(
+          'Content-Type',
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        );
+        res.setHeader('Content-Disposition', 'attachment; filename=reports.xlsx');
+  
+        await workbook.xlsx.write(res);
+        return res.end();
+      }
+  
       return res.status(200).json({
         message: 'All reports retrieved successfully',
         data: reportsResponse,
       });
     } catch (error) {
+      console.error('Error in /admin/all:', error.message);
       return res.status(500).json({ message: 'Internal Server Error', error: error.message });
     }
   });
+
 
   // Route สำหรับดึงรายงานที่ถูกกำหนดให้ Admin ปัจจุบัน
   router.get('/admin/assigned/:id', protect, authorizeAdminOrSuperAdmin, async (req, res) => {
@@ -698,7 +792,7 @@ router.put('/edit/:issueId', protect, upload.single('file'), async (req, res) =>
         reportIssueId,
         { assignedAdmin: adminId },
         { new: true, runValidators: true }
-      ).populate('assignedAdmin', 'firstName lastName role profileImage');
+      ).populate('assignedAdmin', 'firstName lastName role profileImage lineUserId'); // เพิ่ม lineUserId
 
       const reportResponse = {
         issueId: updatedReport._id,
@@ -717,6 +811,20 @@ router.put('/edit/:issueId', protect, upload.single('file'), async (req, res) =>
         } : null,
         createdAt: updatedReport.createdAt,
       };
+
+      // เพิ่มการแจ้งเตือนผ่าน LINE
+      if (updatedReport.assignedAdmin && updatedReport.assignedAdmin.lineUserId) {
+        const lineUserId = updatedReport.assignedAdmin.lineUserId;
+        const topic = updatedReport.topic || `คำร้อง ${reportIssueId}`;
+        const message = `คุณได้รับมอบหมายให้ดูแลรายงาน: ${topic}`;
+
+        try {
+          await sendMessage(lineUserId, message);
+          console.log(`LINE notification sent to assignedAdmin: ${lineUserId}`);
+        } catch (error) {
+          console.error(`Failed to send LINE notification to assignedAdmin: ${lineUserId}`, error.message);
+        }
+      }
 
       return res.status(200).json({
         message: 'Admin assigned to report successfully',

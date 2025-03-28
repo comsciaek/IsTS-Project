@@ -578,7 +578,7 @@ const initializeSocket = (server) => {
     });
 
     socket.on('disconnect', () => {
-      console.log('User disconnected:', socket.id);
+      // console.log('User disconnected:', socket.id);
     });
   });
 

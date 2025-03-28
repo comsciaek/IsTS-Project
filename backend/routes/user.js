@@ -242,6 +242,8 @@ router.get('/all', protect, authorizeAdminOrSuperAdmin, async (req, res) => {
       role: user.role,
       profileImage: user.profileImage,
       createdAt: user.createdAt,
+      status: user.status,
+      inactiveAt: user.inactiveAt,
     }));
 
     return res.status(200).json({
