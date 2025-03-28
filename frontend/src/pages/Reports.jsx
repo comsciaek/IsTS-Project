@@ -157,6 +157,9 @@ const Reports = () => {
       } else if (dateFilter === "monthly") {
         // รายเดือน - 30 วันล่าสุด
         startDate = today.subtract(30, "day");
+      } else if (dateFilter === "yearly") {
+        // รายเดือน - 30 วันล่าสุด
+        startDate = today.subtract(365, "day");
       }
 
       if (startDate) {
@@ -440,6 +443,7 @@ const Reports = () => {
                 <Option value="daily">รายวัน</Option>
                 <Option value="weekly">รายสัปดาห์</Option>
                 <Option value="monthly">รายเดือน</Option>
+                <Option value="yearly">รายปี</Option>
               </Select>
             </div>
           </div>
