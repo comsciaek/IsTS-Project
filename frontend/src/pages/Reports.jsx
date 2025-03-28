@@ -29,6 +29,7 @@ import {
 } from "@ant-design/icons";
 import axios from "axios";
 import dayjs from "dayjs";
+import ExportButton from "../components/export/ExportButton";
 
 const { Content } = Layout;
 const { Title, Text } = Typography;
@@ -176,6 +177,21 @@ const Reports = () => {
   useEffect(() => {
     fetchReports();
   }, [fetchReports]);
+
+  const getDateRangeText = () => {
+    switch (dateFilter) {
+      case "daily":
+        return "รายวัน";
+      case "weekly":
+        return "รายสัปดาห์";
+      case "monthly":
+        return "รายเดือน";
+      case "yearly":
+        return "รายปี";
+      default:
+        return "";
+    }
+  };
 
   const columns = [
     {
@@ -368,22 +384,31 @@ const Reports = () => {
         }}>
         <div className="flex justify-between items-center mb-6">
           <Title level={4}>รายงานคำร้อง</Title>
-          <Button
-            onClick={fetchReports}
-            loading={loading}
-            style={{
-              backgroundColor: "#262362",
-              color: "#fff",
-              transition: "background-color 0.3s",
-              border: "none",
-              borderRadius: "50%",
-              height: "32px",
-              width: "32px",
-            }}
-            onMouseEnter={(e) => (e.target.style.backgroundColor = "#193CB8")}
-            onMouseLeave={(e) => (e.target.style.backgroundColor = "#262362")}>
-            <ReloadOutlined />
-          </Button>
+          <div className="flex gap-2">
+            <ExportButton
+              data={filteredReports}
+              filename="รายงานคำร้อง"
+              dateRange={getDateRangeText()}
+            />
+            <Button
+              onClick={fetchReports}
+              loading={loading}
+              style={{
+                backgroundColor: "#262362",
+                color: "#fff",
+                transition: "background-color 0.3s",
+                border: "none",
+                borderRadius: "50%",
+                height: "32px",
+                width: "32px",
+              }}
+              onMouseEnter={(e) => (e.target.style.backgroundColor = "#193CB8")}
+              onMouseLeave={(e) =>
+                (e.target.style.backgroundColor = "#262362")
+              }>
+              <ReloadOutlined />
+            </Button>
+          </div>
         </div>
 
         <div className="mb-4 flex flex-col sm:flex-row gap-4">
