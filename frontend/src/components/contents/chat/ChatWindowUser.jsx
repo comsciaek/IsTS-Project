@@ -227,7 +227,6 @@ const ChatWindowUser = ({ chat, isMobile }) => {
   }, [messages]);
 
   // เพิ่ม debug log ในไฟล์ ChatWindow.jsx หรือ ChatWindowUser.jsx
-  
 
   // ฟังก์ชันตรวจสอบประเภทของไฟล์
   const getFileIconByType = (fileUrl) => {
@@ -323,14 +322,17 @@ const ChatWindowUser = ({ chat, isMobile }) => {
       // คัดลอกข้อมูลรูปโปรไฟล์จากข้อมูลผู้ใช้ให้ครบถ้วน
       const userProfileImage = user.profileImage || user.profilePicture || "";
 
+      // เก็บข้อความเฉพาะเมื่อมีการพิมพ์ข้อความจริงๆ
+      const messageText = newMessage.trim();
+
       // ข้อมูลสำหรับ socket
       const messageData = {
         issueId: chat.issueId,
-        message: newMessage.trim(),
+        message: messageText || "", // ส่งเป็นสตริงว่างถ้าไม่มีข้อความ แต่มีไฟล์
         senderId: userId,
         senderName:
           user.name || `${user.firstName || ""} ${user.lastName || ""}`.trim(),
-        senderProfileImage: userProfileImage, // เพิ่มข้อมูลรูปโปรไฟล์อย่างชัดเจน
+        senderProfileImage: userProfileImage,
         createdAt: new Date().toISOString(),
         tempId: tempId,
       };
@@ -373,7 +375,7 @@ const ChatWindowUser = ({ chat, isMobile }) => {
       // แสดงข้อความชั่วคราวในหน้าจอ (optimistic update)
       const optimisticMessage = {
         id: tempId,
-        text: newMessage.trim(),
+        text: messageText, // ใช้ messageText แทน newMessage.trim() เพื่อให้สอดคล้องกับ messageData
         senderId: userId,
         senderName:
           user.name || `${user.firstName || ""} ${user.lastName || ""}`.trim(),
@@ -520,12 +522,12 @@ const ChatWindowUser = ({ chat, isMobile }) => {
                     src={message.senderProfileImage}
                     icon={!message.senderProfileImage && <UserOutlined />}
                     size={isMobile ? "small" : "default"}
-                    className="mr-2 mt-1"
+                    className="mr-2 self-start flex-shrink-0 mt-1"
                   />
                 )}
-                <div>
-                  {/* แสดงกล่องข้อความเฉพาะเมื่อมีข้อความข้อความ หรือไม่ใช่รูปภาพ */}
-                  {!hasOnlyImage && (
+                <div className={`${isSelf ? "text-right" : "text-left"}`}>
+                  {/* แสดงกล่องข้อความเฉพาะเมื่อมีข้อความ */}
+                  {message.text && message.text.trim() !== "" && (
                     <Tooltip
                       title={
                         <>
@@ -534,7 +536,7 @@ const ChatWindowUser = ({ chat, isMobile }) => {
                         </>
                       }>
                       <div
-                        className={`rounded-lg py-1.5 sm:py-2 px-3 sm:px-4 break-words text-sm sm:text-base ${
+                        className={`inline-block rounded-lg py-1.5 sm:py-2 px-3 sm:px-4 break-words text-sm sm:text-base ${
                           isSelf
                             ? "bg-[#262362] text-white"
                             : "bg-white shadow-sm"
@@ -547,8 +549,8 @@ const ChatWindowUser = ({ chat, isMobile }) => {
                   {/* แสดงไฟล์แนบ */}
                   {message.fileUrl && (
                     <div
-                      className={`${hasOnlyImage ? "" : "mt-1"} ${
-                        isSelf ? "text-right" : "text-left"
+                      className={`${
+                        message.text && message.text.trim() !== "" ? "mt-1" : ""
                       }`}>
                       {renderFile(message.fileUrl, message.fileName)}
                     </div>
