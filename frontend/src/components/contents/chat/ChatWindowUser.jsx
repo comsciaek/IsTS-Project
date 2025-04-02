@@ -146,17 +146,53 @@ const ChatWindowUser = ({ chat, isMobile }) => {
     const handleNewMessage = (messageData) => {
       // ตรวจสอบว่าข้อความเป็นของแชทนี้หรือไม่
       if (messageData.issueId === chat.issueId) {
-        console.log("Message data received (User):", messageData);
+        console.log(
+          "Message received:",
+          messageData.message || messageData.text
+        );
 
         // เช็คว่าเป็นข้อความที่เรามีอยู่แล้วหรือไม่ เพื่อป้องกัน duplicate
         setMessages((prevMessages) => {
-          // ถ้ามี id ตรงกับข้อความที่มีอยู่แล้ว ไม่ต้องเพิ่ม
-          if (
-            prevMessages.some(
-              (msg) => msg.id === (messageData.id || messageData._id)
-            )
-          ) {
+          // 1. ตรวจสอบ id ที่ตรงกันหรือ tempId ที่อาจตรงกัน
+          const isDuplicateById = prevMessages.some(
+            (msg) =>
+              msg.id === (messageData.id || messageData._id) ||
+              (messageData.tempId && msg.id === messageData.tempId)
+          );
+
+          if (isDuplicateById) {
             return prevMessages;
+          }
+
+          // 2. ตรวจสอบความซ้ำซ้อนของไฟล์หากมีการส่งไฟล์เดียวกัน
+          if (messageData.fileUrl) {
+            // ตรวจสอบว่าไฟล์นี้เคยส่งไปแล้วหรือไม่ในช่วงเวลาใกล้เคียงกัน (5 วินาที)
+            const isDuplicateFile = prevMessages.some((msg) => {
+              // เช็คว่า URL ไฟล์เหมือนกัน
+              if (msg.fileUrl === messageData.fileUrl) {
+                // ถ้ามี fileUploadId ให้เช็คด้วย
+                if (messageData.fileUploadId && msg.fileUploadId) {
+                  return msg.fileUploadId === messageData.fileUploadId;
+                }
+
+                // ถ้าไม่มี fileUploadId ให้เช็คจาก timestamp
+                if (messageData._clientTimestamp && msg._clientTimestamp) {
+                  // ถ้า timestamp ต่างกันไม่เกิน 5 วินาที ถือว่าเป็นข้อความเดียวกัน
+                  return (
+                    Math.abs(
+                      messageData._clientTimestamp - msg._clientTimestamp
+                    ) < 5000
+                  );
+                }
+
+                return true; // ถือว่าเป็นไฟล์เดียวกันถ้า URL ตรงกัน
+              }
+              return false;
+            });
+
+            if (isDuplicateFile) {
+              return prevMessages;
+            }
           }
 
           // แปลงข้อมูล senderId ที่อาจเป็น Object หรือ String
@@ -186,8 +222,6 @@ const ChatWindowUser = ({ chat, isMobile }) => {
               messageData.profilePicture;
           }
 
-          console.log("Processed profile image (User):", senderProfileImage);
-
           // สร้างข้อความในรูปแบบที่ถูกต้อง
           const formattedMessage = {
             id: messageData.id || messageData._id,
@@ -201,7 +235,25 @@ const ChatWindowUser = ({ chat, isMobile }) => {
             fileName:
               messageData.fileName ||
               (messageData.fileUrl && messageData.fileUrl.split("/").pop()),
+            fileUploadId: messageData.fileUploadId,
+            _clientTimestamp: messageData._clientTimestamp,
           };
+
+          // 3. ตรวจสอบว่ามีข้อความชั่วคราว (optimistic) ที่ตรงกันหรือไม่
+          const optimisticIndex = prevMessages.findIndex(
+            (msg) =>
+              msg._isOptimistic &&
+              ((msg.text === formattedMessage.text &&
+                !formattedMessage.fileUrl) ||
+                msg.fileUrl === formattedMessage.fileUrl)
+          );
+
+          if (optimisticIndex !== -1) {
+            // ถ้ามีการอัพเดตข้อความชั่วคราว ให้แทนที่ด้วยข้อความจริง
+            const updatedMessages = [...prevMessages];
+            updatedMessages[optimisticIndex] = formattedMessage;
+            return updatedMessages;
+          }
 
           // เพิ่มข้อความใหม่
           return [...prevMessages, formattedMessage];
@@ -213,10 +265,9 @@ const ChatWindowUser = ({ chat, isMobile }) => {
     };
 
     // เพิ่มตัวฟังก์ชัน event listener
-
     socket.on("messageReceived", handleNewMessage);
 
-    // Clean up function เมื่อ component unmount หรือ dependency เปลี่ยนแปลง
+    // Clean up function
     return () => {
       socket.off("messageReceived", handleNewMessage);
     };
@@ -316,8 +367,10 @@ const ChatWindowUser = ({ chat, isMobile }) => {
       const token = localStorage.getItem("token");
       const userId = user.id || user._id;
 
-      // สร้าง unique ID สำหรับข้อความชั่วคราว
-      const tempId = `temp_${Date.now()}`;
+      // สร้าง unique ID สำหรับข้อความชั่วคราวที่มีความเฉพาะมากขึ้น
+      const tempId = `temp_${Date.now()}_${Math.random()
+        .toString(36)
+        .substring(2, 9)}`;
 
       // คัดลอกข้อมูลรูปโปรไฟล์จากข้อมูลผู้ใช้ให้ครบถ้วน
       const userProfileImage = user.profileImage || user.profilePicture || "";
@@ -335,7 +388,13 @@ const ChatWindowUser = ({ chat, isMobile }) => {
         senderProfileImage: userProfileImage,
         createdAt: new Date().toISOString(),
         tempId: tempId,
+        _clientTimestamp: Date.now(), // เพิ่มตัวระบุเวลาส่งจากฝั่ง client
       };
+
+      // ล้างฟอร์มทันที - ย้ายขึ้นมาลบฟอร์มก่อนที่จะมีการอัปโหลดไฟล์
+      setNewMessage("");
+
+      let fileUploadResponse = null;
 
       // ถ้ามีไฟล์
       if (fileList.length > 0 && fileList[0].originFileObj) {
@@ -345,7 +404,7 @@ const ChatWindowUser = ({ chat, isMobile }) => {
         formData.append("issueId", chat.issueId); // เพิ่ม issueId ใน formData
 
         try {
-          const response = await axios.post(
+          fileUploadResponse = await axios.post(
             "http://172.18.43.39:5000/api/upload/chat",
             formData,
             {
@@ -356,11 +415,13 @@ const ChatWindowUser = ({ chat, isMobile }) => {
             }
           );
 
-          console.log("File uploaded successfully:", response.data);
+          console.log("File uploaded successfully:", fileUploadResponse.data);
           // เพิ่มข้อมูลไฟล์ลงในข้อความที่จะส่งผ่าน socket
-          if (response.data && response.data.fileUrl) {
-            messageData.fileUrl = response.data.fileUrl;
+          if (fileUploadResponse.data && fileUploadResponse.data.fileUrl) {
+            messageData.fileUrl = fileUploadResponse.data.fileUrl;
             messageData.fileName = file.name;
+            messageData.fileUploadId =
+              fileUploadResponse.data.fileId || `file_${Date.now()}`; // เพิ่ม ID ของไฟล์เพื่อช่วยระบุความซ้ำซ้อน
           }
         } catch (error) {
           console.error(
@@ -371,6 +432,9 @@ const ChatWindowUser = ({ chat, isMobile }) => {
           // แม้ว่าอัพโหลดไฟล์จะล้มเหลว เราก็ยังส่งข้อความได้
         }
       }
+
+      // ล้างไฟล์หลังจากอัปโหลด
+      setFileList([]);
 
       // แสดงข้อความชั่วคราวในหน้าจอ (optimistic update)
       const optimisticMessage = {
@@ -384,16 +448,14 @@ const ChatWindowUser = ({ chat, isMobile }) => {
         issueId: chat.issueId,
         fileUrl: messageData.fileUrl,
         fileName: messageData.fileName,
+        fileUploadId: messageData.fileUploadId,
         _isOptimistic: true,
+        _clientTimestamp: messageData._clientTimestamp,
       };
 
       setMessages((prevMessages) => [...prevMessages, optimisticMessage]);
       // เลื่อนลงล่างทันทีเมื่อแสดงข้อความชั่วคราว
       setTimeout(scrollToBottom, 50);
-
-      // ล้างฟอร์มทันที
-      setNewMessage("");
-      setFileList([]);
 
       // ส่งข้อความผ่าน socket และเพิ่ม console.log เพื่อตรวจสอบ
       console.log("Sending message data:", messageData);
