@@ -97,7 +97,7 @@ const Sidebar = () => {
 
   useEffect(() => {
     if (location.pathname === "/settings") {
-      setSelectedKey("6");
+      setSelectedKey("7");
     } else {
       // Make sure we handle the case when filteredMenuItems might be empty
       if (filteredMenuItems.length > 0) {

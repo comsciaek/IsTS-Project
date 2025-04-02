@@ -1,6 +1,10 @@
-import { useState, useEffect } from "react";
-import { Avatar, Badge, Spin, Empty, Input, List, message } from "antd";
-import { UserOutlined, PaperClipOutlined } from "@ant-design/icons";
+import { useState, useEffect, useCallback } from "react";
+import { Avatar, Badge, Spin, Empty, Input, List, Button, message } from "antd";
+import {
+  UserOutlined,
+  PaperClipOutlined,
+  ReloadOutlined,
+} from "@ant-design/icons";
 import axios from "axios";
 import { useSocket } from "../../../context/SocketContext";
 import { useUser } from "../../../context/UserContext";
@@ -24,19 +28,27 @@ const ChatList = ({ onSelectChat, selectedChat }) => {
   const [filteredContacts, setFilteredContacts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchText, setSearchText] = useState(null);
+  const [refreshing, setRefreshing] = useState(false); // เพิ่ม state สำหรับการรีเฟรช
   const { socket } = useSocket();
   const { user } = useUser(); // เพิ่มการใช้งาน user context
 
-  // ดึงรายการคำร้องที่ได้รับมอบหมาย
-  useEffect(() => {
-    const fetchAssignedIssues = async () => {
+  // แปลง fetchAssignedIssues เป็น useCallback เพื่อให้สามารถเรียกใช้ได้ในฟังก์ชันอื่น
+  const fetchAssignedIssues = useCallback(
+    async (isRefreshing = false) => {
       try {
+        if (isRefreshing) {
+          setRefreshing(true);
+        } else {
+          setLoading(true);
+        }
+
         const token = localStorage.getItem("token");
         const userId = user?.id || user?._id;
 
         if (!userId) {
           console.error("User ID is missing");
           setLoading(false);
+          setRefreshing(false);
           return;
         }
 
@@ -44,6 +56,7 @@ const ChatList = ({ onSelectChat, selectedChat }) => {
           console.error("No token found, please log in again");
           antMessage.error("กรุณาเข้าสู่ระบบใหม่อีกครั้ง");
           setLoading(false);
+          setRefreshing(false);
           return;
         }
 
@@ -137,19 +150,29 @@ const ChatList = ({ onSelectChat, selectedChat }) => {
         // console.log("Transformed contacts:", contactsList);
         setContacts(contactsList);
         setFilteredContacts(contactsList);
+
+        // จบการโหลดข้อมูลและแสดงข้อความสำเร็จถ้าเป็นการรีเฟรช
+        if (isRefreshing) {
+          antMessage.success("รีเฟรชข้อมูลสำเร็จ");
+        }
       } catch (error) {
         console.error(
           "Error fetching assigned issues:",
           error.response?.data || error.message
         );
-        message.error("ตอนนี้คุณยังไม่มีคำร้องที่ถูกมอบหมาย");
+        message.error("ไม่สามารถโหลดข้อมูลได้");
       } finally {
         setLoading(false);
+        setRefreshing(false);
       }
-    };
+    },
+    [user]
+  );
 
+  // ดึงรายการคำร้องที่ถูกมอบหมายเมื่อ component mount
+  useEffect(() => {
     fetchAssignedIssues();
-  }, [user]);
+  }, [fetchAssignedIssues]);
 
   // ติดตามข้อความใหม่จาก socket
   useEffect(() => {
@@ -299,6 +322,11 @@ const ChatList = ({ onSelectChat, selectedChat }) => {
     }
   };
 
+  // เพิ่มฟังก์ชันสำหรับการรีเฟรชรายการแชท
+  const handleRefresh = () => {
+    fetchAssignedIssues(true);
+  };
+
   // ปรับปรุงการแสดงข้อความสุดท้าย
   const renderLastMessage = (contact) => {
     if (!contact.lastMessage) return null;
@@ -331,14 +359,33 @@ const ChatList = ({ onSelectChat, selectedChat }) => {
 
   return (
     <div className="chat-list-container h-full flex flex-col">
-      {/* ส่วนค้นหา */}
+      {/* ส่วนค้นหา - เพิ่มปุ่ม Refresh */}
       <div className="p-3 border-b-gray-300 border-b">
-        <Search
-          placeholder="ค้นหาชื่อ หรือแผนก..."
-          value={searchText}
-          onChange={(e) => handleSearch(e.target.value)}
-          onSearch={handleSearch}
-        />
+        <div className="flex gap-2">
+          <Search
+            placeholder="ค้นหาชื่อ หรือแผนก..."
+            value={searchText}
+            onChange={(e) => handleSearch(e.target.value)}
+            onSearch={handleSearch}
+            className="flex-1"
+          />
+          <Button
+            type="primary"
+            icon={<ReloadOutlined />}
+            loading={refreshing}
+            onClick={handleRefresh}
+            style={{
+              backgroundColor: "#262362",
+              transition: "background-color 0.3s",
+              border: "none",
+              borderRadius: "50%",
+              height: "32px",
+              width: "32px",
+            }}
+            onMouseEnter={(e) => (e.target.style.backgroundColor = "#193CB8")}
+            onMouseLeave={(e) => (e.target.style.backgroundColor = "#262362")}
+          />
+        </div>
       </div>
 
       {/* รายการผู้ติดต่อ */}

@@ -32,7 +32,7 @@ const Overview = () => {
         style={{
           padding: 24,
         }}>
-        <ContentOverview timeRange="daily" />
+        <ContentOverview />
       </Content>
     </Layout>
   );

@@ -21,7 +21,7 @@ const ContentOverview = () => {
           background: colorBgContainer,
         }}>
         <>
-          <span className="text-2xl font-semibold mb-4">คำร้องใหม่</span>
+          <span className="text-2xl font-semibold mb-4 p-5">คำร้องใหม่</span>
           <AssignmentTable />
         </>
       </Content>
