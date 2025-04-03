@@ -10,6 +10,7 @@ import path from 'path';
 import mongoose from 'mongoose';
 import { sendMessage } from '../utils/lineNotification.js'; // เพิ่ม import ฟังก์ชันส่ง LINE
 import axios from 'axios';
+import { sendLineNotification } from '../utils/lineNotification.js';
 
 const router = express.Router();
 
@@ -60,6 +61,13 @@ if (!fs.existsSync(reportsUploadDir)) {
 if (!fs.existsSync(chatUploadDir)) {
   fs.mkdirSync(chatUploadDir, { recursive: true });
 }
+
+// ฟังก์ชันช่วยคำนวณขนาดของ JSON
+const getJsonSizeInKB = (obj) => {
+  const jsonString = JSON.stringify(obj);
+  const sizeInBytes = Buffer.byteLength(jsonString, 'utf8');
+  return sizeInBytes / 1024; // แปลงเป็น KB
+};
 
 // Export router as a function that accepts io
 export default (io) => {
@@ -673,145 +681,199 @@ router.put('/edit/:issueId', protect, upload.single('file'), async (req, res) =>
   });
 
   router.put('/assign/:issueId', protect, authorizeAdminOrSuperAdmin, async (req, res) => {
+    const { issueId } = req.params;
+    const { adminId } = req.body;
+  
+    const session = await mongoose.startSession();
+    session.startTransaction();
+  
     try {
-      const reportIssueId = req.params.issueId;
-      const { adminId } = req.body;
-
-      if (!mongoose.Types.ObjectId.isValid(reportIssueId)) {
-        return res.status(400).json({ message: 'Invalid report ID' });
-      }
-
-      const report = await Report.findById(reportIssueId);
+      const report = await Report.findById(issueId).session(session);
       if (!report) {
+        await session.abortTransaction();
+        session.endSession();
         return res.status(404).json({ message: 'Report not found' });
       }
-
-      if (!mongoose.Types.ObjectId.isValid(adminId)) {
-        return res.status(400).json({ message: 'Invalid admin ID' });
-      }
-
-      const admin = await User.findById(adminId);
+  
+      const admin = await User.findById(adminId).session(session);
       if (!admin || (admin.role !== 'Admin' && admin.role !== 'SuperAdmin')) {
-        return res.status(400).json({ message: 'Assigned user must be an Admin or SuperAdmin' });
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({ message: 'Invalid admin ID or user is not an admin' });
       }
-
-      const updatedReport = await Report.findByIdAndUpdate(
-        reportIssueId,
-        { assignedAdmin: adminId },
-        { new: true, runValidators: true }
-      ).populate('assignedAdmin', 'firstName lastName role profileImage lineUserId');
-
-      const reportResponse = {
-        issueId: updatedReport._id,
-        userId: updatedReport.userId,
-        topic: updatedReport.topic,
-        description: updatedReport.description,
-        date: updatedReport.date,
-        file: updatedReport.file,
-        status: updatedReport.status,
-        assignedAdmin: updatedReport.assignedAdmin
-          ? {
-              id: updatedReport.assignedAdmin._id,
-              firstName: updatedReport.assignedAdmin.firstName,
-              lastName: updatedReport.assignedAdmin.lastName,
-              role: updatedReport.assignedAdmin.role,
-              profileImage: updatedReport.assignedAdmin.profileImage,
-            }
-          : null,
-        createdAt: updatedReport.createdAt,
+  
+      report.assignedAdmin = adminId;
+      const updatedReport = await report.save({ session });
+  
+      const io = req.app.locals.io;
+      if (!io) {
+        console.error('Socket.IO is not initialized');
+      } else {
+        io.to(adminId).emit('reportAssigned', {
+          issueId,
+          message: `คุณได้รับการมอบหมายให้ดูแลรายงาน "${report.topic}"`,
+        });
+      }
+  
+      const topic = updatedReport.topic || `Report ${issueId}`;
+      const adminName = `${admin.firstName} ${admin.lastName}` || 'Admin';
+      const assigner = req.user ? `${req.user.firstName} ${req.user.lastName}` : 'Admin';
+  
+      // สร้าง Flex Message สำหรับ Admin
+      const adminFlexMessage = {
+        type: 'bubble',
+        size: 'kilo', // กำหนดขนาด bubble
+        direction: 'ltr', // กำหนดทิศทางการแสดงผล
+        header: {
+          type: 'box',
+          layout: 'vertical',
+          contents: [
+            { type: 'text', text: 'การแจ้งเตือนการมอบหมายงาน', weight: 'bold', size: 'lg', color: '#1DB446', align: 'center' },
+          ],
+        },
+        body: {
+          type: 'box',
+          layout: 'vertical',
+          contents: [
+            { type: 'text', text: `สวัสดี ${adminName}, คุณได้รับการมอบหมายงาน`, size: 'md', margin: 'md', wrap: true },
+            { type: 'text', text: `รายงาน: ${topic}`, size: 'md', margin: 'md', color: '#1DB446', wrap: true },
+            { type: 'text', text: `มอบหมายโดย: ${assigner}`, size: 'sm', color: '#666666', margin: 'sm', wrap: true },
+          ],
+        },
+        footer: {
+          type: 'box',
+          layout: 'vertical',
+          contents: [
+            { type: 'text', text: 'กรุณาตรวจสอบรายละเอียดในระบบ', size: 'sm', color: '#666666', align: 'center' },
+          ],
+        },
       };
-
-      if (updatedReport.assignedAdmin && updatedReport.assignedAdmin.lineUserId) {
-        const lineUserId = updatedReport.assignedAdmin.lineUserId;
-        const topic = updatedReport.topic || `Report ${reportIssueId}`;
-        const adminName = `${updatedReport.assignedAdmin.firstName} ${updatedReport.assignedAdmin.lastName}` || 'Admin';
-        const assigner = req.user ? `${req.user.firstName} ${req.user.lastName}` : 'Admin';
-
-        if (lineUserId && typeof lineUserId === 'string') {
-          try {
-            const flexMessage = {
-              type: 'bubble',
-              body: {
-                type: 'box',
-                layout: 'vertical',
-                contents: [
-                  { type: 'text', text: 'Assignment Notification', weight: 'bold', size: 'lg', color: '#1DB446' },
-                  { type: 'separator', margin: 'md' },
-                  { type: 'text', text: `สวัสด ${adminName}, คุณได้รับการมอบหมายงาน`, size: 'md', margin: 'md', wrap: true },
-                  { type: 'text', text: `Report: ${topic}`, size: 'md', margin: 'md', wrap: true },
-                  { type: 'text', text: `Assigned by: ${assigner}`, size: 'sm', color: '#666666', margin: 'sm', wrap: true },
-                ],
-              },
-            };
-
-            const altText = `Hello ${adminName}, you have been assigned a task: ${topic} by ${assigner}`;
-            const truncatedAltText = altText.length > 400 ? altText.substring(0, 397) + '...' : altText;
-
-            await sendMessage(lineUserId, truncatedAltText, 'flex', flexMessage);
-          } catch (error) {
-            try {
-              const fallbackText = `Hello ${adminName}, you have been assigned a task: ${topic} by ${assigner}`;
-              await sendMessage(lineUserId, fallbackText);
-            } catch (fallbackError) {
-              return res.status(200).json({
-                message: 'Admin assigned successfully, but LINE notification failed',
-                data: reportResponse,
-              });
-            }
-          }
+  
+      // ส่ง Flex Message ไปยัง Admin
+      if (admin.lineUserId) {
+        const adminAltText = `คุณได้รับการมอบหมายให้ดูแลรายงาน "${topic}"`;
+        const adminResult = await sendMessage(admin.lineUserId, adminAltText, 'flex', adminFlexMessage);
+        if (!adminResult.success) {
+          console.error(`Failed to send LINE notification to adminId: ${adminId}`, adminResult.error);
+        } else {
+          console.log(`Successfully sent LINE notification to adminId: ${adminId}`);
         }
       }
-
-      return res.status(200).json({
-        message: 'Admin assigned successfully',
-        data: reportResponse,
-      });
+  
+      // สร้าง Flex Message สำหรับ User
+      if (updatedReport.userId) {
+        const user = await User.findById(updatedReport.userId).session(session);
+        if (user && user.lineUserId) {
+          const userFlexMessage = {
+            type: 'bubble',
+            size: 'kilo',
+            direction: 'ltr',
+            header: {
+              type: 'box',
+              layout: 'vertical',
+              contents: [
+                { type: 'text', text: 'การแจ้งเตือนการมอบหมายงาน', weight: 'bold', size: 'sm', color: '#1DB446', align: 'center' },
+              ],
+            },
+            body: {
+              type: 'box',
+              layout: 'vertical',
+              contents: [
+                { type: 'text', text: `สวัสดี ${user.firstName} ${user.lastName}, รายงานของคุณได้รับการมอบหมาย`, size: 'sm', margin: 'md', wrap: true },
+                { type: 'text', text: `รายงาน: ${topic}`, size: 'md', margin: 'md', color: '#1DB446', wrap: true },
+                { type: 'text', text: `ผู้รับผิดชอบ: ${adminName}`, size: 'sm', color: '#666666', margin: 'sm', wrap: true },
+                // { type: 'text', text: `มอบหมายโดย: ${assigner}`, size: 'sm', color: '#666666', margin: 'sm', wrap: true },
+              ],
+            },
+            footer: {
+              type: 'box',
+              layout: 'vertical',
+              contents: [
+                { type: 'text', text: 'กรุณาตรวจสอบรายละเอียดในระบบ', size: 'sm', color: '#666666', align: 'center' },
+              ],
+            },
+          };
+  
+          const userAltText = `รายงาน "${topic}" ของคุณได้รับการมอบหมายให้ ${adminName} เป็นผู้รับผิดชอบ`;
+          const userResult = await sendMessage(user.lineUserId, userAltText, 'flex', userFlexMessage);
+          if (!userResult.success) {
+            console.error(`Failed to send LINE notification to userId: ${updatedReport.userId}`, userResult.error);
+          } else {
+            console.log(`Successfully sent LINE notification to userId: ${updatedReport.userId}`);
+          }
+  
+          io.to(updatedReport.userId.toString()).emit('reportAssigned', {
+            issueId,
+            message: `รายงาน "${topic}" ของคุณได้รับการมอบหมายให้ ${adminName} เป็นผู้รับผิดชอบ`,
+          });
+        }
+      }
+  
+      await session.commitTransaction();
+      session.endSession();
+  
+      res.status(200).json({ message: 'Admin assigned successfully', report: updatedReport });
     } catch (error) {
-      return res.status(500).json({ message: 'Internal Server Error', error: error.message });
+      await session.abortTransaction();
+      session.endSession();
+      console.error('Error assigning admin:', error.message);
+      res.status(500).json({ message: 'Internal Server Error', error: error.message });
     }
   });
 
   // Route สำหรับให้คะแนน
   router.put('/rate/:issueId', protect, async (req, res) => {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
     try {
       const { issueId } = req.params;
       const { rating } = req.body;
 
       if (!mongoose.Types.ObjectId.isValid(issueId)) {
+        await session.abortTransaction();
+        session.endSession();
         return res.status(400).json({ message: 'Invalid issue ID' });
       }
 
       if (!rating || rating < 1 || rating > 5) {
+        await session.abortTransaction();
+        session.endSession();
         return res.status(400).json({ message: 'Rating must be between 1 and 5' });
       }
 
-      const report = await Report.findById(issueId);
+      const report = await Report.findById(issueId).session(session);
       if (!report) {
+        await session.abortTransaction();
+        session.endSession();
         return res.status(404).json({ message: 'Report not found' });
       }
 
       if (report.status !== 'completed') {
+        await session.abortTransaction();
+        session.endSession();
         return res.status(400).json({ message: 'Report must be completed before rating' });
       }
 
       if (report.rating !== null) {
+        await session.abortTransaction();
+        session.endSession();
         return res.status(400).json({ message: 'This report has already been rated' });
       }
 
       const userId = req.user.id;
-      if (!userId) {
-        return res.status(401).json({ message: 'User not authenticated' });
-      }
-
-      if (report.userId.toString() !== userId) {
+      if (!userId || report.userId.toString() !== userId) {
+        await session.abortTransaction();
+        session.endSession();
         return res.status(403).json({ message: 'Only the report creator can rate this report' });
       }
 
       report.rating = rating;
-      await report.save();
+      await report.save({ session });
 
+      const io = req.app.locals.io;
       const adminId = report.assignedAdmin?.toString();
-      if (adminId) {
+      if (adminId && io) {
         io.to(adminId).emit('reportRated', {
           issueId,
           rating,
@@ -819,8 +881,13 @@ router.put('/edit/:issueId', protect, upload.single('file'), async (req, res) =>
         });
       }
 
+      await session.commitTransaction();
+      session.endSession();
+
       res.status(200).json({ message: 'Rating submitted successfully', rating });
     } catch (error) {
+      await session.abortTransaction();
+      session.endSession();
       console.error('Error submitting rating:', error.message);
       res.status(500).json({ message: 'Internal Server Error', error: error.message });
     }

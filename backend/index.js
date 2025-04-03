@@ -19,6 +19,7 @@ import Chat from './model/Chat.js';
 import cron from 'node-cron';
 import axios from 'axios';
 import { createHmac } from 'crypto';
+import { updateReportStatus } from './utils/reportUtils.js';
 
 dotenv.config();
 
@@ -177,7 +178,7 @@ app.get('/api-test', (req, res) => {
 // API สำหรับอัปเดตสถานะของรายงาน
 app.put('/api/reports/:id/status', async (req, res) => {
   try {
-    const { id } = req.params;
+    const { id: issueId } = req.params;
     const { status } = req.body;
 
     const token = req.headers.authorization?.split(' ')[1];
@@ -186,108 +187,14 @@ app.put('/api/reports/:id/status', async (req, res) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const userRole = decoded.role;
-    if (userRole !== 'Admin' && userRole !== 'SuperAdmin') {
-      return res.status(403).json({ message: 'Only Admin or SuperAdmin can update status' });
-    }
+    const userId = decoded.id;
+    const role = decoded.role;
 
-    if (!['pending', 'approved', 'rejected', 'completed'].includes(status)) {
-      return res.status(400).json({ message: 'Invalid status value' });
-    }
-
-    const report = await Report.findById(id);
-    if (!report) {
-      return res.status(404).json({ message: 'Report not found' });
-    }
-
-    const oldStatus = report.status;
-    report.status = status;
-    await report.save();
-
-    const userId = report.userId?.toString();
-    const adminId = report.assignedAdmin?.toString() || decoded.id;
-    const topic = report.topic || `คำร้อง ${id}`;
-
-    const notificationData = {
-      issueId: id,
-      oldStatus,
-      newStatus: status,
-      message: `Report ${topic} status updated to ${status} by Admin`,
-      createdAt: new Date(),
-    };
-
-    console.log('Creating notification for userId:', userId);
-    if (userId) {
-      try {
-        const userNotification = new Notification({
-          userId,
-          ...notificationData,
-          isRead: false,
-        });
-        await userNotification.save();
-        console.log('User notification created:', userNotification);
-        io.to(userId).emit('statusUpdate', {
-          id: userNotification._id,
-          issueId: id,
-          userId,
-          oldStatus,
-          status,
-          message: userNotification.message,
-          isRead: userNotification.isRead,
-          createdAt: userNotification.createdAt,
-        });
-      } catch (error) {
-        console.error('Error saving user notification:', error.message);
-      }
-    }
-
-    console.log('Creating notification for adminId:', adminId);
-    if (adminId) {
-      try {
-        const adminNotification = new Notification({
-          userId: adminId,
-          ...notificationData,
-          message: `Report ${topic} status updated to ${status} (by you)`,
-          isRead: false,
-        });
-        await adminNotification.save();
-        console.log('Admin notification created:', adminNotification);
-        io.to(adminId).emit('statusUpdate', {
-          id: adminNotification._id,
-          issueId: id,
-          userId: adminId,
-          oldStatus,
-          status,
-          message: adminNotification.message,
-          isRead: adminNotification.isRead,
-          createdAt: adminNotification.createdAt,
-        });
-      } catch (error) {
-        console.error('Error saving admin notification:', error.message);
-      }
-    }
-
-    if (userId) {
-      io.to(userId).emit('reportStatusUpdate', {
-        issueId: id,
-        oldStatus,
-        newStatus: status,
-        message: `Report status updated to ${status}`,
-      });
-    }
-    if (adminId) {
-      io.to(adminId).emit('reportStatusUpdate', {
-        issueId: id,
-        oldStatus,
-        newStatus: status,
-        message: `Report status updated to ${status}`,
-      });
-    }
-
-    res.status(200).json({ message: 'Report status updated', status });
+    const result = await updateReportStatus({ issueId, status, userId, role, io });
+    res.status(200).json(result);
   } catch (error) {
     console.error('Error updating report status:', error.message);
-    res.status(500).json({ message: 'Internal Server Error', error: error.message });
+    res.status(500).json({ message: error.message });
   }
 });
 

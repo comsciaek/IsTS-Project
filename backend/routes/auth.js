@@ -194,13 +194,21 @@ router.post('/forgot-password', async (req, res) => {
       to: user.email,
       subject: 'Password Reset Request',
       html: `
-        <h3>Password Reset Request</h3>
-        <p>Hello ${user.firstName},</p>
-        <p>You requested a password reset. Click the link below to reset your password:</p>
-        <p><a href="${resetLink}">Reset Password</a></p>
-        <p>This link will expire in 24 hours.</p>
-        <p>If you didn't request this, please ignore this email.</p>
-        <p>Best regards,<br>Your App Team</p>
+      <h3>Password Reset Request</h3>
+      <p>Hello ${user.firstName},</p>
+      <p>You requested a password reset. Click the link below to reset your password:</p>
+      <p><a href="${resetLink}">Reset Password</a></p>
+      <p>This link will expire in 24 hours.</p>
+      <p>If you didn't request this, please ignore this email.</p>
+      <p>Best regards,<br>From IsTS</p>
+      <hr>
+      <h3>คำขอรีเซ็ตรหัสผ่าน</h3>
+      <p>สวัสดี ${user.firstName},</p>
+      <p>คุณได้ส่งคำขอรีเซ็ตรหัสผ่าน กรุณาคลิกลิงก์ด้านล่างเพื่อรีเซ็ตรหัสผ่านของคุณ:</p>
+      <p><a href="${resetLink}">รีเซ็ตรหัสผ่าน</a></p>
+      <p>ลิงก์นี้จะหมดอายุใน 24 ชั่วโมง</p>
+      <p>หากคุณไม่ได้ส่งคำขอนี้ กรุณาเพิกเฉยต่ออีเมลนี้</p>
+      <p>ด้วยความเคารพ,<br>จาก IsTS</p>
       `,
     });
     return res.status(200).json({ message: 'Reset link sent to your email' });
