@@ -133,6 +133,38 @@ const ChatWindowUser = ({ chat, isMobile }) => {
     }
   }, [chat, getChatMessages]);
 
+  // เพิ่มการติดตามการเปลี่ยนแปลงสถานะคำร้องใน socket
+  useEffect(() => {
+    if (!socket || !chat || !chat.issueId) return;
+
+    // ฟังก์ชันจัดการเมื่อมีการอัปเดตสถานะคำร้อง
+    const handleStatusUpdate = (data) => {
+      if (data.issueId === chat.issueId && data.status === "completed") {
+        console.log("Report status changed to completed, refreshing page...");
+        message.success(
+          "คำร้องได้รับการดำเนินการเสร็จสิ้นแล้ว กำลังรีเฟรชหน้า..."
+        );
+
+        // รอให้ข้อความแจ้งเตือนแสดงสักครู่แล้วจึงรีเฟรชหน้า
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
+      }
+    };
+
+    // รับเหตุการณ์การเปลี่ยนแปลงสถานะคำร้องจากหลายช่องทาง (จากที่กำหนดใน SocketContext)
+    socket.on("issue_status_changed", handleStatusUpdate);
+    socket.on("reportStatusUpdate", handleStatusUpdate);
+    socket.on("statusUpdate", handleStatusUpdate);
+
+    // คืนค่าฟังก์ชันทำความสะอาด
+    return () => {
+      socket.off("issue_status_changed", handleStatusUpdate);
+      socket.off("reportStatusUpdate", handleStatusUpdate);
+      socket.off("statusUpdate", handleStatusUpdate);
+    };
+  }, [socket, chat]);
+
   // ยังคงรักษา event listener สำหรับ newMessage ไว้เพื่อความเข้ากันได้กับระบบเดิม
   useEffect(() => {
     if (!socket || !chat || !chat.issueId) return;
