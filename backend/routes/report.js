@@ -40,17 +40,46 @@ const chatStorage = multer.diskStorage({
   },
 });
 
-// ตรวจสอบว่าไฟล์เป็นไฟล์ที่อนุญาต (เช่น JPEG, PNG, PDF, DOC, DOCX)
+// ตรวจสอบว่าไฟล์เป็นไฟล์ที่อนุญาต (เช่น JPEG, PNG, PDF, DOC, DOCX, Excel)
 const fileFilter = (req, file, cb) => {
-  const allowedTypes = ['image/jpeg', 'image/png', 'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-  if (allowedTypes.includes(file.mimetype)) {
+  const allowedTypes = [
+    'image/jpeg',
+    'image/png',
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel', // MIME type สำหรับ Excel (.xls)
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // MIME type สำหรับ Excel (.xlsx)
+  ];
+
+  const allowedExtensions = ['.jpeg', '.jpg', '.png', '.pdf', '.doc', '.docx', '.xls', '.xlsx'];
+
+  const fileExtension = path.extname(file.originalname).toLowerCase();
+
+  console.log('MIME type:', file.mimetype);
+  console.log('File extension:', fileExtension);
+
+  if (allowedTypes.includes(file.mimetype) && allowedExtensions.includes(fileExtension)) {
     cb(null, true);
   } else {
-    cb(new Error('Only image (JPEG/PNG), PDF, or Word (DOC/DOCX) files are allowed'), false);
+    // ส่ง error code และข้อความกลับไปยัง Frontend
+    const error = new Error('Invalid file type. Only JPEG, PNG, PDF, Word (DOC/DOCX), or Excel (XLS/XLSX) files are allowed');
+    error.statusCode = 400; // กำหนด status code เป็น 400 (Bad Request)
+    cb(error, false);
   }
 };
 
-const upload = multer({ storage: storage, fileFilter });
+// Middleware สำหรับจัดการข้อผิดพลาดของ Multer
+const multerErrorHandler = (err, req, res, next) => {
+  if (err instanceof multer.MulterError || err.statusCode === 400) {
+    return res.status(err.statusCode || 500).json({
+      message: err.message || 'An error occurred during file upload',
+    });
+  }
+  next(err);
+};
+
+const upload = multer({ storage: storage, fileFilter, limits: { fileSize: 5 * 1024 * 1024 } }); // เพิ่ม limits
 const chatUpload = multer({ storage: chatStorage, fileFilter });
 
 const reportsUploadDir = './uploads/reports';
@@ -72,7 +101,7 @@ const getJsonSizeInKB = (obj) => {
 // Export router as a function that accepts io
 export default (io) => {
   // Route สำหรับสร้างรายงานใหม่
-  router.post('/create/me', protect, upload.single('file'), async (req, res) => {
+  router.post('/create/me', protect, upload.single('file'), multerErrorHandler, async (req, res) => {
     try {
       const userId = req.user.id;
       const { topic, description, date } = req.body;
@@ -99,23 +128,12 @@ export default (io) => {
         file: fileUrl,
       });
 
-      const reportResponse = {
-        issueId: report._id,
-        userId: report.userId,
-        topic: report.topic,
-        description: report.description,
-        date: report.date,
-        file: report.file,
-        status: report.status,
-        assignedAdmin: report.assignedAdmin,
-        createdAt: report.createdAt,
-      };
-
       return res.status(201).json({
         message: 'Report created successfully',
-        data: reportResponse,
+        data: report,
       });
     } catch (error) {
+      console.error('Error creating report:', error);
       return res.status(500).json({ message: 'Internal Server Error', error: error.message });
     }
   });

@@ -380,7 +380,7 @@ const initializeSocket = (server) => {
               { type: 'text', text: 'การแจ้งเตือนสถานะรายงาน', weight: 'bold', size: 'lg', color: '#1DB446' },
               { type: 'text', text: `รายงาน: ${report.topic}`, size: 'md', margin: 'md', wrap: true },
               { type: 'text', text: `สถานะ: ${status}`, size: 'md', margin: 'md', color: '#FF6B6B', wrap: true },
-              { type: 'text', text: `โดย: คุณ`, size: 'sm', color: '#666666', margin: 'sm', wrap: true },
+              { type: 'text', text: `โดย: ${admin.firstName} ${admin.lastName}`, size: 'sm', color: '#666666', margin: 'sm', wrap: true },
             ],
           },
         };
@@ -403,14 +403,14 @@ const initializeSocket = (server) => {
               { type: 'text', text: 'การแจ้งเตือนสถานะรายงาน', weight: 'bold', size: 'lg', color: '#1DB446' },
               { type: 'text', text: `รายงาน: ${report.topic}`, size: 'md', margin: 'md', wrap: true },
               { type: 'text', text: `สถานะ: ${status}`, size: 'md', margin: 'md', color: '#FF6B6B', wrap: true },
-              { type: 'text', text: `โดย: คุณ`, size: 'sm', color: '#666666', margin: 'sm', wrap: true },
+              { type: 'text', text: `โดย: ${admin.firstName} ${admin.lastName}`, size: 'sm', color: '#666666', margin: 'sm', wrap: true },
             ],
           },
         };
 
         // ส่ง Flex Message ไปยัง user
         if (user.lineUserId) {
-          const userResult = await sendMessage(user.lineUserId, `สวัสดีคุณ ${user.firstName}, สถานะของรายงานหัวข้อ "${report.topic}" ได้ถูกเปลี่ยนเป็น ${status}`, 'flex', userFlexMessage);
+          const userResult = await sendMessage(user.lineUserId, `สวัสดีคุณ ${user.firstName}, สถานะของรายงานหัวข้อ "${report.topic}" ได้ถูกเปลี่ยนเป็น ${status} โดย ${admin.firstName} ${admin.lastName}`, 'flex', userFlexMessage);
           if (!userResult.success) {
             console.error('Failed to send LINE notification to user:', userResult.error);
           }
