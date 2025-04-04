@@ -31,6 +31,7 @@ const AccountSettings = () => {
   const [submitting, setSubmitting] = useState(false);
   const [uploadLoading, setUploadLoading] = useState(false);
   const [image, setImage] = useState(null);
+  const [previewImage, setPreviewImage] = useState(null); // เพิ่ม state สำหรับแสดงตัวอย่างรูปที่เลือก
 
   // เรียกใช้ context สำหรับข้อมูลผู้ใช้
   const { user, updateUser } = useUser();
@@ -74,12 +75,14 @@ const AccountSettings = () => {
         });
 
         // ตั้งค่ารูปโปรไฟล์
-        setProfileImage(
+        const profileImageUrl =
           profileData.profileImage ||
-            profileData.profilePicture ||
-            user.profileImage ||
-            user.profilePicture
-        );
+          profileData.profilePicture ||
+          user.profileImage ||
+          user.profilePicture;
+
+        setProfileImage(profileImageUrl);
+        setPreviewImage(profileImageUrl); // เซ็ตรูปตัวอย่างเป็นรูปโปรไฟล์ปัจจุบันด้วย
       } catch (error) {
         console.error("Error fetching user profile:", error);
         message.error("ไม่สามารถดึงข้อมูลโปรไฟล์ได้");
@@ -96,7 +99,9 @@ const AccountSettings = () => {
             email: user.email || "",
           });
 
-          setProfileImage(user.profileImage || user.profilePicture);
+          const userProfileImage = user.profileImage || user.profilePicture;
+          setProfileImage(userProfileImage);
+          setPreviewImage(userProfileImage);
         }
       } finally {
         setLoading(false);
@@ -152,6 +157,7 @@ const AccountSettings = () => {
 
         // อัพเดต state และ context - ทำให้แน่ใจว่า update ทั้ง profileImage และ profilePicture
         setProfileImage(imageUrl);
+        setPreviewImage(imageUrl); // อัพเดตรูปตัวอย่างด้วย
         updateUser({
           profileImage: imageUrl,
           profilePicture: imageUrl,
@@ -169,34 +175,41 @@ const AccountSettings = () => {
 
         message.success("อัพโหลดรูปโปรไฟล์สำเร็จ (local)");
       }
+
+      // ล้าง image state เพื่อไม่ให้แสดงปุ่ม "อัพโหลดรูปภาพ" หลังจากอัพโหลดสำเร็จ
+      setImage(null);
     } catch (error) {
       console.error("Error uploading profile image:", error);
       message.error("ไม่สามารถอัพโหลดรูปโปรไฟล์ได้");
-
-      // ในกรณีที่มีข้อผิดพลาด ให้สร้าง URL ท้องถิ่นเพื่อแสดงรูปที่เลือก
-      if (image) {
-        const localUrl = URL.createObjectURL(image);
-        setProfileImage(localUrl);
-        updateUser({
-          profileImage: localUrl,
-          profilePicture: localUrl,
-        });
-      }
     } finally {
       setUploadLoading(false);
     }
   };
 
   // ฟังก์ชันใหม่สำหรับจัดการการเลือกไฟล์
-  // const handleFileChange = (e) => {
-  //   const file = e.target.files[0];
-  //   if (file) {
-  //     setImage(file);
-  //     // สร้าง URL ชั่วคราวสำหรับแสดงตัวอย่าง
-  //     const previewURL = URL.createObjectURL(file);
-  //     setProfileImage(previewURL);
-  //   }
-  // };
+  const handleBeforeUpload = (file) => {
+    // ตรวจสอบประเภทไฟล์
+    const isImage = file.type.startsWith("image/");
+    if (!isImage) {
+      message.error("โปรดอัพโหลดไฟล์รูปภาพเท่านั้น!");
+      return Upload.LIST_IGNORE;
+    }
+
+    // ตรวจสอบขนาดไฟล์ (ต้องไม่เกิน 2MB)
+    const isLt2M = file.size / 1024 / 1024 < 2;
+    if (!isLt2M) {
+      message.error("รูปภาพต้องมีขนาดไม่เกิน 2MB!");
+      return Upload.LIST_IGNORE;
+    }
+
+    // สร้าง URL สำหรับแสดงตัวอย่างรูป
+    const previewURL = URL.createObjectURL(file);
+    setPreviewImage(previewURL);
+    setImage(file);
+
+    // return false เพื่อป้องกันการอัพโหลดอัตโนมัติของ antd
+    return false;
+  };
 
   // อัพเดตข้อมูลผู้ใช้
   const handleFinish = async (values) => {
@@ -274,23 +287,21 @@ const AccountSettings = () => {
           phoneNumber: "",
         }}>
         <div className="mb-6 text-center">
-          <div style={{ marginBottom: "16px" }}>
-            <Avatar
-              size={100}
-              src={profileImage}
-              icon={!profileImage && <UserOutlined />}
-            />
+          {/* แสดงรูปตัวอย่าง */}
+          <div className="mb-4">
+            {previewImage ? (
+              <Avatar size={100} src={previewImage} alt="Preview" />
+            ) : (
+              <Avatar size={100} icon={<UserOutlined />} />
+            )}
           </div>
 
-          {/* วิธีที่ 2: ยังคงใช้ Upload component ของ antd */}
+          {/* ส่วนเลือกรูปภาพ */}
           <div className="flex flex-col items-center space-y-4">
             <Upload
               name="profileImage"
               showUploadList={false}
-              beforeUpload={(file) => {
-                setImage(file);
-                return false; // ป้องกันการอัพโหลดอัตโนมัติ
-              }}>
+              beforeUpload={handleBeforeUpload}>
               <Button icon={<UploadOutlined />} style={{ marginTop: 8 }}>
                 เลือกรูปภาพ
               </Button>
@@ -307,10 +318,21 @@ const AccountSettings = () => {
                   border: "none",
                   marginTop: 8,
                 }}
-                onMouseEnter={(e) => (e.target.style.backgroundColor = "#193CB8")}
-                onMouseLeave={(e) => (e.target.style.backgroundColor = "#262362")}>
+                onMouseEnter={(e) =>
+                  (e.target.style.backgroundColor = "#193CB8")
+                }
+                onMouseLeave={(e) =>
+                  (e.target.style.backgroundColor = "#262362")
+                }>
                 อัพโหลดรูปภาพ
               </Button>
+            )}
+
+            {/* แสดงชื่อไฟล์ที่เลือก */}
+            {image && (
+              <div className="text-xs text-gray-500 mt-1">
+                {image.name} ({(image.size / 1024).toFixed(1)} KB)
+              </div>
             )}
           </div>
         </div>

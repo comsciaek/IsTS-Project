@@ -24,6 +24,9 @@ import {
   FileTextOutlined,
   UserOutlined,
   InfoOutlined,
+  CheckCircleOutlined,
+  ClockCircleOutlined,
+  CloseCircleOutlined,
 } from "@ant-design/icons";
 import { Link } from "react-router";
 import TableSkeleton from "../skeletons/TableSkeleton";
@@ -399,16 +402,19 @@ const ContentTable = () => {
       {
         key: "1",
         label: "รอดำเนินการ",
+        icon: <ClockCircleOutlined />,
         onClick: () => handleStatusChange(record, "pending"),
       },
       {
         key: "2",
         label: "เสร็จสิ้น",
+        icon: <CheckCircleOutlined />,
         onClick: () => handleStatusChange(record, "completed"),
       },
       {
         key: "3",
         label: "ปฏิเสธคำร้อง",
+        icon: <CloseCircleOutlined />,
         danger: true,
         onClick: () => handleStatusChange(record, "rejected"),
       },
@@ -515,7 +521,7 @@ const ContentTable = () => {
       render: (_, record) => (
         <Space>
           <Button
-            style={{ borderRadius: "50%", height: "30px", width: "30px"}}
+            style={{ borderRadius: "50%", height: "30px", width: "30px" }}
             onClick={() => showDetailModal(record)}
             icon={<InfoOutlined />}
           />

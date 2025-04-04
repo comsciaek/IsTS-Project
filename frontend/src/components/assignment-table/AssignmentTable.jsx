@@ -19,9 +19,9 @@ import {
   UserOutlined,
   FileTextOutlined,
   MoreOutlined,
-  EditOutlined,
   CheckCircleOutlined,
   CloseCircleOutlined,
+  ClockCircleOutlined,
 } from "@ant-design/icons";
 import axios from "axios";
 import dayjs from "dayjs";
@@ -462,7 +462,7 @@ const AssignmentTable = () => {
         key: "4",
         label: (
           <span onClick={() => onStatusChange(record, "pending")}>
-            <EditOutlined /> รอดำเนินการ
+            <ClockCircleOutlined /> รอดำเนินการ
           </span>
         ),
         disabled: record.status === "pending",

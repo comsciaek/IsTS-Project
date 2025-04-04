@@ -342,14 +342,33 @@ const ChatWindowUser = ({ chat, isMobile }) => {
     setFileList(info.fileList);
   };
 
-  // เช็คขนาดไฟล์ก่อนอัปโหลด
+  // เช็คขนาดไฟล์และประเภทก่อนอัปโหลด
   const beforeUpload = (file) => {
     const isLt10M = file.size / 1024 / 1024 < 10;
     if (!isLt10M) {
       message.error("ไฟล์ต้องมีขนาดไม่เกิน 10MB");
-      return false;
+      return Upload.LIST_IGNORE;
     }
-    return false;
+
+    // ตรวจสอบประเภทไฟล์ที่อนุญาต: รูปภาพ, PDF, และ Word
+    const allowedTypes = [
+      "image/jpeg",
+      "image/png",
+      "image/gif",
+      "application/pdf",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ];
+    const isAllowedFileType = allowedTypes.includes(file.type);
+
+    if (!isAllowedFileType) {
+      message.error(
+        "สามารถอัพโหลดเฉพาะไฟล์รูปภาพ (JPEG/PNG), PDF, หรือ Word (DOC/DOCX) เท่านั้น"
+      );
+      return Upload.LIST_IGNORE;
+    }
+
+    return false; // ป้องกันการอัปโหลดอัตโนมัติ
   };
 
   // ส่งข้อความใหม่พร้อมไฟล์
@@ -722,7 +741,7 @@ const ChatWindowUser = ({ chat, isMobile }) => {
           } text-gray-500`}>
           {chat.status === "completed"
             ? "คำร้องนี้ได้รับการแก้ไขเรียบร้อยแล้ว ไม่สามารถส่งข้อความเพิ่มเติมได้"
-            : "สามารถอัปโหลดไฟล์ได้ไม่เกิน 10MB (รูปภาพ, เอกสาร, ฯลฯ)"}
+            : "สามารถอัพโหลดเฉพาะไฟล์รูปภาพ (JPEG/PNG), PDF, หรือ Word (DOC/DOCX) ขนาดไม่เกิน 10MB"}
         </div>
       </div>
     </div>
