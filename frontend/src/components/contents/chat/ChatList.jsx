@@ -160,7 +160,7 @@ const ChatList = ({ onSelectChat, selectedChat }) => {
           "Error fetching assigned issues:",
           error.response?.data || error.message
         );
-        message.error("ไม่สามารถโหลดข้อมูลได้");
+        message.error("คุณยังไม่มีแชทคำร้อง");
       } finally {
         setLoading(false);
         setRefreshing(false);

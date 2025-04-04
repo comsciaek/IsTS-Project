@@ -21,7 +21,6 @@ import {
   FilePdfOutlined,
   FileWordOutlined,
   FileExcelOutlined,
-  DownloadOutlined,
 } from "@ant-design/icons";
 import { useSocket } from "../../../context/SocketContext";
 import { useUser } from "../../../context/UserContext";
@@ -298,13 +297,15 @@ const ChatWindowUser = ({ chat, isMobile }) => {
     return <FileOutlined />;
   };
 
-  // ฟังก์ชันเรียกดูไฟล์แนบ
-  const renderFile = (fileUrl, fileName) => {
+  // ปรับปรุงฟังก์ชันเรียกดูไฟล์แนบ
+  const renderFile = (fileUrl, fileName, isSelf) => {
     if (!fileUrl) return null;
 
     const extension = fileUrl.split(".").pop().toLowerCase();
     const isImage = ["jpg", "jpeg", "png", "gif"].includes(extension);
+    const isPdf = extension === "pdf";
 
+    // กรณีเป็นรูปภาพ - แสดงในหน้าเว็บโดยตรง
     if (isImage) {
       return (
         <div
@@ -318,20 +319,53 @@ const ChatWindowUser = ({ chat, isMobile }) => {
         </div>
       );
     }
-
-    return (
-      <a
-        href={fileUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="flex items-center text-blue-500 hover:underline mt-2">
-        {getFileIconByType(fileUrl)}
-        <span className="ml-2 break-all">
-          {fileName || fileUrl.split("/").pop()}
-        </span>
-        <DownloadOutlined className="ml-2" />
-      </a>
-    );
+    // กรณีเป็น PDF - แสดง embed PDF viewer
+    else if (isPdf) {
+      return (
+        <div className="flex flex-col space-y-2">
+          <a
+            href={fileUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`flex items-center ${
+              isSelf ? "text-white" : "text-blue-500"
+            }`}>
+            <FilePdfOutlined style={{ marginRight: "8px", color: "#ff4d4f" }} />
+            <span className="underline">
+              {fileName || fileUrl.split("/").pop()}
+            </span>
+          </a>
+          <div
+            className="border rounded overflow-hidden mt-2"
+            style={{ width: "100%", maxWidth: "500px" }}>
+            <iframe
+              src={fileUrl}
+              width="100%"
+              height="300px"
+              title={fileName || "PDF Document"}
+              className="border-0"
+            />
+          </div>
+        </div>
+      );
+    }
+    // กรณีเป็น Word หรือไฟล์อื่นๆ
+    else {
+      return (
+        <div className="flex items-center">
+          {getFileIconByType(fileUrl)}
+          <a
+            href={fileUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`ml-2 underline break-all ${
+              isSelf ? "text-white" : "text-blue-500"
+            }`}>
+            {fileName || fileUrl.split("/").pop()}
+          </a>
+        </div>
+      );
+    }
   };
 
   // จัดการการเลือกไฟล์
@@ -433,7 +467,6 @@ const ChatWindowUser = ({ chat, isMobile }) => {
               },
             }
           );
-
           console.log("File uploaded successfully:", fileUploadResponse.data);
           // เพิ่มข้อมูลไฟล์ลงในข้อความที่จะส่งผ่าน socket
           if (fileUploadResponse.data && fileUploadResponse.data.fileUrl) {
@@ -523,6 +556,7 @@ const ChatWindowUser = ({ chat, isMobile }) => {
     );
   }
 
+  // แก้ไขส่วนการเรนเดอร์ข้อความ
   return (
     <div className="flex flex-col h-full">
       {/* ส่วนหัวแชท */}
@@ -586,12 +620,6 @@ const ChatWindowUser = ({ chat, isMobile }) => {
         ) : (
           messages.map((message, index) => {
             const isSelf = message.senderId === (user.id || user._id);
-            const isImage =
-              message.fileUrl &&
-              message.fileUrl.match(/\.(jpeg|jpg|gif|png)$/i) !== null;
-            const hasOnlyImage =
-              isImage && (!message.text || message.text.trim() === "");
-
             return (
               <div
                 key={index}
@@ -606,51 +634,33 @@ const ChatWindowUser = ({ chat, isMobile }) => {
                     className="mr-2 self-start flex-shrink-0 mt-1"
                   />
                 )}
-                <div className={`${isSelf ? "text-right" : "text-left"}`}>
-                  {/* แสดงกล่องข้อความเฉพาะเมื่อมีข้อความ */}
-                  {message.text && message.text.trim() !== "" && (
-                    <Tooltip
-                      title={
-                        <>
-                          <div>{message.senderName}</div>
-                          <div>{formatTime(message.createdAt)}</div>
-                        </>
-                      }>
-                      <div
-                        className={`inline-block rounded-lg py-1.5 sm:py-2 px-3 sm:px-4 break-words text-sm sm:text-base ${
-                          isSelf
-                            ? "bg-[#262362] text-white"
-                            : "bg-white shadow-sm"
-                        }`}>
-                        {message.text}
-                      </div>
-                    </Tooltip>
-                  )}
-
-                  {/* แสดงไฟล์แนบ */}
-                  {message.fileUrl && (
+                <div
+                  className={`${
+                    isSelf ? "text-right" : "text-left"
+                  } max-w-[80%]`}>
+                  <Tooltip
+                    title={
+                      <>
+                        <div>{message.senderName}</div>
+                        <div>{formatTime(message.createdAt)}</div>
+                      </>
+                    }>
                     <div
-                      className={`${
-                        message.text && message.text.trim() !== "" ? "mt-1" : ""
+                      className={`inline-block rounded-lg py-2 px-3 sm:px-4 break-words text-sm sm:text-base ${
+                        isSelf
+                          ? "bg-[#262362] text-white"
+                          : "bg-white shadow-sm"
                       }`}>
-                      {renderFile(message.fileUrl, message.fileName)}
-                    </div>
-                  )}
+                      {/* แสดงข้อความ (ถ้ามี) */}
+                      {message.text && message.text.trim() !== "" && (
+                        <div className="mb-2">{message.text}</div>
+                      )}
 
-                  {/* ถ้าเป็นรูปภาพเพียงอย่างเดียว ให้แสดง tooltip ที่รูปภาพแทน */}
-                  {hasOnlyImage && (
-                    <div className="mt-1">
-                      <Tooltip
-                        title={
-                          <>
-                            <div>{message.senderName}</div>
-                            <div>{formatTime(message.createdAt)}</div>
-                          </>
-                        }>
-                        <span></span>
-                      </Tooltip>
+                      {/* แสดงไฟล์แนบ (ถ้ามี) และส่งค่า isSelf เข้าไปด้วย */}
+                      {message.fileUrl &&
+                        renderFile(message.fileUrl, message.fileName, isSelf)}
                     </div>
-                  )}
+                  </Tooltip>
                 </div>
               </div>
             );
@@ -732,16 +742,6 @@ const ChatWindowUser = ({ chat, isMobile }) => {
             }}
             size={isMobile ? "middle" : "default"}
           />
-        </div>
-
-        {/* ลดขนาดข้อความขนาดเล็กลงเมื่ออยู่ในโหมดมือถือ */}
-        <div
-          className={`${
-            isMobile ? "mt-0.5 text-2xs" : "mt-1 text-xs"
-          } text-gray-500`}>
-          {chat.status === "completed"
-            ? "คำร้องนี้ได้รับการแก้ไขเรียบร้อยแล้ว ไม่สามารถส่งข้อความเพิ่มเติมได้"
-            : "สามารถอัพโหลดเฉพาะไฟล์รูปภาพ (JPEG/PNG), PDF, หรือ Word (DOC/DOCX) ขนาดไม่เกิน 10MB"}
         </div>
       </div>
     </div>

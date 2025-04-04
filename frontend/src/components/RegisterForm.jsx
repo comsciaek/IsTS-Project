@@ -261,7 +261,25 @@ const RegisterForm = () => {
           <p>รหัสผ่าน</p>
           <Form.Item
             name="password"
-            rules={[{ required: true, message: "กรุณากรอกรหัสผ่าน!" }]}>
+            rules={[
+              { required: true, message: "กรุณากรอกรหัสผ่าน!" },
+              {
+                min: 8,
+                message: "รหัสผ่านต้องมีความยาวอย่างน้อย 8 ตัวอักษร!",
+              },
+              {
+                pattern: /[A-Z]/,
+                message: "รหัสผ่านต้องมีตัวอักษรพิมพ์ใหญ่อย่างน้อย 1 ตัว!",
+              },
+              {
+                pattern: /[a-z]/,
+                message: "รหัสผ่านต้องมีตัวอักษรพิมพ์เล็กอย่างน้อย 1 ตัว!",
+              },
+              {
+                pattern: /[0-9]/,
+                message: "รหัสผ่านต้องมีตัวเลขอย่างน้อย 1 ตัว!",
+              },
+            ]}>
             <Input
               type={passwordVisible ? "text" : "password"}
               placeholder="กรอกรหัสผ่าน"
@@ -278,6 +296,13 @@ const RegisterForm = () => {
               }
             />
           </Form.Item>
+
+          {/* เพิ่มคำอธิบายข้อกำหนดรหัสผ่าน */}
+          <div className="text-xs text-gray-500 mb-4 mt-1">
+            รหัสผ่านต้องมีความยาวอย่างน้อย 8 ตัวอักษร ประกอบด้วย ตัวพิมพ์ใหญ่
+            ตัวพิมพ์เล็ก และตัวเลข
+          </div>
+
           <p>ยืนยันรหัสผ่าน</p>
           <Form.Item
             name="confirmPassword"

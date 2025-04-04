@@ -170,7 +170,7 @@ const UserChatList = ({ onSelectChat, selectedChat }) => {
           "Error fetching user issues:",
           error.response?.data || error.message
         );
-        antMessage.error("ไม่สามารถโหลดข้อมูลได้");
+        antMessage.error("คุณยังไม่มีแชทคำร้อง");
       } finally {
         setLoading(false);
         setRefreshing(false);
