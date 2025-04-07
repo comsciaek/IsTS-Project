@@ -15,6 +15,7 @@ import { Outlet } from "react-router";
 import NotiFications from "../NotiFications";
 import { getUserDisplayName, getUserInitial } from "../../utils/userUtils";
 import { useUser } from "../../context/UserContext";
+import FloatingQrButton from "../FloatingQrButton";
 
 const { Header, Sider } = Layout;
 
@@ -187,6 +188,7 @@ const UsersSidebar = () => {
         <Content style={{ padding: "16px", overflow: "auto" }}>
           <Outlet />
         </Content>
+        <FloatingQrButton />
       </Layout>
     </Layout>
   );

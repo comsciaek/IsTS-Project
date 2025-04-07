@@ -366,26 +366,26 @@ export const SocketProvider = ({ children }) => {
       });
 
       // เพิ่มการรับการแจ้งเตือนข้อความใหม่
-      socketInstance.on("newMessageNotification", (data) => {
-        console.log("New message notification received:", data);
+      // socketInstance.on("newMessageNotification", (data) => {
+      //   console.log("New message notification received:", data);
 
-        const notification = {
-          id:
-            data.id ||
-            `notif_${Date.now()}${Math.random().toString(36).substr(2, 5)}`,
-          issueId: data.issueId,
-          message: data.message,
-          createdAt: data.createdAt || new Date().toISOString(),
-          read: false,
-          type: "info",
-        };
+      //   const notification = {
+      //     id:
+      //       data.id ||
+      //       `notif_${Date.now()}${Math.random().toString(36).substr(2, 5)}`,
+      //     issueId: data.issueId,
+      //     message: data.message,
+      //     createdAt: data.createdAt || new Date().toISOString(),
+      //     read: false,
+      //     type: "info",
+      //   };
 
-        setNotifications((prev) => [notification, ...prev]);
-        displayNotificationMessage(notification);
+      //   setNotifications((prev) => [notification, ...prev]);
+      //   displayNotificationMessage(notification);
 
-        // บันทึกการแจ้งเตือนข้อความใหม่ลงในฐานข้อมูล
-        saveNotificationToServer(notification);
-      });
+      //   // บันทึกการแจ้งเตือนข้อความใหม่ลงในฐานข้อมูล
+      //   saveNotificationToServer(notification);
+      // });
 
       // รับการแจ้งเตือนที่ถูกบันทึกไว้ขณะผู้ใช้ออฟไลน์
       socketInstance.on("storedNotifications", (notifications) => {
