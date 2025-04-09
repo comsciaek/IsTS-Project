@@ -775,6 +775,13 @@ const ChatWindowUser = ({ chat, isMobile }) => {
             size={isMobile ? "middle" : "default"}
           />
         </div>
+        <div
+          className={`${
+            isMobile ? "mt-0.5 text-2xs" : "mt-1 text-xs"
+          } text-gray-500`}>
+          สามารถอัพโหลดเฉพาะไฟล์รูปภาพ (JPEG/PNG), PDF, หรือ Word (DOC/DOCX)
+          ขนาดไม่เกิน 10MB
+        </div>
       </div>
     </div>
   );
