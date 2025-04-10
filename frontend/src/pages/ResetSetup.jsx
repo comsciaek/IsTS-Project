@@ -4,6 +4,7 @@ import { Form, Input, Button, message, Layout, Alert, Spin } from "antd";
 import { KeyOutlined } from "@ant-design/icons";
 import axios from "axios";
 import {jwtDecode} from "jwt-decode"; // Correct import
+import { API_BASE_URL } from "../utils/baseApi"; // Import your API base URL from the utils file
 
 const { Content } = Layout;
 
@@ -58,7 +59,7 @@ const ResetSetup = () => {
       setSuccessMessage(""); // ล้างข้อความสำเร็จก่อนเริ่มการส่งคำขอ
       
       // ส่งข้อมูลให้ครบถ้วนตามที่ API ต้องการ
-      const response = await axios.post("http://172.18.43.39:5000/api/auth/reset-password", {
+      const response = await axios.post(`${API_BASE_URL}/auth/reset-password`, {
         token: token,
         email: email,
         newPassword: values.newPassword,

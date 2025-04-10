@@ -25,11 +25,9 @@ import dayjs from "dayjs";
 import { useUser } from "../context/UserContext";
 import { useEffect, useState } from "react";
 import axios from "axios";
+import { API_BASE_URL } from "../utils/baseApi"; // Import your API base URL from the utils file
 
 const { Text, Paragraph } = Typography;
-
-// API Base URL
-const API_BASE_URL = "http://172.18.43.39:5000/api";
 
 // กำหนดสีของสถานะ
 const statusColors = {

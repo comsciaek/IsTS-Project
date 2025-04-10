@@ -31,6 +31,7 @@ import { useSocket } from "../../../context/SocketContext";
 import { useUser } from "../../../context/UserContext";
 import axios from "axios";
 import PropTypes from "prop-types";
+import { API_BASE_URL } from "../../../utils/baseApi";
 
 const { Text } = Typography;
 
@@ -457,7 +458,7 @@ const ChatWindow = ({ chat, isMobile }) => {
 
         try {
           fileUploadResponse = await axios.post(
-            "http://172.18.43.39:5000/api/upload/chat",
+            `${API_BASE_URL}/upload/chat`,
             formData,
             {
               headers: {
@@ -571,7 +572,7 @@ const ChatWindow = ({ chat, isMobile }) => {
 
       // ส่งคำขอไปยัง API เพื่อเปลี่ยนสถานะคำร้องเป็น "completed"
       await axios.put(
-        `http://172.18.43.39:5000/api/reports/edit/${chat.issueId}`, //404
+        `${API_BASE_URL}/reports/edit/${chat.issueId}`, //404
         { status: "completed" },
         {
           headers: {

@@ -12,6 +12,7 @@ import {
 import { UserOutlined } from "@ant-design/icons";
 import PropTypes from "prop-types";
 import axios from "axios";
+import { API_BASE_URL } from "../../utils/baseApi"
 
 const { Option } = Select;
 const { Title, Text } = Typography;
@@ -23,7 +24,6 @@ const AssignAdminModal = ({
   admins,
   loadingAdmins,
   onRefresh,
-  API_BASE_URL,
 }) => {
   const [form] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
@@ -242,7 +242,6 @@ AssignAdminModal.propTypes = {
   admins: PropTypes.array.isRequired,
   loadingAdmins: PropTypes.bool,
   onRefresh: PropTypes.func,
-  API_BASE_URL: PropTypes.string.isRequired,
 };
 
 export default AssignAdminModal;

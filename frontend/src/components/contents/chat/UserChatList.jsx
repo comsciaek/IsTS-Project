@@ -9,6 +9,7 @@ import axios from "axios";
 import { useSocket } from "../../../context/SocketContext";
 import { useUser } from "../../../context/UserContext";
 import PropTypes from "prop-types";
+import { API_BASE_URL } from "../../../utils/baseApi";
 
 const { Search } = Input;
 
@@ -62,7 +63,7 @@ const UserChatList = ({ onSelectChat, selectedChat }) => {
 
         // ดึงคำร้องของผู้ใช้
         const response = await axios.get(
-          `http://172.18.43.39:5000/api/reports/user/me`,
+          `${API_BASE_URL}/reports/user/me`,
           {
             headers: { Authorization: `Bearer ${token}` },
           }
@@ -99,7 +100,7 @@ const UserChatList = ({ onSelectChat, selectedChat }) => {
 
             // แก้ไข endpoint ให้ถูกต้อง - ใช้ endpoint เดียวกับ admin แต่เพิ่ม user
             const chatResponse = await axios.get(
-              `http://172.18.43.39:5000/api/reports/chat/${issueId}/unread-count`,
+              `${API_BASE_URL}/reports/chat/${issueId}/unread-count`,
               {
                 headers: { Authorization: `Bearer ${token}` },
               }
@@ -395,7 +396,7 @@ const UserChatList = ({ onSelectChat, selectedChat }) => {
 
       // เรียก API เพื่อทำเครื่องหมายว่าอ่านแล้ว
       await axios.post(
-        `http://172.18.43.39:5000/api/reports/chat/${issueId}/mark-read`,
+        `${API_BASE_URL}/reports/chat/${issueId}/mark-read`,
         {},
         {
           headers: { Authorization: `Bearer ${token}` },

@@ -26,6 +26,8 @@ import { useSocket } from "../../../context/SocketContext";
 import { useUser } from "../../../context/UserContext";
 import axios from "axios";
 import PropTypes from "prop-types";
+import { API_BASE_URL } from "../../../utils/baseApi";
+
 
 const { Text } = Typography;
 
@@ -490,7 +492,7 @@ const ChatWindowUser = ({ chat, isMobile }) => {
 
         try {
           fileUploadResponse = await axios.post(
-            "http://172.18.43.39:5000/api/upload/chat",
+            `${API_BASE_URL}/upload/chat`,
             formData,
             {
               headers: {

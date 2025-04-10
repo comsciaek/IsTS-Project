@@ -2,6 +2,7 @@ import { Form, Input, Button, message, Modal } from "antd";
 import axios from "axios";
 import { ExclamationCircleFilled } from "@ant-design/icons";
 import { useNavigate } from "react-router";
+import { API_BASE_URL } from "../../utils/baseApi"; // Import your API base URL from the utils file
 
 const { confirm } = Modal;
 
@@ -37,7 +38,7 @@ const ChangePassword = () => {
     try {
       // Call the API to change the password
       const response = await axios.post(
-        "http://172.18.43.39:5000/api/auth/change-password",
+        `${API_BASE_URL}/auth/change-password`,
         {
           currentPassword: values.currentPassword,
           newPassword: values.newPassword,

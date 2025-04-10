@@ -30,13 +30,12 @@ import {
 import axios from "axios";
 import dayjs from "dayjs";
 import ExportButton from "../components/export/ExportButton";
+import { API_BASE_URL } from "../utils/baseApi"; // Import your API base URL from the utils file
 
 const { Content } = Layout;
 const { Title, Text } = Typography;
 const { Option } = Select;
 
-// API Base URL
-const API_BASE_URL = "http://172.18.43.39:5000/api";
 
 const Reports = () => {
   const [reports, setReports] = useState([]);

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Form, Input, Button, Layout, Alert, Result } from "antd";
 import { Link } from "react-router";
 import axios from "axios";
+import { API_BASE_URL } from "../utils/baseApi"; // Import your API base URL from the utils file
 
 const { Content } = Layout;
 
@@ -17,7 +18,7 @@ const ForgotPassword = () => {
       setError(""); // ล้างข้อความ error เก่า
 
       const response = await axios.post(
-        "http://172.18.43.39:5000/api/auth/forgot-password",
+        `${API_BASE_URL}/auth/forgot-password`,
         {
           email: values.email,
         }

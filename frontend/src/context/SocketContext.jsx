@@ -10,13 +10,13 @@ import PropTypes from "prop-types";
 import { useUser } from "./UserContext";
 import { message } from "antd";
 import axios from "axios"; // เพิ่มการนำเข้า axios สำหรับการเรียกใช้ API
+import { API_BASE_URL } from "../utils/baseApi"; // นำเข้า base API URL
 
 // สร้าง context
 export const SocketContext = createContext();
 
 // URL ของ Socket.io server และ API
 const SOCKET_URL = "http://172.18.43.39:5000";
-const API_BASE_URL = "http://172.18.43.39:5000/api";
 
 export const SocketProvider = ({ children }) => {
   const [socket, setSocket] = useState(null);

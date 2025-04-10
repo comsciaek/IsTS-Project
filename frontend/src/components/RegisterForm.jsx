@@ -8,6 +8,7 @@ import {
   employeeIdOptions,
 } from "../utils/optionsData";
 import axios from "axios";
+import { API_BASE_URL } from "../utils/baseApi"; // Import your API base URL from the utils file
 
 const formItemLayout = {
   labelCol: {
@@ -100,7 +101,7 @@ const RegisterForm = () => {
       // console.log(" Sending data:", dataToSubmit);
 
       const response = await axios.post(
-        "http://172.18.43.39:5000/api/auth/register",
+        `${API_BASE_URL}/auth/register`,
         dataToSubmit,
         { headers: { "Content-Type": "application/json" } }
       );

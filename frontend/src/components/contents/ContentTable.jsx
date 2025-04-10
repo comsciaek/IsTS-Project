@@ -34,12 +34,12 @@ import axios from "axios";
 import dayjs from "dayjs";
 import { useUser } from "../../context/UserContext";
 import { useSocket } from "../../context/SocketContext"; // Add missing import
-
+import { API_BASE_URL } from "../../utils/baseApi"
 const { Content } = Layout;
 const { Search } = Input;
 
 // API Base URL
-const API_BASE_URL = "http://172.18.43.39:5000/api";
+
 
 const ContentTable = () => {
   const {

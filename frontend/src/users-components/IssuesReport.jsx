@@ -24,9 +24,7 @@ import IssueCard from "./IssueCard";
 import { Content } from "antd/es/layout/layout";
 import axios from "axios";
 import { useUser } from "../context/UserContext";
-
-// API Base URL
-const API_BASE_URL = "http://172.18.43.39:5000/api";
+import { API_BASE_URL } from "../utils/baseApi"; // Import your API base URL from the utils file
 
 const IssuesReport = () => {
   const {

@@ -9,7 +9,7 @@ import axios from "axios";
 import { useSocket } from "../../../context/SocketContext";
 import { useUser } from "../../../context/UserContext";
 import PropTypes from "prop-types";
-
+import { API_BASE_URL } from "../../../utils/baseApi";
 const { Search } = Input;
 
 // Import message component สำหรับการแสดงข้อความแจ้งเตือน
@@ -62,7 +62,7 @@ const ChatList = ({ onSelectChat, selectedChat }) => {
 
         // ดึงคำร้องที่ถูกมอบหมายให้กับ Admin/SuperAdmin นี้
         const response = await axios.get(
-          `http://172.18.43.39:5000/api/reports/admin/assigned/${userId}`,
+          `${API_BASE_URL}/reports/admin/assigned/${userId}`,
           {
             headers: { Authorization: `Bearer ${token}` },
           }
@@ -90,7 +90,7 @@ const ChatList = ({ onSelectChat, selectedChat }) => {
 
             // แก้ไข endpoint ให้ถูกต้อง
             const chatResponse = await axios.get(
-              `http://172.18.43.39:5000/api/reports/chat/${issueId}/unread-count`,
+              `${API_BASE_URL}/reports/chat/${issueId}/unread-count`,
               {
                 headers: { Authorization: `Bearer ${token}` },
               }
@@ -306,7 +306,7 @@ const ChatList = ({ onSelectChat, selectedChat }) => {
 
       // เรียก API เพื่อทำเครื่องหมายว่าอ่านแล้ว
       await axios.post(
-        `http://172.18.43.39:5000/api/reports/chat/${issueId}/mark-read`,
+        `${API_BASE_URL}/reports/chat/${issueId}/mark-read`,
         {},
         {
           headers: { Authorization: `Bearer ${token}` },

@@ -4,6 +4,7 @@
  */
 
 import axios from "axios";
+import { API_BASE_URL } from "./baseApi"; // Adjust the import path as necessary
 
 export const testLoginAPI = async (employeeId, password) => {
   try {
@@ -13,7 +14,7 @@ export const testLoginAPI = async (employeeId, password) => {
     });
 
     const response = await axios.post(
-      "http://172.18.43.39:5000/api/auth/login",
+      `${API_BASE_URL}/auth/login`,
       {
         employeeId,
         password,

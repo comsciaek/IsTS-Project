@@ -31,13 +31,14 @@ import AssignAdminModal from "./AssignAdminModal";
 import ReportDetailModal from "./ReportDetailModal";
 import TableSkeleton from "../skeletons/TableSkeleton";
 import { useSocket } from "../../context/SocketContext";
+import { API_BASE_URL } from "../../utils/baseApi"
 // import { useUser } from "../../context/UserContext"; // Add missing import
 
 const { Content } = Layout;
 const { Search } = Input;
 
 // API Base URL
-const API_BASE_URL = "http://172.18.43.39:5000/api";
+
 
 const AssignmentTable = () => {
   const {

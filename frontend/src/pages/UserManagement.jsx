@@ -23,8 +23,7 @@ import {
 } from "@ant-design/icons";
 import axios from "axios";
 import dayjs from "dayjs";
-
-const API_BASE_URL = "http://172.18.43.39:5000/api";
+import { API_BASE_URL } from "../utils/baseApi"; // Import your API base URL from the utils file
 
 const UserManagement = () => {
   const [users, setUsers] = useState([]);

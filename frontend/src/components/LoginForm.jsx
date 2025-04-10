@@ -8,6 +8,7 @@ import {
   diagnoseNavigationIssues,
 } from "../utils/debugUtils";
 import { useUser } from "../context/UserContext";
+import { API_BASE_URL } from "../utils/baseApi"; // Import your API base URL from the utils file
 
 const formItemLayout = {
   labelCol: {
@@ -78,7 +79,7 @@ const LoginForm = () => {
 
       // เรียก API เพื่อเข้าสู่ระบบ
       const response = await axios.post(
-        "http://172.18.43.39:5000/api/auth/login",
+        `${API_BASE_URL}/auth/login`,
         values
       );
       const data = response.data;

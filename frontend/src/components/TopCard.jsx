@@ -6,9 +6,7 @@ import {
 import { Card, Col, Row, Statistic, Spin } from "antd";
 import { useState, useEffect } from "react";
 import axios from "axios";
-
-// API Base URL
-const API_BASE_URL = "http://172.18.43.39:5000/api";
+import { API_BASE_URL } from "../utils/baseApi"; // Import your API base URL from the utils file
 
 const TopCard = () => {
   const [stats, setStats] = useState({
