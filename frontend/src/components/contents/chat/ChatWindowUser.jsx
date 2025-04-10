@@ -28,7 +28,6 @@ import axios from "axios";
 import PropTypes from "prop-types";
 import { API_BASE_URL } from "../../../utils/baseApi";
 
-
 const { Text } = Typography;
 
 const ChatWindowUser = ({ chat, isMobile }) => {
@@ -139,10 +138,18 @@ const ChatWindowUser = ({ chat, isMobile }) => {
   useEffect(() => {
     if (!socket || !chat || !chat.issueId) return;
 
+    let isRefreshing = false;
+
     // ฟังก์ชันจัดการเมื่อมีการอัปเดตสถานะคำร้อง
     const handleStatusUpdate = (data) => {
-      if (data.issueId === chat.issueId && data.status === "completed") {
+      if (
+        data.issueId === chat.issueId &&
+        data.status === "completed" &&
+        !isRefreshing
+      ) {
         console.log("Report status changed to completed, refreshing page...");
+        isRefreshing = true; // ตั้งค่าเป็น true เพื่อป้องกันการรีเฟรชซ้ำ
+
         message.success(
           "คำร้องได้รับการดำเนินการเสร็จสิ้นแล้ว กำลังรีเฟรชหน้า..."
         );
@@ -154,16 +161,23 @@ const ChatWindowUser = ({ chat, isMobile }) => {
       }
     };
 
-    // รับเหตุการณ์การเปลี่ยนแปลงสถานะคำร้องจากหลายช่องทาง (จากที่กำหนดใน SocketContext)
-    socket.on("issue_status_changed", handleStatusUpdate);
-    socket.on("reportStatusUpdate", handleStatusUpdate);
-    socket.on("statusUpdate", handleStatusUpdate);
+    const statusEvents = [
+      "issue_status_changed",
+      "reportStatusUpdate",
+      "statusUpdate",
+    ];
+
+    // ลงทะเบียนรับเหตุการณ์ทั้งหมด
+    statusEvents.forEach((event) => {
+      socket.on(event, handleStatusUpdate);
+    });
 
     // คืนค่าฟังก์ชันทำความสะอาด
     return () => {
-      socket.off("issue_status_changed", handleStatusUpdate);
-      socket.off("reportStatusUpdate", handleStatusUpdate);
-      socket.off("statusUpdate", handleStatusUpdate);
+      // ยกเลิกการรับเหตุการณ์ทั้งหมด
+      statusEvents.forEach((event) => {
+        socket.off(event, handleStatusUpdate);
+      });
     };
   }, [socket, chat]);
 
