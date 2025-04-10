@@ -58,7 +58,7 @@ const Reports = () => {
         },
       });
 
-      console.log("All reports response:", response.data);
+      // console.log("All reports response:", response.data);
 
       let reportsData = [];
       if (response.data && Array.isArray(response.data.data)) {
@@ -117,7 +117,7 @@ const Reports = () => {
 
       setReports(formattedReports);
       setFilteredReports(formattedReports);
-      console.log("Formatted reports:", formattedReports);
+      // console.log("Formatted reports:", formattedReports);
     } catch (error) {
       console.error("Error fetching reports:", error);
       message.error("ไม่สามารถดึงข้อมูลรายงานได้");
