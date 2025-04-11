@@ -371,30 +371,30 @@ const ChatWindowUser = ({ chat, isMobile }) => {
     else if (isPdf) {
       return (
         <div className="flex flex-col space-y-2">
-          <a
-            href={fileUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={`flex items-center ${
-              isSelf ? "text-white" : "text-blue-500"
-            }`}>
-            <FilePdfOutlined style={{ marginRight: "8px", color: "#ff4d4f" }} />
-            <span className="underline">
-              {fileName || fileUrl.split("/").pop()}
-            </span>
-          </a>
-          <div
-            className="border rounded overflow-hidden mt-2"
-            style={{ width: "100%", maxWidth: "500px" }}>
-            <iframe
-              src={fileUrl}
-              width="100%"
-              height="300px"
-              title={fileName || "PDF Document"}
-              className="border-0"
-            />
-          </div>
-        </div>
+  <a
+    href={fileUrl}
+    target="_blank"
+    rel="noopener noreferrer"
+    className={`flex items-center ${
+      isSelf ? "text-white" : "text-blue-500"
+    }`}>
+    <FilePdfOutlined style={{ marginRight: "8px", color: "#ff4d4f" }} />
+    <span className="underline truncate" style={{ maxWidth: isMobile ? "180px" : "300px" }}>
+      {fileName || fileUrl.split("/").pop()}
+    </span>
+  </a>
+  <div
+    className="border rounded overflow-hidden mt-2"
+    style={{ width: "100%", maxWidth: isMobile ? "280px" : "500px" }}>
+    <iframe
+      src={fileUrl}
+      width="100%"
+      height={isMobile ? "300px" : "300px"}
+      title={fileName || "PDF Document"}
+      className="border-0"
+    />
+  </div>
+</div>
       );
     }
     // กรณีเป็น Word หรือไฟล์อื่นๆ

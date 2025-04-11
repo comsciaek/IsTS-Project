@@ -64,7 +64,7 @@ const UserManagement = () => {
         userData = [];
       }
 
-      console.log("Fetched users:", userData);
+      // console.log("Fetched users:", userData);
       setUsers(userData);
     } catch (error) {
       console.error("Error fetching users:", error);

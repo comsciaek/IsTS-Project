@@ -112,7 +112,7 @@ const IssuesReport = () => {
   };
 
   const handleRatingChange = (issueId, newRating) => {
-    console.log(`Rating changed for issue ${issueId} to ${newRating}`);
+    // console.log(`Rating changed for issue ${issueId} to ${newRating}`);
 
     // อัปเดต state เฉพาะหน้าทันที
     setIssues((prevIssues) =>

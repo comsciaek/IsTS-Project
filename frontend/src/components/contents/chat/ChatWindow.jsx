@@ -149,8 +149,7 @@ const ChatWindow = ({ chat, isMobile }) => {
     const handleNewMessage = (messageData) => {
       // ตรวจสอบว่าข้อความเป็นของแชทนี้หรือไม่
       if (messageData.issueId === chat.issueId) {
-        console.log("Message data received:", messageData);
-
+        // console.log("Message data received:", messageData);
         // เช็คว่าเป็นข้อความที่เรามีอยู่แล้วหรือไม่ เพื่อป้องกัน duplicate
         setMessages((prevMessages) => {
           // 1. ตรวจสอบ id ที่ตรงกันหรือ tempId ที่อาจตรงกัน
@@ -312,17 +311,19 @@ const ChatWindow = ({ chat, isMobile }) => {
               isSelf ? "text-white" : "text-blue-500"
             }`}>
             <FilePdfOutlined style={{ marginRight: "8px", color: "#ff4d4f" }} />
-            <span className="underline">
+            <span
+              className="underline truncate"
+              style={{ maxWidth: isMobile ? "180px" : "300px" }}>
               {fileName || fileUrl.split("/").pop()}
             </span>
           </a>
           <div
             className="border rounded overflow-hidden mt-2"
-            style={{ width: "100%", maxWidth: "500px" }}>
+            style={{ width: "100%", maxWidth: isMobile ? "280px" : "500px" }}>
             <iframe
               src={fileUrl}
               width="100%"
-              height="300px"
+              height={isMobile ? "300px" : "300px"}
               title={fileName || "PDF Document"}
               className="border-0"
             />
