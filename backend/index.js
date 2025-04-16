@@ -20,6 +20,9 @@ import cron from 'node-cron';
 import axios from 'axios';
 import { createHmac } from 'crypto';
 import { updateReportStatus } from './utils/reportUtils.js';
+import cronRouter from './routes/cron.js'; // เปลี่ยนเส้นทางตามที่คุณต้องการ
+
+
 
 dotenv.config();
 
@@ -46,6 +49,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/reports', reportRoutes(io));
 app.use('/api/upload', uploadRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/', cronRouter);
 
 // Channel Secret และ Access Token จาก LINE Developers Console
 const CHANNEL_SECRET = process.env.CHANNEL_SECRET;
