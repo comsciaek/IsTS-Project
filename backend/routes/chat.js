@@ -53,6 +53,8 @@ router.post('/send/:issueId', protect, upload.single('file'), async (req, res) =
       senderId: userId,
       message: message || '',
       file: fileUrl,
+      fileName: req.file ? req.file.originalname : null,
+  
       createdAt: new Date(),
     });
     await chatMessage.save();
