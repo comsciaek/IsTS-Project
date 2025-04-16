@@ -19,7 +19,7 @@ const chatSchema = new mongoose.Schema({
   },
   file: {
     type: String,
-    default: '', // เก็บ URL ของไฟล์ เช่น http://172.18.43.39:5000/uploads/chat/filename.jpg
+    default: '', 
   },
   readBy: [
     { type: mongoose.Schema.Types.ObjectId, 

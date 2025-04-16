@@ -11,7 +11,11 @@ import mongoose from 'mongoose';
 import { sendMessage } from '../utils/lineNotification.js'; // เพิ่ม import ฟังก์ชันส่ง LINE
 import axios from 'axios';
 import { sendLineNotification } from '../utils/lineNotification.js';
+import dotenv from 'dotenv';
 
+dotenv.config();
+
+const backendUrl = process.env.API_BASE_URL || 5000; // ใช้พอร์ตที่คุณกำหนดใน .env
 const router = express.Router();
 
 // ตั้งค่าโฟลเดอร์สำหรับเก็บไฟล์แนบ (เช่น reports)
@@ -117,7 +121,7 @@ export default (io) => {
 
       let fileUrl = '';
       if (req.file) {
-        fileUrl = `http://172.18.43.39:5000/uploads/reports/${req.file.filename}`;
+        fileUrl = `${process.env.API_BASE_URL}/uploads/reports/${req.file.filename}`;
       }
 
       const report = await Report.create({
@@ -356,7 +360,7 @@ router.put('/edit/:issueId', protect, upload.single('file'), async (req, res) =>
           console.error('Error deleting old report file:', error.message);
         }
       }
-      fileUrl = `http://172.18.43.39:5000/uploads/reports/${req.file.filename}`;
+      fileUrl = `${process.env.API_BASE_URL}/uploads/reports/${req.file.filename}`;
     }
 
     const updatedReport = await Report.findByIdAndUpdate(

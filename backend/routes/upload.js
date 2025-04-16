@@ -4,6 +4,11 @@ import { upload } from '../utils/multer.js'; // ใช้เส้นทาง�
 import path from 'path';
 import fs from 'fs';
 
+import dotenv from 'dotenv';
+dotenv.config();
+
+const backendUrl = process.env;
+
 const router = express.Router();
 const chatUploadDir = path.join(process.cwd(), 'uploads', 'chat');
 
@@ -14,7 +19,7 @@ router.post('/chat', protect, upload.single('file'), async (req, res) => {
       return res.status(400).json({ message: 'No file uploaded' });
     }
 
-    const fileUrl = `http://172.18.43.39:5000/uploads/chat/${req.file.filename}`;
+    const fileUrl = `${process.env.API_BASE_URL}/uploads/chat/${req.file.filename}`;
 
     return res.status(200).json({
       message: 'File uploaded successfully',

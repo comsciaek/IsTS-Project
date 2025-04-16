@@ -5,7 +5,12 @@ import Report from '../model/Report.js';
 import Notification from '../model/Notification.js';
 import { protect } from '../auth/middleware.js';
 import upload from '../middleware/multerConfig.js';
+import backendUrl from '../config/backendUrl.js';
+import dotenv from 'dotenv';
 
+dotenv.config();
+
+const backendPort = process.env.API_BASE_URL || 5000; // ใช้พอร์ตที่คุณกำหนดใน .env
 const router = express.Router();
 
 // ส่งข้อความในแชท
@@ -40,7 +45,7 @@ router.post('/send/:issueId', protect, upload.single('file'), async (req, res) =
 
     let fileUrl = null;
     if (req.file) {
-      fileUrl = `http://172.18.43.39:5000/uploads/chats/${req.file.filename}`;
+      fileUrl = `${process.env.API_BASE_URL}/uploads/chats/${req.file.filename}`;
     }
 
     const chatMessage = new Chat({

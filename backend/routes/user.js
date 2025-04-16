@@ -5,7 +5,8 @@ import multer from 'multer';
 import fs from 'fs';
 import path from 'path';
 import mongoose from 'mongoose';
-
+import dotenv from 'dotenv';
+dotenv.config();
 
 const router = express.Router();
 
@@ -146,7 +147,7 @@ router.put('/profile/:id', protect, (req, res, next) => {
         }
       }
 
-      imageUrl = `http://172.18.43.39:5000/uploads/profile/${req.file.filename}`;
+      const newLocal = imageUrl = `${process.env.API_BASE_URL}/uploads/profile/${req.file.filename}`;
       updatedData.profileImage = imageUrl;
     }
 

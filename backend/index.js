@@ -22,8 +22,6 @@ import { createHmac } from 'crypto';
 import { updateReportStatus } from './utils/reportUtils.js';
 import cronRouter from './routes/cron.js'; // เปลี่ยนเส้นทางตามที่คุณต้องการ
 
-
-
 dotenv.config();
 
 const app = express();
@@ -31,7 +29,7 @@ const server = http.createServer(app);
 const io = initializeSocket(server);
 
 app.use(cors({
-  origin: ['http://localhost:5000', 'http://localhost:5173', 'http://localhost:5500'],
+  origin: [process.env.API_BASE_URL, 'http://localhost:5173', 'http://localhost:5500'],
 }));
 app.use(express.json());
 app.use('/uploads', express.static('uploads'));

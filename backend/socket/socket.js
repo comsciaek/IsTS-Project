@@ -4,6 +4,9 @@ import mongoose from 'mongoose';
 import models from '../model/index.js'; // ใช้ models/index.js เพื่อรวม models
 import axios from 'axios';
 import { updateReportStatus } from '../utils/reportUtils.js';
+import  dotenv from 'dotenv';
+
+dotenv.config();
 
 const { User, Report, Chat, Notification } = models; // ลบ UserLink ออก
 
@@ -72,7 +75,7 @@ const sendMessage = async (lineUserId, message, type = 'text', flexMessage = nul
 const initializeSocket = (server) => {
   const io = new Server(server, {
     cors: {
-      origin: ['http://172.18.43.39:5000', 'http://localhost:5173', 'http://127.0.0.1:5500'],
+      origin: [`${process.env.API_BASE_URL}`, 'http://localhost:5173', 'http://127.0.0.1:5500'],
       methods: ['GET', 'POST', 'PUT', 'DELETE'],
       credentials: true,
     },
